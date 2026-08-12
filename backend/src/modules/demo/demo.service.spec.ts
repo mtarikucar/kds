@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DemoService } from './demo.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlanProjectorService } from '../entitlements/plan-projector.service';
+import { TenantMarketplaceService } from '../marketplace/tenant-marketplace.service';
 import {
   mockPrismaClient,
   MockPrismaClient,
@@ -26,15 +27,18 @@ describe('DemoService', () => {
   let service: DemoService;
   let prisma: MockPrismaClient;
   let projector: { projectTenant: jest.Mock };
+  let tenantMarketplace: { purchase: jest.Mock };
 
   beforeEach(async () => {
     prisma = mockPrismaClient();
     projector = { projectTenant: jest.fn().mockResolvedValue(undefined) };
+    tenantMarketplace = { purchase: jest.fn().mockResolvedValue({ id: 'ta-x' }) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DemoService,
         { provide: PrismaService, useValue: prisma },
         { provide: PlanProjectorService, useValue: projector },
+        { provide: TenantMarketplaceService, useValue: tenantMarketplace },
       ],
     }).compile();
     service = module.get(DemoService);
@@ -296,12 +300,16 @@ describe('DemoService', () => {
 
       await service.ensureDemoTenant();
 
-      const rows = (prisma.tenantAddOn.createMany as jest.Mock).mock.calls[0][0]
-        .data;
-      expect(rows.map((r: any) => r.addOnId).sort()).toEqual(['p-lic', 'p-sms']);
-      // Comped, not sold: free, auditable, and never a real payment.
-      expect(rows.every((r: any) => r.origin === 'comp')).toBe(true);
-      expect(rows.every((r: any) => r.chargedCents === 0)).toBe(true);
+      // Through purchase(), NOT a raw insert: that path stamps the
+      // anniversary anchor. Writing rows directly left the demo holding a live
+      // licence with no anchor, the snapshot reported "none", and the store
+      // added a SECOND licence to every basket — which checkout refused,
+      // failing the whole purchase.
+      const codes = tenantMarketplace.purchase.mock.calls.map((c) => c[1].addOnCode);
+      expect(codes.sort()).toEqual(['license_annual', 'sms_integration']);
+      expect(tenantMarketplace.purchase.mock.calls[0][3]).toMatchObject({
+        comp: expect.objectContaining({ reason: expect.any(String) }),
+      });
       expect(projector.projectTenant).toHaveBeenCalledWith('demo-tenant');
     });
 
@@ -344,7 +352,7 @@ describe('DemoService', () => {
 
       await service.ensureDemoTenant();
 
-      expect(prisma.tenantAddOn.createMany).not.toHaveBeenCalled();
+      expect(tenantMarketplace.purchase).not.toHaveBeenCalled();
       expect(projector.projectTenant).not.toHaveBeenCalled();
     });
 
@@ -359,7 +367,7 @@ describe('DemoService', () => {
       await expect(service.ensureDemoTenant()).resolves.toMatchObject({
         id: 'demo-admin',
       });
-      expect(prisma.tenantAddOn.createMany).not.toHaveBeenCalled();
+      expect(tenantMarketplace.purchase).not.toHaveBeenCalled();
       expect(prisma.tenant.update).toHaveBeenCalled();
     });
   });

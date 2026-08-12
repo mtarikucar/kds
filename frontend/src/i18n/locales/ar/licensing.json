@@ -92,7 +92,8 @@
     "decrease": "إنقاص الكمية",
     "pay": "ادفع",
     "reviewBill": "عرض الفاتورة",
-    "selectedCount": "تم تحديد {{count}}"
+    "selectedCount": "تم تحديد {{count}}",
+    "maxReached": "بلغ الحد الأقصى"
   },
   "invoices": {
     "title": "الفواتير",

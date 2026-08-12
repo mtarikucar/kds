@@ -4,6 +4,7 @@ import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PlanProjectorService } from "../entitlements/plan-projector.service";
+import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
 import { DEMO_PLAN_NAME } from "./demo.constants";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { UserRole } from "../../common/constants/roles.enum";
@@ -87,6 +88,7 @@ export class DemoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projector: PlanProjectorService,
+    private readonly tenantMarketplace: TenantMarketplaceService,
   ) {}
 
   /**
@@ -201,6 +203,10 @@ export class DemoService {
         status: "published",
         OR: [{ kind: "license" }, { kind: "integration" }],
       },
+      // The licence first: purchase() stamps the anniversary anchor off it,
+      // and the projector suppresses every requiresLicense product until a
+      // licence PRODUCT is owned.
+      orderBy: { kind: "asc" },
       select: { id: true, code: true, kind: true },
     });
     if (wanted.length === 0) return 0;
@@ -217,33 +223,47 @@ export class DemoService {
     const missing = wanted.filter((w) => !heldIds.has(w.id));
     if (missing.length === 0) return 0;
 
-    const now = new Date();
-    // A decade out: the demo has no anniversary, no renewal cycle and nobody
-    // to invoice, and an expiring row would darken the demo on a date nobody
-    // is watching.
-    const periodEnd = new Date(now.getTime() + 3650 * 24 * 3600 * 1000);
-
-    await this.prisma.tenantAddOn.createMany({
-      data: missing.map((m) => ({
-        tenantId,
-        addOnId: m.id,
-        quantity: 1,
-        status: "active",
-        origin: "comp",
-        compReason: "Demo restaurant — every screen reachable",
-        chargedCents: 0,
-        activatedAt: now,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      })),
-      skipDuplicates: true,
-    });
-    this.logger.warn(
-      `Demo tenant ${tenantId}: comped ${missing.length} product(s) — ${missing
-        .map((m) => m.code)
-        .join(", ")}`,
-    );
-    return missing.length;
+    // Through purchase(), NOT a raw row insert.
+    //
+    // The first cut wrote TenantAddOn rows directly and skipped everything
+    // purchase() does around them — including stamping `licenseAnchorAt`. The
+    // demo ended up holding a live licence with no anchor, the licensing
+    // snapshot read the anchor to decide licence state and reported "none",
+    // and the storefront duly added a SECOND licence to every basket, which
+    // checkout refused as already-owned — taking the module the visitor
+    // actually wanted down with it.
+    let created = 0;
+    for (const product of missing) {
+      try {
+        await this.tenantMarketplace.purchase(
+          tenantId,
+          { addOnCode: product.code, quantity: 1 },
+          undefined,
+          {
+            comp: {
+              actorId: "system:demo-seed",
+              reason: "Demo restaurant — every screen reachable",
+            },
+          },
+        );
+        created += 1;
+      } catch (err) {
+        // One unsellable product must not stop the demo coming up. A draft or
+        // archived catalog row, or a dependency this environment lacks, is a
+        // catalog problem — not a reason to serve a broken demo.
+        this.logger.warn(
+          `Demo tenant ${tenantId}: could not comp ${product.code} — ${
+            (err as Error).message
+          }`,
+        );
+      }
+    }
+    if (created > 0) {
+      this.logger.warn(
+        `Demo tenant ${tenantId}: comped ${created} product(s) through the purchase path`,
+      );
+    }
+    return created;
   }
 
   /** The override map, in the projector's grant-mode shape. */

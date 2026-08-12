@@ -45,7 +45,7 @@ const LICENCE_CODE = 'license_annual';
 const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   const { t } = useTranslation(['licensing', 'common']);
   const { data: products, isLoading } = useCatalogPricing();
-  const { owned, license, snapshot } = useEntitlements();
+  const { license, snapshot } = useEntitlements();
   const purchase = usePurchaseAddOnViaCheckout();
   const [busy, setBusy] = useState(false);
   // code → quantity. Absent means unticked.
@@ -53,10 +53,20 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
   const consentGiven = useConsentComplete(acceptedDocs);
 
-  const ownedCodes = useMemo(
-    () => new Set(owned.filter((o) => o.status === 'active').map((o) => o.code)),
-    [owned],
-  );
+  /**
+   * Can this product be bought — the SERVER's answer, not ours.
+   *
+   * The store used to ask "is there an ownership row?", which is a different
+   * question from the one checkout asks ("is this already covered by your
+   * entitlements?"). Anything granted without a row — a comp, an operator
+   * override, the whole demo tenant — was offered for sale and then refused at
+   * checkout with ADDON_ALREADY_GRANTED, taking the rest of the basket with
+   * it, because one rejected line fails the cart.
+   */
+  const blockedReason = (code: string): string | null => {
+    const verdict = snapshot?.purchasability?.[code];
+    return verdict && !verdict.ok ? (verdict.reason ?? 'BLOCKED') : null;
+  };
 
   // Offers are keyed by GRANT key, not by product code, so index them by code
   // once rather than guessing which key a product happens to grant.
@@ -89,10 +99,13 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   // Arriving from an upsell ("buy Personnel to continue") should land with that
   // line already ticked — the customer already said what they wanted.
   useEffect(() => {
-    if (!focusCode || !byCode.has(focusCode) || ownedCodes.has(focusCode)) return;
+    if (!focusCode || !byCode.has(focusCode) || blockedReason(focusCode)) return;
     setPicked((prev) => (focusCode in prev ? prev : { ...prev, [focusCode]: 1 }));
-  }, [focusCode, byCode, ownedCodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCode, byCode, snapshot]);
 
+  // Grace counts as having a licence: the capability is live and buying a
+  // second one is refused. Only 'none' and 'expired' need one added.
   const needsLicence = license.status === 'none' || license.status === 'expired';
 
   /** Today's price for one unit — prorated when the engine priced it. */
@@ -199,7 +212,11 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                 // Credits and extra branches are bought repeatedly; a module is
                 // owned once, so owning it takes it off the menu.
                 const repeatable = COUNTABLE_KINDS.has(product.kind);
-                const isOwned = ownedCodes.has(product.code) && !repeatable;
+                const blocked = blockedReason(product.code);
+                // A blocked line is unbuyable for a reason the server named.
+                // `LICENSE_REQUIRED` is not one of them here: the store adds
+                // the licence itself, so those stay tickable.
+                const isOwned = !!blocked && blocked !== 'LICENSE_REQUIRED';
                 const isLicenceAuto =
                   product.code === LICENCE_CODE && licenceAutoAdded;
                 const checked = product.code in picked || isLicenceAuto;
@@ -243,7 +260,9 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                           {isOwned && (
                             <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                               <Check size={12} />
-                              {t('licensing:store.owned')}
+                              {blocked === 'ADDON_MAX_QUANTITY'
+                                ? t('licensing:store.maxReached')
+                                : t('licensing:store.owned')}
                             </span>
                           )}
                           {isLicenceAuto && (

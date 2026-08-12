@@ -63,6 +63,20 @@ export interface LicensingSnapshot {
   renewal: RenewalSummary | null;
   /** Grant key → the cheapest product that provides it, priced for today. */
   offers: Record<string, Offer>;
+  /**
+   * Product code → whether it can be bought right now, decided by the SAME
+   * function the pre-payment guard uses.
+   *
+   * The store used to decide this itself, by looking for an ownership row.
+   * Anything granted without one — a comp, an operator override, every feature
+   * the demo tenant holds — therefore showed a Buy button that checkout
+   * refuses, and since a rejected line fails the whole cart, the customer
+   * could not buy the product they actually wanted either.
+   */
+  purchasability: Record<
+    string,
+    { ok: boolean; reason?: string; message?: string }
+  >;
 }
 
 export const licensingKeys = {

@@ -92,7 +92,8 @@
     "decrease": "Sonini kamaytirish",
     "pay": "To‘lash",
     "reviewBill": "Hisobni ko‘rish",
-    "selectedCount": "{{count}} ta tanlandi"
+    "selectedCount": "{{count}} ta tanlandi",
+    "maxReached": "Maksimalga yetdi"
   },
   "invoices": {
     "title": "Hisob-fakturalar",

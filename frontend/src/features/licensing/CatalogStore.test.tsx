@@ -16,6 +16,8 @@ let products: any[];
 let owned: any[];
 let licenseStatus: string;
 let offers: Record<string, any>;
+/** Product code → the SERVER's verdict, exactly as /v1/me/licensing returns it. */
+let purchasability: Record<string, { ok: boolean; reason?: string }>;
 const purchaseAsync = vi.fn();
 
 vi.mock('./licensingApi', async () => {
@@ -32,7 +34,7 @@ vi.mock('../../contexts/SubscriptionContext', () => ({
   useEntitlements: () => ({
     owned,
     license: { status: licenseStatus },
-    snapshot: { offers },
+    snapshot: { offers, purchasability },
     offerFor: () => null,
   }),
 }));
@@ -102,6 +104,7 @@ beforeEach(() => {
   licenseStatus = 'active';
   owned = [];
   offers = {};
+  purchasability = {};
   products = [LICENCE, product()];
 });
 
@@ -220,6 +223,19 @@ describe('CatalogStore — the licence prerequisite', () => {
     tick('Personel Yönetimi');
     expect(within(bill()).queryByText('HummyTummy Lisansı')).not.toBeInTheDocument();
   });
+
+  it('does not re-add a licence that is inside its grace window', () => {
+    // Grace means the licence is still LIVE. Adding a second one produces a
+    // basket checkout refuses as already-owned, killing the whole purchase.
+    licenseStatus = 'grace';
+    render(<CatalogStore />);
+    tick('Personel Yönetimi');
+
+    expect(within(bill()).queryByText('HummyTummy Lisansı')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /store\.payTotal/ }));
+    const codes = purchaseAsync.mock.calls[0][0].items.map((i: any) => i.code);
+    expect(codes).toEqual(['module_personnel']);
+  });
 });
 
 describe('CatalogStore — quantities and ownership', () => {
@@ -277,11 +293,49 @@ describe('CatalogStore — quantities and ownership', () => {
   });
 
   it('shows an owned module as owned and refuses to re-sell it', () => {
-    owned = [{ code: 'module_personnel', status: 'active' }];
+    purchasability = {
+      module_personnel: { ok: false, reason: 'ADDON_ALREADY_OWNED' },
+    };
     render(<CatalogStore />);
 
     expect(screen.getByRole('checkbox', { name: 'Personel Yönetimi' })).toBeDisabled();
     expect(screen.getByText('licensing:store.owned')).toBeInTheDocument();
+  });
+
+  it('refuses to re-sell a capability granted WITHOUT an ownership row', () => {
+    // The bug a demo visitor hit: the demo's features come from operator
+    // overrides, so no ownership row exists and the store cheerfully offered
+    // everything it already had. Checkout then refused the cart with
+    // ADDON_ALREADY_GRANTED — and because one bad line fails the whole basket,
+    // the product they DID want failed with it.
+    owned = [];
+    purchasability = {
+      module_personnel: { ok: false, reason: 'ADDON_ALREADY_GRANTED' },
+    };
+    render(<CatalogStore />);
+
+    expect(screen.getByRole('checkbox', { name: 'Personel Yönetimi' })).toBeDisabled();
+  });
+
+  it('says "max reached" rather than "owned" when capacity is capped', () => {
+    products = [product({ code: 'extra_branch', name: 'Ek Şube', kind: 'capacity', priceCents: 399000 })];
+    purchasability = { extra_branch: { ok: false, reason: 'ADDON_MAX_QUANTITY' } };
+    render(<CatalogStore />);
+
+    expect(screen.getByText('licensing:store.maxReached')).toBeInTheDocument();
+  });
+
+  it('still offers a licence-gated product to a tenant with no licence', () => {
+    // LICENSE_REQUIRED is not a refusal to sell — the store adds the licence
+    // itself. Treating it as one would grey out the entire catalogue for every
+    // tenant who has not bought yet.
+    licenseStatus = 'none';
+    purchasability = {
+      module_personnel: { ok: false, reason: 'LICENSE_REQUIRED' },
+    };
+    render(<CatalogStore />);
+
+    expect(screen.getByRole('checkbox', { name: 'Personel Yönetimi' })).not.toBeDisabled();
   });
 
   it('still sells a repeatable product the tenant already owns', () => {
@@ -341,7 +395,9 @@ describe('CatalogStore — arriving from an upsell', () => {
   });
 
   it('does not pre-tick something already owned', () => {
-    owned = [{ code: 'module_personnel', status: 'active' }];
+    purchasability = {
+      module_personnel: { ok: false, reason: 'ADDON_ALREADY_OWNED' },
+    };
     render(<CatalogStore focusCode="module_personnel" />);
     expect(within(bill()).getByText('licensing:store.billEmpty')).toBeInTheDocument();
   });

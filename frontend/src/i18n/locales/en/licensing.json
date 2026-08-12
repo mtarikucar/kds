@@ -92,7 +92,8 @@
     "decrease": "Decrease quantity",
     "pay": "Pay",
     "reviewBill": "Review bill",
-    "selectedCount": "{{count}} selected"
+    "selectedCount": "{{count}} selected",
+    "maxReached": "Max reached"
   },
   "invoices": {
     "title": "Invoices",
