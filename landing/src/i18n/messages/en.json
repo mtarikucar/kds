@@ -496,12 +496,12 @@
     "sections": {
       "general": {
         "title": "General Contact",
-        "content": "For questions about our service, subscription plans, or partnership opportunities, drop us an email. We aim to respond within two business days."
+        "content": "For questions about our service, our pricing, or partnership opportunities, drop us an email. We aim to respond within two business days."
       },
       "support": {
         "title": "Technical Support",
         "content": "For technical issues, account questions, or billing matters, reach us at the address below.",
-        "hours": "Replies on weekdays 09:00 – 18:00 (Turkey time). Urgent issues follow the SLA terms of your subscription."
+        "hours": "Replies on weekdays 09:00 – 18:00 (Turkey time). Urgent issues follow the SLA terms of your Priority Support module."
       },
       "kvkk": {
         "title": "KVKK Requests",

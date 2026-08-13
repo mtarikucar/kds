@@ -1,6 +1,6 @@
 export default {
   "index": "Genel Bakış",
   "feature-matrix": "Özellik matrisi",
-  "choosing-and-upgrading": "Plan seçimi ve yükseltme",
-  "trial-and-billing": "Deneme ve faturalama",
+  "choosing-and-upgrading": "Hangi modüller size uygun",
+  "trial-and-billing": "Faturalama ve yenileme",
 };

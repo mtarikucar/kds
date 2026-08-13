@@ -1,326 +1,82 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+/* eslint-disable no-console */
+/* ==========================================================================
+ * KULLANILMIYOR / EMEKLİ — BU DOSYAYI ÇALIŞTIRMAYIN.
+ * RETIRED — DO NOT RUN. This script is a tombstone; it refuses to execute.
+ * ==========================================================================
+ *
+ * Nothing in the repository references `seed-prod.js`: no npm script, no
+ * Dockerfile, no compose file, no CI workflow, no ops script, no doc.
+ * (`git grep seed-prod` returns nothing but this file.) It was a one-off
+ * bootstrap helper from the very first deploy and has been dead since.
+ *
+ * WHY IT IS NOT MERELY DEAD BUT DANGEROUS
+ *
+ * It was written against a product that no longer exists and a schema that
+ * no longer accepts it, and — worse — the two halves fail in the wrong
+ * order. The writes are not wrapped in a transaction, so the parts that
+ * still "work" commit before the parts that crash:
+ *
+ *   1. It upserted FREE ($0) and BASIC ($29.99/mo, trialDays 14) rows into
+ *      `subscription_plans` with `isActive: true`, and `isPublic` defaults
+ *      to true in the schema. That is exactly the filter
+ *      `SubscriptionService.getAvailablePlans` selects on, and it is served
+ *      by the PUBLIC route `GET /subscriptions/plans`. Running this against
+ *      a live database would republish a retired, USD-denominated, monthly,
+ *      trial-bearing price list on the public pricing surface — undoing
+ *      `20260811120000_free_core`, which switched those flags off precisely
+ *      so the endpoint would stop advertising tiers.
+ *   2. Only THEN does it hit the schema drift and abort: `table.createMany`
+ *      omits the required `Table.branchId` (v3.0.0 strict branch scope), and
+ *      the WAITER/KITCHEN users it creates violate the DB CHECK constraint
+ *      that requires a `primaryBranchId` for hard-restricted roles. It also
+ *      echoes working admin credentials to stdout.
+ *
+ * So the failure mode is "corrupt the price list, then crash" — the worst
+ * possible ordering. Hence the hard refusal below rather than a comment
+ * asking nicely.
+ *
+ * WHAT THE PRODUCT ACTUALLY IS NOW (2026-08-11 à-la-carte release)
+ *
+ * There are no plans, no tiers and no trials. The core is free and
+ * unlimited for every tenant; paid capability is bought one annual product
+ * at a time behind an annual licence. Sources of truth:
+ *
+ *   free core → backend/src/modules/entitlements/free-baseline.const.ts
+ *   pricing   → backend/src/modules/marketplace/alacarte-catalog.const.ts
+ *   history   → backend/src/common/constants/subscription-plans.const.ts
+ *
+ * WHAT TO RUN INSTEAD
+ *
+ *   local dev fixture   npm run prisma:seed      (backend/prisma/seed.ts)
+ *   e2e demo tenant     npm run seed:demo        (backend/prisma/seed-demo.ts)
+ *   marketplace catalog npm run seed:marketplace (backend/prisma/seeds/…)
+ *   platform users      npx ts-node prisma/seed-platform-users.ts
+ *
+ * None of them seed a plan catalogue into a fresh database, and none of
+ * them need this file. Delete it whenever someone is confident enough to
+ * press the button; until then it stays as a signpost so nobody rediscovers
+ * the original and runs it.
+ * ========================================================================== */
 
-const prisma = new PrismaClient();
+console.error(
+  [
+    "",
+    "  seed-prod.js is RETIRED and refuses to run.",
+    "",
+    "  It seeded a subscription-plan catalogue (FREE / BASIC, USD, monthly,",
+    "  14-day trial) that the product retired on 2026-08-11. Running it would",
+    "  have republished those rows on the public GET /subscriptions/plans",
+    "  endpoint and then crashed on the current schema. The core product is",
+    "  free and unlimited; paid capability is per-module and annual.",
+    "",
+    "  Use instead:",
+    "    npm run prisma:seed       # local dev fixture (prisma/seed.ts)",
+    "    npm run seed:demo         # e2e demo tenant  (prisma/seed-demo.ts)",
+    "    npm run seed:marketplace  # à-la-carte product catalogue",
+    "",
+    "  See the header comment in this file for the full rationale.",
+    "",
+  ].join("\n"),
+);
 
-// User roles constants (matching backend/src/common/constants/roles.enum.ts)
-const UserRole = {
-  ADMIN: 'ADMIN',
-  MANAGER: 'MANAGER',
-  WAITER: 'WAITER',
-  KITCHEN: 'KITCHEN',
-  COURIER: 'COURIER',
-};
-
-async function main() {
-  console.log('🌱 Seeding database...');
-
-  // Create subscription plans
-  const freePlan = await prisma.subscriptionPlan.upsert({
-    where: { name: 'FREE' },
-    update: {},
-    create: {
-      name: 'FREE',
-      displayName: 'Free Plan',
-      description: 'Perfect for small restaurants getting started',
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      currency: 'USD',
-      trialDays: 0,
-      maxUsers: 2,
-      maxTables: 5,
-      maxProducts: 25,
-      maxCategories: 5,
-      maxMonthlyOrders: 50,
-      advancedReports: false,
-      multiLocation: false,
-      customBranding: false,
-      apiAccess: false,
-      prioritySupport: false,
-      inventoryTracking: false,
-      kdsIntegration: true,
-      isActive: true,
-    },
-  });
-
-  const basicPlan = await prisma.subscriptionPlan.upsert({
-    where: { name: 'BASIC' },
-    update: {},
-    create: {
-      name: 'BASIC',
-      displayName: 'Basic Plan',
-      description: 'Great for growing restaurants',
-      monthlyPrice: 29.99,
-      yearlyPrice: 299.99,
-      currency: 'USD',
-      trialDays: 14,
-      maxUsers: 5,
-      maxTables: 20,
-      maxProducts: 100,
-      maxCategories: 20,
-      maxMonthlyOrders: 500,
-      advancedReports: false,
-      multiLocation: false,
-      customBranding: false,
-      apiAccess: false,
-      prioritySupport: false,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      isActive: true,
-    },
-  });
-
-  console.log('✅ Subscription plans created');
-
-  // Create tenant
-  const tenant = await prisma.tenant.create({
-    data: {
-      name: 'Demo Restaurant',
-      subdomain: 'demo',
-      status: 'ACTIVE',
-      currentPlanId: freePlan.id,
-    },
-  });
-
-  console.log('✅ Tenant created:', tenant.name);
-
-  // Create users
-  const hashedPassword = await bcrypt.hash('password123', 10);
-
-  const admin = await prisma.user.create({
-    data: {
-      email: 'admin@restaurant.com',
-      password: hashedPassword,
-      firstName: 'John',
-      lastName: 'Admin',
-      role: UserRole.ADMIN,
-      status: 'ACTIVE',
-      tenantId: tenant.id,
-    },
-  });
-
-  const waiter = await prisma.user.create({
-    data: {
-      email: 'waiter@restaurant.com',
-      password: hashedPassword,
-      firstName: 'Jane',
-      lastName: 'Waiter',
-      role: UserRole.WAITER,
-      status: 'ACTIVE',
-      tenantId: tenant.id,
-    },
-  });
-
-  const kitchen = await prisma.user.create({
-    data: {
-      email: 'kitchen@restaurant.com',
-      password: hashedPassword,
-      firstName: 'Mike',
-      lastName: 'Chef',
-      role: UserRole.KITCHEN,
-      status: 'ACTIVE',
-      tenantId: tenant.id,
-    },
-  });
-
-  console.log('✅ Users created');
-
-  // Create categories
-  const appetizers = await prisma.category.create({
-    data: {
-      name: 'Appetizers',
-      description: 'Start your meal with our delicious starters',
-      displayOrder: 1,
-      isActive: true,
-      tenantId: tenant.id,
-    },
-  });
-
-  const mains = await prisma.category.create({
-    data: {
-      name: 'Main Courses',
-      description: 'Our signature main dishes',
-      displayOrder: 2,
-      isActive: true,
-      tenantId: tenant.id,
-    },
-  });
-
-  const desserts = await prisma.category.create({
-    data: {
-      name: 'Desserts',
-      description: 'Sweet endings to your meal',
-      displayOrder: 3,
-      isActive: true,
-      tenantId: tenant.id,
-    },
-  });
-
-  const beverages = await prisma.category.create({
-    data: {
-      name: 'Beverages',
-      description: 'Refreshing drinks',
-      displayOrder: 4,
-      isActive: true,
-      tenantId: tenant.id,
-    },
-  });
-
-  console.log('✅ Categories created');
-
-  // Create products
-  const products = await prisma.product.createMany({
-    data: [
-      // Appetizers
-      {
-        name: 'Caesar Salad',
-        description: 'Fresh romaine lettuce with Caesar dressing and croutons',
-        price: 8.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 50,
-        categoryId: appetizers.id,
-        tenantId: tenant.id,
-      },
-      {
-        name: 'Garlic Bread',
-        description: 'Toasted bread with garlic butter',
-        price: 5.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 30,
-        categoryId: appetizers.id,
-        tenantId: tenant.id,
-      },
-      // Main Courses
-      {
-        name: 'Grilled Salmon',
-        description: 'Fresh Atlantic salmon with vegetables',
-        price: 24.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 15,
-        categoryId: mains.id,
-        tenantId: tenant.id,
-      },
-      {
-        name: 'Beef Burger',
-        description: 'Premium beef patty with cheese and fries',
-        price: 15.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 40,
-        categoryId: mains.id,
-        tenantId: tenant.id,
-      },
-      // Desserts
-      {
-        name: 'Chocolate Lava Cake',
-        description: 'Warm chocolate cake with molten center',
-        price: 7.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 22,
-        categoryId: desserts.id,
-        tenantId: tenant.id,
-      },
-      // Beverages
-      {
-        name: 'Coca Cola',
-        description: 'Refreshing soft drink',
-        price: 2.99,
-        isAvailable: true,
-        stockTracked: true,
-        currentStock: 100,
-        categoryId: beverages.id,
-        tenantId: tenant.id,
-      },
-      {
-        name: 'Coffee',
-        description: 'Freshly brewed coffee',
-        price: 3.99,
-        isAvailable: true,
-        stockTracked: false,
-        currentStock: 0,
-        categoryId: beverages.id,
-        tenantId: tenant.id,
-      },
-    ],
-  });
-
-  console.log('✅ Products created');
-
-  // Create tables
-  await prisma.table.createMany({
-    data: [
-      {
-        number: '1',
-        capacity: 2,
-        section: 'Main Hall',
-        status: 'AVAILABLE',
-        tenantId: tenant.id,
-      },
-      {
-        number: '2',
-        capacity: 4,
-        section: 'Main Hall',
-        status: 'AVAILABLE',
-        tenantId: tenant.id,
-      },
-      {
-        number: '3',
-        capacity: 4,
-        section: 'Main Hall',
-        status: 'AVAILABLE',
-        tenantId: tenant.id,
-      },
-      {
-        number: '4',
-        capacity: 6,
-        section: 'Main Hall',
-        status: 'AVAILABLE',
-        tenantId: tenant.id,
-      },
-      {
-        number: '5',
-        capacity: 2,
-        section: 'Terrace',
-        status: 'AVAILABLE',
-        tenantId: tenant.id,
-      },
-    ],
-  });
-
-  console.log('✅ Tables created');
-
-  console.log(`
-  ========================================
-  🎉 Database seeded successfully!
-  ========================================
-
-  Default Login Credentials:
-
-  Admin:
-    Email: admin@restaurant.com
-    Password: password123
-
-  Waiter:
-    Email: waiter@restaurant.com
-    Password: password123
-
-  Kitchen:
-    Email: kitchen@restaurant.com
-    Password: password123
-
-  ========================================
-  `);
-}
-
-main()
-  .catch((e) => {
-    console.error('❌ Error seeding database:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+process.exit(1);

@@ -207,12 +207,12 @@
     "finalizing": "İndiriliyor / kaydediliyor…",
     "quotaPhotos": "Fotoğraf",
     "quotaVideos": "Video",
-    "quotaExhaustedPhotos": "Aylık fotoğraf üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin.",
-    "quotaExhaustedVideos": "Aylık video üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
+    "quotaExhaustedPhotos": "AI görsel kontörünüz kalmadı. Mağaza'dan 100 görsellik kontör paketi alabilirsiniz (690 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir.",
+    "quotaExhaustedVideos": "AI video kontörünüz kalmadı. Mağaza'dan 20 videoluk kontör paketi alabilirsiniz (890 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir."
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "Aylık 3D model üretim hakkınız doldu — gelecek ay başında yenilenir. Daha yüksek limit için paketinizi yükseltin."
+    "quotaExhausted": "AI 3D model kontörünüz kalmadı. Mağaza'dan 10 modellik kontör paketi alabilirsiniz (790 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir."
   },
   "import": {
     "invalidRows": "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin"

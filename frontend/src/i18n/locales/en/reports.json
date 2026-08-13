@@ -229,7 +229,7 @@
     "tabVariance": "Usage Variance",
     "tabRecipes": "Recipe Costs",
     "menuTitle": "Menu profitability",
-    "upgradeRequired": "Menu engineering requires the Advanced Reports feature — upgrade your plan.",
+    "upgradeRequired": "Menu engineering requires the Advanced Reports & Analytics module (1,290 TRY/year, licence required).",
     "uncosted": "{{count}} sold product(s) have no cost defined — they can't be classified and are hidden from the table. Enter a recipe/cost.",
     "headProduct": "Product",
     "headUnits": "Units",

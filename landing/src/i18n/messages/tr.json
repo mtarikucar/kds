@@ -496,12 +496,12 @@
     "sections": {
       "general": {
         "title": "Genel İletişim",
-        "content": "Hizmetimiz, abonelik planlarımız veya iş birliği fırsatları hakkında bilgi almak için bize e-posta gönderebilirsiniz. Tüm mesajları en geç 2 iş günü içinde yanıtlamaya özen gösteririz."
+        "content": "Hizmetimiz, fiyatlandırmamız veya iş birliği fırsatları hakkında bilgi almak için bize e-posta gönderebilirsiniz. Tüm mesajları en geç 2 iş günü içinde yanıtlamaya özen gösteririz."
       },
       "support": {
         "title": "Teknik Destek",
         "content": "Hizmeti kullanırken karşılaştığınız teknik sorunlar, hesabınız veya faturalama ile ilgili konular için aşağıdaki adresten bize ulaşabilirsiniz.",
-        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için aboneliğinize bağlı SLA hükümleri geçerlidir."
+        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için Öncelikli Destek modülünüzün SLA hükümleri geçerlidir."
       },
       "kvkk": {
         "title": "KVKK Başvuruları",

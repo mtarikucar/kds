@@ -124,10 +124,10 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
     // more free comps from the storefront button.
     const addon = catalog.find((a: MarketplaceAddOn) => a.code === code);
     // Defence in depth: never start a checkout for something the tenant already
-    // has — whether it's included in their plan OR already purchased. `owned`
-    // comes from a separate query (/addons/mine) that may still be loading when
-    // the catalogue renders, so this guard backs up the hidden/disabled button
-    // and prevents a double-charge in that window.
+    // has — whether their entitlements already grant it OR they already bought
+    // it. `owned` comes from a separate query (/addons/mine) that may still be
+    // loading when the catalogue renders, so this guard backs up the
+    // hidden/disabled button and prevents a double-charge in that window.
     if (addon?.includedInPlan || ownedCodes.has(code)) return;
     const price = addon
       ? (addon.priceCents / 100).toLocaleString('tr-TR', {
@@ -135,7 +135,12 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
           currency: addon.currency || 'TRY',
         })
       : '';
-    const suffix = addon?.billing === 'recurring' ? '/ay' : '';
+    // Annual products are quoted per licensing year; `oneTime` rows (credit
+    // packs, on-site setup) are a flat charge and carry no period suffix.
+    const suffix =
+      addon?.billing === 'annual'
+        ? t('hummytummy.marketplace.perYear', { defaultValue: '/yıl' })
+        : '';
     const message = t('hummytummy.marketplace.purchaseConfirm', {
       defaultValue: `Bu eklenti ${price}${suffix}. Ödemeyi tamamlamak için güvenli ödeme sayfasına yönlendirileceksiniz. Devam edilsin mi?`,
       price,
@@ -236,8 +241,9 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
             const isBusy = purchase.isPending && purchasingCode === a.code;
             const isHighlighted = highlightCode === a.code;
             const owned = ownedCodes.has(a.code);
-            // Already provided by the tenant's plan (server-computed). Shown as
-            // "included", never sold — purchased add-ons (owned) take priority.
+            // Already granted by the tenant's entitlements — the free core or a
+            // module they hold (server-computed). Shown as already active,
+            // never sold; purchased add-ons (owned) take priority.
             const includedInPlan = !owned && !!a.includedInPlan;
             const KindIcon = KIND_ICON[a.kind] ?? Package;
             return (
@@ -269,7 +275,7 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                     <Badge variant="success" size="sm">
                       <CheckCircle2 className="mr-1 h-3 w-3" />
                       {t('hummytummy.marketplace.includedInPlan', {
-                        defaultValue: 'Planınıza dahil',
+                        defaultValue: 'Hesabınızda zaten etkin',
                       })}
                     </Badge>
                   ) : (
@@ -298,8 +304,10 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                       style: 'currency',
                       currency: a.currency,
                     })}
-                    {a.billing === 'recurring' && (
-                      <span className="text-xs font-normal text-slate-500"> / mo</span>
+                    {a.billing === 'annual' && (
+                      <span className="text-xs font-normal text-slate-500">
+                        {t('hummytummy.marketplace.perYear', { defaultValue: '/yıl' })}
+                      </span>
                     )}
                   </span>
                   {owned ? (
@@ -311,7 +319,7 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
                     <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600">
                       <CheckCircle2 className="h-4 w-4" />
                       {t('hummytummy.marketplace.includedInPlan', {
-                        defaultValue: 'Planınıza dahil',
+                        defaultValue: 'Hesabınızda zaten etkin',
                       })}
                     </span>
                   ) : (

@@ -45,9 +45,18 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
   const { mutateAsync: updateSettings, isPending } = useUpdateTenantSettings();
   const { hasFeature, isLoading: isLoadingSubscription } = useSubscription();
 
+  // `feature.customBranding` is in FREE_BASELINE_GRANTS — granted to every
+  // tenant unconditionally, so this is NOT an upsell gate and there is nothing
+  // to sell. It can only read false in two situations:
+  //   1. the licensing snapshot failed to load (hasFeature fails closed, so
+  //      `false` also means "we don't know yet"), or
+  //   2. ops suppressed the capability for this one tenant via an
+  //      `override:admin` grant while handling abuse.
+  // Both are "temporarily unavailable, here is where to look", never
+  // "buy something". The loading case is handled by the early return below.
   const hasCustomBranding = hasFeature('customBranding');
   const currentSubdomain = settings?.subdomain || '';
-  const isGrandfathered = !hasCustomBranding && !!currentSubdomain;
+  const isLockedWithSubdomain = !hasCustomBranding && !!currentSubdomain;
 
   const [formState, setFormState] = useState<SubdomainFormState>({
     subdomain: '',
@@ -110,7 +119,7 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
       toast.success(t('subdomain.saveSuccess'), { duration: 2000 });
     } catch (error) {
       const errorMessage = error instanceof Error && error.message.includes('403')
-        ? t('subdomain.proFeature')
+        ? t('subdomain.permissionDenied')
         : t('subdomain.saveError');
       toast.error(errorMessage);
     }
@@ -140,8 +149,13 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
     validateSubdomain(normalized);
   };
 
-  const handleUpgrade = () => {
-    navigate('/subscription/change-plan');
+  // /subscription/change-plan compared plan tiers and no longer exists (App.tsx
+  // redirects the surviving plan bookmarks to /admin/license). Licence & Access
+  // is where a tenant can actually see what is switched on for the account,
+  // which is the only useful destination when a free-core capability reads as
+  // unavailable.
+  const handleOpenLicense = () => {
+    navigate('/admin/license');
   };
 
   // Preview URL
@@ -169,27 +183,28 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
     );
   }
 
-  // Upgrade prompt content (no subdomain, no feature)
-  const upgradePromptContent = (
-    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3">
+  // Not an upsell: the capability is free for everyone, so the only honest
+  // message is "it is included, and here is why it might look switched off".
+  const unavailableNotice = (
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
       <div className="flex items-start gap-2">
-        <div className="flex-shrink-0 p-1.5 bg-amber-100 rounded-full">
-          <Lock className="w-3.5 h-3.5 text-amber-600" />
+        <div className="flex-shrink-0 p-1.5 bg-slate-200 rounded-full">
+          <Lock className="w-3.5 h-3.5 text-slate-600" />
         </div>
         <div className="flex-1">
           <p className="text-xs font-medium text-slate-900 mb-0.5">
-            {t('subdomain.proFeature')}
+            {t('subdomain.unavailableTitle')}
           </p>
           <p className="text-xs text-slate-600 mb-2">
-            {t('subdomain.proFeatureDescription')}
+            {t('subdomain.unavailableDescription')}
           </p>
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
-            onClick={handleUpgrade}
+            onClick={handleOpenLicense}
             className="inline-flex items-center gap-1"
           >
-            {t('subdomain.upgradeToPro')}
+            {t('subdomain.openLicense')}
             <ArrowRight className="w-3 h-3" />
           </Button>
         </div>
@@ -197,10 +212,10 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
     </div>
   );
 
-  // Show upgrade prompt only (no subdomain, no feature)
+  // Nothing set and the capability reads as unavailable — explain, don't sell.
   if (!hasCustomBranding && !currentSubdomain) {
     if (compact) {
-      return upgradePromptContent;
+      return unavailableNotice;
     }
     return (
       <SettingsSection
@@ -208,27 +223,27 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
         description={t('subdomain.description')}
         icon={<Globe className="w-4 h-4" />}
       >
-        {upgradePromptContent}
+        {unavailableNotice}
       </SettingsSection>
     );
   }
 
   const subdomainContent = (
     <>
-      {/* Grandfathered notice */}
-      {isGrandfathered && (
+      {/* The address stays live; only editing it is currently blocked. */}
+      {isLockedWithSubdomain && (
         <div className="mb-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-2">
             <Lock className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-xs text-amber-800">
-                {t('subdomain.grandfathered')}
+                {t('subdomain.lockedNotice')}
               </p>
               <button
-                onClick={handleUpgrade}
+                onClick={handleOpenLicense}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium underline mt-0.5"
               >
-                {t('subdomain.upgradeToChange')}
+                {t('subdomain.openLicense')}
               </button>
             </div>
           </div>
@@ -248,9 +263,9 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
               onChange={(e) => handleChange(e.target.value)}
               placeholder={t('subdomain.inputPlaceholder')}
               maxLength={63}
-              disabled={isGrandfathered}
+              disabled={isLockedWithSubdomain}
               className={`flex-1 px-2.5 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
-                isGrandfathered
+                isLockedWithSubdomain
                   ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200'
                   : 'border-slate-300'
               } ${validationError ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : ''}`}
@@ -282,7 +297,7 @@ export default function SubdomainSettings({ compact = false }: SubdomainSettings
         {/* Explicit save — changing/removing an existing subdomain is
             destructive (90-day quarantine, broken printed QR codes), so
             there is deliberately NO autosave here. */}
-        {!isGrandfathered && hasCustomBranding && (
+        {!isLockedWithSubdomain && hasCustomBranding && (
           <div className="flex justify-end pt-1">
             <Button
               variant="primary"

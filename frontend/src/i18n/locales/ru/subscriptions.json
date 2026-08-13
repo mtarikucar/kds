@@ -8,17 +8,13 @@
     "cancel": "Отменить подписку",
     "renew": "Продлить",
     "billing": "Оплата",
-    "billingCycle": "Период оплаты",
-    "monthly": "Ежемесячно",
     "yearly": "Ежегодно",
-    "nextBillingDate": "Следующая дата оплаты",
     "paymentMethod": "Способ оплаты",
     "updatePaymentMethod": "Выбрать способ оплаты",
     "invoices": "Счета",
     "downloadInvoice": "Скачать счет",
     "features": "Функции",
     "price": "Цена",
-    "perMonth": "в месяц",
     "perYear": "в год",
     "selectPlan": "Выбрать модуль",
     "currentlyActive": "Активен",
@@ -38,7 +34,6 @@
     "viewAllPlans": "Все модули",
     "status": {
       "active": "Активна",
-      "trial": "Активна",
       "cancelled": "Отменена",
       "expired": "Истекла",
       "pastDue": "Просрочена",
@@ -52,9 +47,7 @@
       "uncollectible": "Не взыскан"
     },
     "currentSubscription": "Текущая подписка",
-    "month": "месяц",
     "year": "год",
-    "trialEnds": "Действует до",
     "cancelsOn": "Отменяется",
     "planLimitsFeatures": "Ёмкость и функции",
     "planLimits": {
@@ -90,13 +83,11 @@
       "other": "Другое"
     },
     "selectNewPlan": "Выберите модуль для подключения:",
-    "perMonthShort": "мес",
     "perYearShort": "год",
     "keepSubscription": "Сохранить подписку",
     "management": "Управление подпиской",
     "viewAllPlansBtn": "Все модули",
     "unknownPlan": "Неизвестный модуль",
-    "nextBilling": "Следующая оплата",
     "plansPage": {
       "title": "Выберите модули",
       "subtitle": "Ядро бесплатно. Платите только за нужные модули.",
@@ -127,7 +118,6 @@
       "backToPlans": "Вернуться к модулям",
       "securePaymentWith": "Безопасная оплата через",
       "securePaymentTitle": "Безопасная оплата",
-      "securePaymentDescStripe": "Платежи принимаются только через защищённую инфраструктуру PayTR. Данные карты у нас не хранятся.",
       "securePaymentDescPaytr": "Ваши платежные данные безопасно обрабатываются PayTR. Данные карты у нас не хранятся.",
       "paymentApproved": "Платеж подтвержден!",
       "activatingSubscription": "Платеж подтвержден! Активация подписки...",
@@ -156,7 +146,6 @@
         "goToDashboard": "Перейти на панель управления"
       }
     },
-    "savePercent": "Экономия {{percent}}%",
     "changePlanTitle": "Управление модулями",
     "currentPlanLabel": "Текущая лицензия",
     "backToSubscription": "Назад к подписке",
@@ -246,7 +235,6 @@
       "tryAgain": "Попробовать снова"
     },
     "statusBanner": {
-      "trialCountdown": "Лицензию {{plan}} нужно продлить через {{days}} дн.",
       "gracePeriod": "Ожидается оплата продления — оплатите в течение {{days}} дн., иначе доступ к платным модулям закроется. Данные не удаляются.",
       "subscribeNow": "Получить лицензию",
       "payNow": "Оплатить сейчас",

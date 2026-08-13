@@ -19,18 +19,35 @@ const DEFAULT_PASSWORD = 'Passw0rd!';
  * Register a brand-new tenant (and its ADMIN user) via the public
  * `POST /auth/register` endpoint and return an authed APIRequestContext.
  *
- * Trial-related specs need this because the seeded demo tenant is already
- * on BUSINESS, has its trial state pre-stamped, and is shared across
- * matrix tests — flipping its trial fields would break dozens of
- * unrelated assertions. A throwaway tenant minted per test keeps the
- * trial-lifecycle scenarios isolated.
+ * WHY A THROWAWAY TENANT
  *
- * AuthService.register auto-attaches a 14-day BUSINESS trial on every
- * new restaurant, so the returned tenant is on TRIALING BUSINESS unless
- * the test explicitly downgrades it.
+ * The seeded Sultanahmet demo tenant is shared by the whole matrix suite, so
+ * any spec that mutates tenant-wide state — entitlement overrides, owned
+ * modules, licence dates, billing profile — would break dozens of unrelated
+ * assertions and leave the shared fixture dirty when its own cleanup is
+ * skipped (timeout, abort, retry). A tenant minted per spec keeps those
+ * scenarios isolated.
+ *
+ * WHAT THE RETURNED TENANT ACTUALLY IS
+ *
+ * The free core, and nothing else. `POST /auth/register` creates a tenant, a
+ * Main branch and an ADMIN user; it attaches no plan, no subscription row and
+ * no trial countdown (see AuthProvisioningService.provisionNewTenantWithAdmin
+ * — since the 2026-08-11 à-la-carte release it does not even look a plan up).
+ *
+ * The practical consequence for callers: paid capability is never present by
+ * default. Each paid module is an individual annual product bought behind the
+ * annual licence, so a spec that needs one must grant or purchase it
+ * explicitly — do not assume the tenant arrives holding anything beyond
+ * `FREE_BASELINE_GRANTS` (backend/src/modules/entitlements/free-baseline.const.ts).
+ *
+ * The header this replaced described the retired model as fact ("already on
+ * BUSINESS", "auto-attaches a 14-day BUSINESS trial", "unless the test
+ * explicitly downgrades it"), which would have sent the next reader looking
+ * for tiers and trials that no longer exist anywhere in the product.
  */
 export async function registerFreshTenant(
-  label = 'trial',
+  label = 'fresh',
 ): Promise<FreshTenantResult> {
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 7);
@@ -67,8 +84,8 @@ export async function registerFreshTenant(
 
     // PaymentsService.createIntent throws PROFILE_PHONE_REQUIRED when
     // the calling user's phone is empty (PayTR's get-token rejects
-    // empty user_phone). Stamp a Turkish-format placeholder so trial
-    // tests can drive create-intent without a separate UI detour.
+    // empty user_phone). Stamp a Turkish-format placeholder so checkout
+    // specs can drive create-intent without a separate UI detour.
     // Idempotent if profile-update fails — caller can still proceed
     // for tests that don't touch checkout.
     await api

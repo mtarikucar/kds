@@ -496,12 +496,12 @@
     "sections": {
       "general": {
         "title": "Umumiy aloqa",
-        "content": "Xizmatimiz, obuna rejalari yoki hamkorlik haqida savollaringiz uchun bizga email yuboring. Eng kechi 2 ish kuni ichida javob beramiz."
+        "content": "Xizmatimiz, narxlarimiz yoki hamkorlik haqida savollaringiz uchun bizga email yuboring. Eng kechi 2 ish kuni ichida javob beramiz."
       },
       "support": {
         "title": "Texnik yordam",
         "content": "Texnik muammolar, hisob yoki to'lov masalalari uchun quyidagi manzilga yozing.",
-        "hours": "Ish kunlari 09:00 – 18:00 (Turkiya vaqti) javob beriladi. Shoshilinch masalalar obunangiz SLA shartlariga bo'ysunadi."
+        "hours": "Ish kunlari 09:00 – 18:00 (Turkiya vaqti) javob beriladi. Shoshilinch masalalar «Ustuvor yordam» modulingiz SLA shartlariga bo'ysunadi."
       },
       "kvkk": {
         "title": "KVKK murojaatlari",

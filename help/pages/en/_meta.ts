@@ -2,7 +2,7 @@ export default {
   "index": "Home",
   "getting-started": "Getting Started",
   "admin-guide": "Admin Guide",
-  "plans": "Plans",
+  "plans": "Licence & modules",
   "marketplace": "Marketplace",
   "desktop": "Desktop App",
   "developer-portal": {

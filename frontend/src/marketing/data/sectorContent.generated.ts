@@ -104,7 +104,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
         body: "Süt, çekirdek, şurup derken maliyet sessizce sızar; teslimat siparişleri de her platformun ayrı tabletinde beklemenizi ister. HummyTummy stok tüketimini reçeteye bağlar, teslimat platformlarını tek panele toplar ve kural/eşik tabanlı raporlarla neyin işlediğini, neyin kar ettiğini gösterir.",
         bullets: [
           "Süt, çekirdek, şurup gibi malzemelerin stoğunu takip edin; reçeteye bağlı tüketimle kalan miktarı görün.",
-          "Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek panele düşsün; her platform için ayrı tablet başında beklemeyin.",
+          "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panele düşsün; her platform için ayrı tablet başında beklemeyin.",
           "Kural ve eşik tabanlı raporlarla en çok satan ürünü, en yoğun saati ve azalan stoğu görün.",
           "Çok şubeliyseniz şube başına satışı ve ürün maliyetini yan yana karşılaştırın.",
         ],
@@ -116,7 +116,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
       "Arayüz 5 dilde; çok dilli ekibiniz ve yabancı misafirleriniz için tanıdık bir kullanım.",
       "Bulut tabanlı: kasadan, telefon ya da tabletin tarayıcısından aynı canlı veriye ulaşın, ayrıca program kurmayın.",
       "PayTR ile online tahsilat, nakit ve kart ödeme kaydı, gün sonu raporu tek panelde.",
-      "Teslimat platformları entegre: Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek ekranda toplanır.",
+      "Teslimat platformları entegre: Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek ekranda toplanır.",
     ],
     faq: [
       {
@@ -133,7 +133,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
       },
       {
         q: "Teslimat platformlarıyla çalışıyor mu, kendi kuryemi takip edebilir miyim?",
-        a: "Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek panele düşer; her platform için ayrı ekran başında beklemezsiniz. Teslimatı platformun kendi kurye ağı üstlenir. Kendi kuryenizi atayıp canlı GPS ile konum takibi yapma özelliği ise bulunmuyor.",
+        a: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panele düşer; her platform için ayrı ekran başında beklemezsiniz. Teslimatı platformun kendi kurye ağı üstlenir. Kendi kuryenizi atayıp canlı GPS ile konum takibi yapma özelliği ise bulunmuyor.",
       },
       {
         q: "Birden fazla şubem var, hepsini tek yerden yönetebilir miyim?",
@@ -322,10 +322,10 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
         ],
       },
       {
-        title: "Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek panelde",
-        body: "Ayrı ayrı tabletlerde çalan dört farklı platform, yoğun saatte kabus olur. HummyTummy, Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek entegrasyonuyla bu kanallardan gelen siparişleri tek panelde toplar; her sipariş otomatik olarak mutfak ekranına ve satış raporlarına düşer. Böylece masa, paket ve platform siparişleri aynı sistemde, aynı personelle yürür. Teslimatı platformların kendi kurye ağı taşır — siz sipariş ve mutfak akışına odaklanırsınız.",
+        title: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panelde",
+        body: "Ayrı ayrı tabletlerde çalan üç farklı platform, yoğun saatte kabus olur. HummyTummy, Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek entegrasyonuyla bu kanallardan gelen siparişleri tek panelde toplar; her sipariş otomatik olarak mutfak ekranına ve satış raporlarına düşer. Böylece masa, paket ve platform siparişleri aynı sistemde, aynı personelle yürür. Teslimatı platformların kendi kurye ağı taşır — siz sipariş ve mutfak akışına odaklanırsınız.",
         bullets: [
-          "Dört teslimat platformunun siparişleri tek panelde, tek akışta toplanır",
+          "Üç teslimat platformunun siparişleri tek panelde, tek akışta toplanır",
           "Gelen her sipariş otomatik mutfak ekranına ve satış raporlarına yansır",
           "Masa, paket ve platform siparişleri aynı sistemde birlikte yönetilir",
           "Şube bazında hangi kanal ne kadar satıyor, kural tabanlı raporlarla net görün",
@@ -361,14 +361,14 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
       title:
         "Fast food'da kazandıran tek şey hız — HummyTummy onu sisteme bağlar",
       subtitle:
-        "QR menü, self-servis ödeme, tek dokunuşluk POS ve mutfak ekranı; masadan, paketten ve Yemeksepeti/Getir/Trendyol/Migros'tan gelen tüm siparişler tek akışta buluşur.",
+        "QR menü, self-servis ödeme, tek dokunuşluk POS ve mutfak ekranı; masadan, paketten ve Yemeksepeti/Getir/Trendyol Yemek/Migros Yemek'ten gelen tüm siparişler tek akışta buluşur.",
     },
     intro:
-      "Fast food işletmesinde her şey öğle ve akşam patlamasında belli olur: kasada uzayan kuyruk, mutfakta biriken fişler, aynı anda dört farklı teslimat platformundan çalan siparişler ve 'bu neydi, kimindi' karmaşası. HummyTummy tam bu yoğunluk için tasarlandı. Müşteri masadaki QR koddan sipariş verir, self-servis ekranda PayTR ile online öder; kasadaki personel hızlı POS ile en çok satan ürünleri tek dokunuşta seçer. Masadan, paketten ve teslimat platformlarından gelen her sipariş şubenin tek mutfak ekranında geliş sırasına göre toplanır, hazırlanıyor ve hazır durumlarıyla takip edilir. Tek hesaptan tüm şubelerinizin cirosunu, en çok satan ürünlerini ve saatlik yoğunluğunu kural tabanlı raporlarla görürsünüz — kağıt fiş, dağınık tablet ve yanlış anlaşılan sipariş devri kapanır.",
+      "Fast food işletmesinde her şey öğle ve akşam patlamasında belli olur: kasada uzayan kuyruk, mutfakta biriken fişler, aynı anda üç farklı teslimat platformundan çalan siparişler ve 'bu neydi, kimindi' karmaşası. HummyTummy tam bu yoğunluk için tasarlandı. Müşteri masadaki QR koddan sipariş verir, self-servis ekranda PayTR ile online öder; kasadaki personel hızlı POS ile en çok satan ürünleri tek dokunuşta seçer. Masadan, paketten ve teslimat platformlarından gelen her sipariş şubenin tek mutfak ekranında geliş sırasına göre toplanır, hazırlanıyor ve hazır durumlarıyla takip edilir. Tek hesaptan tüm şubelerinizin cirosunu, en çok satan ürünlerini ve saatlik yoğunluğunu kural tabanlı raporlarla görürsünüz — kağıt fiş, dağınık tablet ve yanlış anlaşılan sipariş devri kapanır.",
     why: [
       "Yoğun saatte hız: QR menü, self-servis ödeme ve hızlı POS birlikte kuyruğu eritir",
       "Sipariş doğruluğu: seçim müşteriden dijital olarak mutfağa düşer, yanlış anlaşılan sipariş biter",
-      "Tek panelde çok kanal: masa, paket ve dört teslimat platformu aynı akışta birleşir",
+      "Tek panelde çok kanal: masa, paket ve üç teslimat platformu aynı akışta birleşir",
       "Çok şube tek merkez: her şubenin cirosu, ürünleri ve mutfak akışı tek hesaptan yönetilir",
       "Online tahsilat: self-servis ve QR ödemede PayTR ile güvenli, kuyruksuz ödeme",
       "Kural tabanlı raporlar: en çok satan ürün, saatlik yoğunluk ve şube karşılaştırması net rakamlarla",
@@ -381,7 +381,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
         body: "Cuma akşamı salon dolu, telefon susmuyor, Yemeksepeti ve Getir'den siparişler arka arkaya düşüyor. HummyTummy bu üç kanalı tek adisyon akışında birleştirir; personeliniz masa ile paket arasında koşarken siparişleri karıştırmaz. Her pizzayı boyutu, hamuru ve malzeme seçenekleriyle tanımlar, ekstra malzeme farklarını fiyatıyla adisyona işlersiniz.",
         bullets: [
           "Masadaki açık hesap, gel-al ve paket siparişleri tek sipariş ekranında",
-          "Yemeksepeti, Getir, Trendyol ve Migros siparişleri otomatik panele düşer; ayrı platform tabletleri arasında koşmak yok",
+          "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri otomatik panele düşer; ayrı platform tabletleri arasında koşmak yok",
           "Boyut (orta/büyük/aile), hamur ve malzeme seçenekleriyle her pizzayı tek dokunuşla oluştur",
           "Yarım-yarım pizza ve ekstra malzeme farklarını fiyatıyla adisyona ekle",
         ],
@@ -411,7 +411,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     why: [
       "Akşam ve hafta sonu yoğunluğunda salon, telefon ve platform siparişlerini karıştırmadan tek panelden yönetirsiniz",
       "Fırın önündeki mutfak ekranıyla sipariş sırası ve bekleme süresi her an gözünüzün önünde olur",
-      "Yemeksepeti, Getir, Trendyol ve Migros entegrasyonuyla platform siparişleri otomatik panele ve mutfak ekranına düşer",
+      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek entegrasyonuyla platform siparişleri otomatik panele ve mutfak ekranına düşer",
       "Boyut, hamur ve malzeme varyasyonlarıyla pizza menünüzü ve kampanyalarınızı esnek kurarsınız",
       "Malzeme stok takibiyle mozzarella veya hamur bitmeden haberiniz olur",
       "Çok şubeli pizzacıda her şubenin cirosunu ve performansını tek yerden görürsünüz",
@@ -419,7 +419,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     faq: [
       {
         q: "Yemeksepeti ve Getir siparişleri panele otomatik düşer mi?",
-        a: "Evet. Yemeksepeti, Getir, Trendyol ve Migros hesaplarınızı bağladığınızda gelen siparişler otomatik olarak sipariş panelinize ve mutfak ekranınıza düşer; personeliniz ayrı platform tabletleri arasında koşmak zorunda kalmaz.",
+        a: "Evet. Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek hesaplarınızı bağladığınızda gelen siparişler otomatik olarak sipariş panelinize ve mutfak ekranınıza düşer; personeliniz ayrı platform tabletleri arasında koşmak zorunda kalmaz.",
       },
       {
         q: "Kendi motorlu kuryemi atayıp canlı olarak takip edebilir miyim?",
@@ -464,10 +464,10 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
       },
       {
         title:
-          "Yemeksepeti, Getir, Trendyol ve Migros siparişleri aynı ekranda toplansın",
-        body: "Burgerin en çok satıldığı yer çoğu zaman paket ve online; ama her platformun ayrı tableti masada bip bip öter, biri gözden kaçar, biri geç onaylanır. HummyTummy; Yemeksepeti, Getir, Trendyol ve Migros siparişlerini tek panelde toplar, hepsi aynı POS ve mutfak akışına düşer. Masadaki misafir için QR menüden sipariş, salon ve paket aynı sistemde birleşir; hangi kanaldan kaç burger gittiğini tek yerden görürsün. (Kendi kurye ekibini yönetmek veya canlı harita takibi yerine, teslimatı platformların kendi kuryesiyle yürütür; sen mutfağa ve satışa odaklanırsın.)",
+          "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri aynı ekranda toplansın",
+        body: "Burgerin en çok satıldığı yer çoğu zaman paket ve online; ama her platformun ayrı tableti masada bip bip öter, biri gözden kaçar, biri geç onaylanır. HummyTummy; Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişlerini tek panelde toplar, hepsi aynı POS ve mutfak akışına düşer. Masadaki misafir için QR menüden sipariş, salon ve paket aynı sistemde birleşir; hangi kanaldan kaç burger gittiğini tek yerden görürsün. (Kendi kurye ekibini yönetmek veya canlı harita takibi yerine, teslimatı platformların kendi kuryesiyle yürütür; sen mutfağa ve satışa odaklanırsın.)",
         bullets: [
-          "Dört teslimat platformunun siparişi tek panelde, ayrı ayrı tablet dolaşmadan yönetilir",
+          "Üç teslimat platformunun siparişi tek panelde, ayrı ayrı tablet dolaşmadan yönetilir",
           "Platform siparişi de salon siparişiyle aynı mutfak ekranına düşer, hazırlık akışı bölünmez",
           "QR menüyle masadaki misafir garson beklemeden sipariş verir, PayTR ile online tahsilat yapılabilir",
           "Kanal bazında satış: online mu, salon mu, paket mi çok satıyor tek raporda görünür",
@@ -490,22 +490,22 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
       title:
         "Kalabalık akşam servisinde her burger sıcak, hızlı ve tam istendiği gibi çıksın",
       subtitle:
-        "HummyTummy; hızlı POS, şube mutfak ekranı (KDS), QR menü, dört teslimat platformu entegrasyonu ve reçete bazlı stok-maliyet takibini tek sistemde birleştirir. Tek dükkândan zincire, her siparişi hatasız çevirirsin.",
+        "HummyTummy; hızlı POS, şube mutfak ekranı (KDS), QR menü, üç teslimat platformu entegrasyonu ve reçete bazlı stok-maliyet takibini tek sistemde birleştirir. Tek dükkândan zincire, her siparişi hatasız çevirirsin.",
     },
     intro:
-      "Burgercilik hız işidir: sipariş yoğunlaştığında kasa tıkanmamalı, mutfak ne pişireceğini net görmeli, paket ve online siparişler birbirine karışmamalı. HummyTummy tam bu akışı düzenler. Kasadan geçen sipariş anında şubenin mutfak ekranına düşer; 'çift köfte, ekstra cheddar, acılı, soğansız' gibi özelleştirmeler mutfağa net satır olarak gider. Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek panelde toplanır, salon ve QR menü siparişleriyle aynı akışa girer. Her burgerin reçetesini tanımlarsın; satış oldukça köfte, ekmek ve sos stoktan otomatik düşer, maliyetin ve kârın gözünün önünde durur. Tek şubede de, büyüyen bir zincirde de aynı sadelikle çalışırsın.",
+      "Burgercilik hız işidir: sipariş yoğunlaştığında kasa tıkanmamalı, mutfak ne pişireceğini net görmeli, paket ve online siparişler birbirine karışmamalı. HummyTummy tam bu akışı düzenler. Kasadan geçen sipariş anında şubenin mutfak ekranına düşer; 'çift köfte, ekstra cheddar, acılı, soğansız' gibi özelleştirmeler mutfağa net satır olarak gider. Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panelde toplanır, salon ve QR menü siparişleriyle aynı akışa girer. Her burgerin reçetesini tanımlarsın; satış oldukça köfte, ekmek ve sos stoktan otomatik düşer, maliyetin ve kârın gözünün önünde durur. Tek şubede de, büyüyen bir zincirde de aynı sadelikle çalışırsın.",
     why: [
       "Hızlı POS ile yoğun saatte fiş kesme hızlanır; ekstralar ve pişirme notları hatasız girilir",
       "Şube başına tek mutfak ekranı (KDS): onaylanan sipariş anında mutfağa düşer, kağıt fiş kargaşası biter",
-      "Yemeksepeti, Getir, Trendyol ve Migros tek panelde; hiçbir online sipariş gözden kaçmaz",
+      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek tek panelde; hiçbir online sipariş gözden kaçmaz",
       "Reçete bazlı stok ve maliyet: satılan her burgerde malzeme düşer, kritik stok uyarı verir",
       "QR menüyle masadaki misafir garson beklemeden sipariş verir, online tahsilat PayTR ile alınır",
       "Çoklu şube tek panelde: her şubenin cirosu, en çok satan burgeri ve maliyeti karşılaştırılabilir",
     ],
     faq: [
       {
-        q: "Yemeksepeti, Getir, Trendyol ve Migros siparişleri sisteme otomatik düşüyor mu?",
-        a: "Evet. Dört platformun siparişleri tek panelde toplanır ve salon siparişleriyle aynı mutfak akışına girer, böylece her platform için ayrı tablet takip etmek zorunda kalmazsın. Teslimat, platformların kendi kuryeleriyle yürür; sistem kendi kurye atama veya canlı harita takibi yapmaz.",
+        q: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri sisteme otomatik düşüyor mu?",
+        a: "Evet. Üç platformun siparişleri tek panelde toplanır ve salon siparişleriyle aynı mutfak akışına girer, böylece her platform için ayrı tablet takip etmek zorunda kalmazsın. Teslimat, platformların kendi kuryeleriyle yürür; sistem kendi kurye atama veya canlı harita takibi yapmaz.",
       },
       {
         q: "Mutfak ekranı istasyon istasyon mu çalışıyor (ızgara, paket ayrı)?",
@@ -578,7 +578,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     faq: [
       {
         q: "Kaç şube ekleyebilirim?",
-        a: "Zincirinizi aynı hesaba dilediğiniz kadar büyütürsünüz; şube sayısı planınıza göre artar. Yeni bir şube açtığınızda ayrı bir kurulumla uğraşmaz, mevcut hesabınıza eklersiniz.",
+        a: "Zincirinizi aynı hesap altında büyütürsünüz. Şube paneli ücretsiz çekirdeğe dahildir ve ilk şubeniz ücretsizdir; sonraki her şubeyi yıllık Ek Şube kalemiyle (lisans ön koşuluyla) adet adet eklersiniz — 100 şubeye kadar. Yeni bir şube açtığınızda ayrı bir kurulumla uğraşmaz, mevcut hesabınıza eklersiniz.",
       },
       {
         q: "Her şube farklı menü ve fiyat kullanabilir mi?",
@@ -603,10 +603,10 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
   "bulut-mutfak": {
     blocks: [
       {
-        title: "Dört platformun siparişi tek akışta birleşir",
-        body: "Bulut mutfağın en büyük derdi, mutfağın bir köşesinde yan yana dizili tabletler ve her platformun ayrı ekranıdır. HummyTummy, Yemeksepeti, Getir, Trendyol ve Migros'tan gelen tüm siparişleri tek bir panelde toplar. Personelin bir tabletten diğerine koşup siparişi deftere kopyalamasına gerek kalmaz; her sipariş hangi platformdan geldiği, ne zaman girildiği ve hangi aşamada olduğu net biçimde tek akışta görünür.",
+        title: "Üç platformun siparişi tek akışta birleşir",
+        body: "Bulut mutfağın en büyük derdi, mutfağın bir köşesinde yan yana dizili tabletler ve her platformun ayrı ekranıdır. HummyTummy, Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek'ten gelen tüm siparişleri tek bir panelde toplar. Personelin bir tabletten diğerine koşup siparişi deftere kopyalamasına gerek kalmaz; her sipariş hangi platformdan geldiği, ne zaman girildiği ve hangi aşamada olduğu net biçimde tek akışta görünür.",
         bullets: [
-          "Yemeksepeti, Getir, Trendyol ve Migros siparişleri otomatik olarak aynı sipariş akışına düşer",
+          "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri otomatik olarak aynı sipariş akışına düşer",
           "Her sipariş kaynak platformuna göre etiketlenir; hangi kanaldan geldiği tek bakışta belli",
           "Aynı mutfaktan işlettiğiniz birden fazla sanal markanın siparişleri de aynı panelde toplanır, marka bazında filtrelenir",
           "Yoğun saatte tablet başında bekleyip sipariş kaçırma riski ortadan kalkar",
@@ -635,7 +635,7 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     ],
     why: [
       "Sadece teslimat modeline göre kurgulandı: masa-adisyon karmaşası yerine sipariş hızı ve doğruluğu önceliğiniz olur",
-      "Yemeksepeti, Getir, Trendyol ve Migros tek panelde birleşir; mutfaktaki tablet kalabalığı ve kanal karmaşası biter",
+      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek tek panelde birleşir; mutfaktaki tablet kalabalığı ve kanal karmaşası biter",
       "Aynı mutfaktan yürüttüğünüz birden fazla sanal markayı tek ekrandan yönetir, marka bazında raporlarsınız",
       "Bulut tabanlı çalışır: mutfaktaki ekran, ofisteki bilgisayar ve telefon tarayıcısı hep aynı güncel veriyi gösterir",
       "Arayüz Türkçe dahil 5 dilde; farklı vardiya ve ekiplerle çalışmak kolaylaşır",
@@ -644,11 +644,11 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     faq: [
       {
         q: "Kendi kuryemi atayıp canlı GPS ile takip edebilir miyim?",
-        a: "Hayır. HummyTummy kurye atama ve canlı GPS/rota takibi yapmaz. Teslimatı Yemeksepeti, Getir, Trendyol ve Migros kendi kurye ağlarıyla yürütür; biz bu platformlardan gelen siparişleri tek panelde toplar, mutfağınızı, stoğunuzu ve raporlarınızı yönetiriz.",
+        a: "Hayır. HummyTummy kurye atama ve canlı GPS/rota takibi yapmaz. Teslimatı Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek kendi kurye ağlarıyla yürütür; biz bu platformlardan gelen siparişleri tek panelde toplar, mutfağınızı, stoğunuzu ve raporlarınızı yönetiriz.",
       },
       {
         q: "Hangi teslimat platformlarıyla çalışıyor?",
-        a: "Yemeksepeti, Getir, Trendyol ve Migros siparişleri tek panele akar. Böylece her platform için ayrı tablet ve ayrı ekran takip etmek yerine tüm siparişleri aynı akışta görürsünüz.",
+        a: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panele akar. Böylece her platform için ayrı tablet ve ayrı ekran takip etmek yerine tüm siparişleri aynı akışta görürsünüz.",
       },
       {
         q: "Aynı mutfaktan birden fazla sanal marka işletiyorum, hepsini tek yerden yönetebilir miyim?",
@@ -668,11 +668,11 @@ export const GENERATED_SECTORS: Record<string, SectorCopy> = {
     hero: {
       eyebrow: "Bulut Mutfak Yönetimi",
       title:
-        "Yemeksepeti, Getir, Trendyol ve Migros — hepsi tek mutfak panelinde",
+        "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek — hepsi tek mutfak panelinde",
       subtitle:
-        "Sadece teslimat üzerine çalışan bulut mutfaklar için: dört platformun siparişini tek ekranda birleştirin, mutfağı hızlandırın, stok ve raporları tek yerden yönetin.",
+        "Sadece teslimat üzerine çalışan bulut mutfaklar için: üç platformun siparişini tek ekranda birleştirin, mutfağı hızlandırın, stok ve raporları tek yerden yönetin.",
     },
     intro:
-      "HummyTummy, masası ve salonu olmayan, işini tamamen teslimat üzerine kuran bulut mutfaklar için tasarlandı. Yemeksepeti, Getir, Trendyol ve Migros'tan gelen tüm siparişleri tek bir ekranda toplar; ayrı ayrı tabletler arasında koşmayı, siparişi elle deftere yazmayı ve yoğun saatteki platform kargaşasını ortadan kaldırır. Aynı mutfaktan birden fazla sanal marka işletiyor olsanız bile her siparişin hangi platformdan geldiğini, ne zaman girildiğini ve mutfağın hangi aşamada olduğunu tek bakışta görürsünüz. Siparişler anlık olarak mutfak ekranına düşer, satışla birlikte stok azalır ve platform ile marka bazında raporlar tek yerde birikir — böylece tüm dikkatinizi tek işe, siparişi hızlı ve doğru hazırlamaya verirsiniz.",
+      "HummyTummy, masası ve salonu olmayan, işini tamamen teslimat üzerine kuran bulut mutfaklar için tasarlandı. Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek'ten gelen tüm siparişleri tek bir ekranda toplar; ayrı ayrı tabletler arasında koşmayı, siparişi elle deftere yazmayı ve yoğun saatteki platform kargaşasını ortadan kaldırır. Aynı mutfaktan birden fazla sanal marka işletiyor olsanız bile her siparişin hangi platformdan geldiğini, ne zaman girildiğini ve mutfağın hangi aşamada olduğunu tek bakışta görürsünüz. Siparişler anlık olarak mutfak ekranına düşer, satışla birlikte stok azalır ve platform ile marka bazında raporlar tek yerde birikir — böylece tüm dikkatinizi tek işe, siparişi hızlı ve doğru hazırlamaya verirsiniz.",
   },
 };

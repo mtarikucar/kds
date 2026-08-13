@@ -3,7 +3,7 @@ export default {
   "api-fundamentals": "API Temelleri",
   "partner-display": "Partner Display API",
   "webhooks": "Webhook'lar",
-  "billing-api": "Abonelik & Ödeme API",
+  "billing-api": "Lisans & Ödeme API",
   "marketplace-api": "Marketplace API",
   "devices-api": "Cihaz API (Device Mesh)",
   "desktop-api": "Masaüstü Sürüm API",

@@ -8,17 +8,13 @@
     "cancel": "Obunani bekor qilish",
     "renew": "Yangilash",
     "billing": "Hisob-kitob",
-    "billingCycle": "Hisob-kitob davri",
-    "monthly": "Oylik",
     "yearly": "Yillik",
-    "nextBillingDate": "Keyingi hisob-kitob sanasi",
     "paymentMethod": "To'lov usuli",
     "updatePaymentMethod": "To'lov usulini tanlash",
     "invoices": "Hisob-fakturalar",
     "downloadInvoice": "Hisob-fakturani yuklab olish",
     "features": "Xususiyatlar",
     "price": "Narx",
-    "perMonth": "oyiga",
     "perYear": "yiliga",
     "selectPlan": "Modulni tanlash",
     "currentlyActive": "Faol",
@@ -38,7 +34,6 @@
     "viewAllPlans": "Barcha modullar",
     "status": {
       "active": "Faol",
-      "trial": "Faol",
       "cancelled": "Bekor qilingan",
       "expired": "Muddati tugagan",
       "pastDue": "Muddat o'tgan",
@@ -52,9 +47,7 @@
       "uncollectible": "Undirib bo'lmaydi"
     },
     "currentSubscription": "Joriy obuna",
-    "month": "oy",
     "year": "yil",
-    "trialEnds": "Amal qilish muddati",
     "cancelsOn": "Bekor qilinadi",
     "planLimitsFeatures": "Sig'im va xususiyatlar",
     "planLimits": {
@@ -90,13 +83,11 @@
       "other": "Boshqa"
     },
     "selectNewPlan": "Qo'shmoqchi bo'lgan modulni tanlang:",
-    "perMonthShort": "oy",
     "perYearShort": "yil",
     "keepSubscription": "Obunani saqlab qolish",
     "management": "Obunani boshqarish",
     "viewAllPlansBtn": "Barcha modullar",
     "unknownPlan": "Noma'lum modul",
-    "nextBilling": "Keyingi hisob-kitob",
     "plansPage": {
       "title": "Modullaringizni tanlang",
       "subtitle": "Yadro bepul. Faqat kerakli modul uchun to'laysiz.",
@@ -127,7 +118,6 @@
       "backToPlans": "Modullarga qaytish",
       "securePaymentWith": "Xavfsiz to'lov",
       "securePaymentTitle": "Xavfsiz to'lov",
-      "securePaymentDescStripe": "To'lovlar faqat PayTR xavfsiz infratuzilmasi orqali qabul qilinadi. Karta ma'lumotlaringiz bizda saqlanmaydi.",
       "securePaymentDescPaytr": "To'lov ma'lumotlaringiz PayTR tomonidan xavfsiz qayta ishlanadi. Karta ma'lumotlaringiz bizda saqlanmaydi.",
       "paymentApproved": "To'lov tasdiqlandi!",
       "activatingSubscription": "To'lov tasdiqlandi! Obuna faollashtirilmoqda...",
@@ -156,7 +146,6 @@
         "goToDashboard": "Boshqaruv paneliga o'tish"
       }
     },
-    "savePercent": "{{percent}}% tejang",
     "changePlanTitle": "Modullaringizni boshqaring",
     "currentPlanLabel": "Joriy litsenziya",
     "backToSubscription": "Obunaga qaytish",
@@ -246,7 +235,6 @@
       "tryAgain": "Qaytadan urinib ko'rish"
     },
     "statusBanner": {
-      "trialCountdown": "{{plan}} litsenziyangizni {{days}} kun ichida yangilash kerak",
       "gracePeriod": "Yangilash to'lovi kutilmoqda — {{days}} kun ichida to'lang, aks holda pullik modullarga kirish yopiladi. Ma'lumotlaringiz o'chirilmaydi.",
       "subscribeNow": "Litsenziya olish",
       "payNow": "Hozir to'lash",

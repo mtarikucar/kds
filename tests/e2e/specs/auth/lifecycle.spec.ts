@@ -25,7 +25,7 @@ async function newPublicCtx() {
 }
 
 test.describe('Auth — register', () => {
-  test('new-restaurant signup creates a tenant + admin user + 14-day BUSINESS trial', async () => {
+  test('new-restaurant signup lands on the free core — no plan, no subscription, no trial', async () => {
     const pub = await newPublicCtx();
     const email = uniqueEmail('newresto');
     const res = await pub.post('auth/register', {
@@ -43,24 +43,56 @@ test.describe('Auth — register', () => {
     expect(body.user?.email).toBe(email);
     expect(body.user?.role).toBe('ADMIN');
 
-    // Subscription state — registration now auto-attaches a 14-day
-    // BUSINESS trial instead of dropping the tenant onto FREE. The
-    // assertion lives here (not in a separate spec) so the
-    // registration contract is a single source of truth for downstream
-    // changes.
+    // v3.3.0 registration contract. A brand-new tenant gets a tenant row,
+    // a Main branch and an ADMIN user — and nothing else.
+    // `AuthProvisioningService.provisionNewTenantWithAdmin` does not look a
+    // plan up, does not stamp `currentPlanId`, does not write a Subscription
+    // and does not start a countdown of any kind. Capability comes from the
+    // free core every tenant holds unconditionally, plus whatever annual
+    // modules that tenant later buys.
+    //
+    // This assertion deliberately lives with the register spec rather than in
+    // a subscription spec of its own: signup is where the "what does a new
+    // customer actually get" contract is decided, so a change that reintroduces
+    // a plan or a countdown should fail HERE.
+    //
+    // What this replaced: the previous version of this test asserted a 14-day
+    // BUSINESS trial (plan.name === 'BUSINESS', status TRIALING, isTrialPeriod,
+    // trialStart/trialEnd populated). That rail was retired by the 2026-08-11
+    // à-la-carte migrations, so those lines had turned into a test that
+    // guarded a contract the product no longer offers.
+    const branchId: string | undefined = body.user?.primaryBranchId ?? undefined;
+    expect(branchId, 'signup must mint a Main branch and assign it').toBeTruthy();
+
     const authed = await request.newContext({
       baseURL: API_BASE,
-      extraHTTPHeaders: { Authorization: `Bearer ${body.accessToken}` },
+      extraHTTPHeaders: {
+        Authorization: `Bearer ${body.accessToken}`,
+        // BranchGuard is global and strict: every branch-scoped route needs
+        // the header, with no fallback to a JWT claim or "first active branch".
+        'X-Branch-Id': branchId as string,
+      },
     });
     try {
       const subRes = await authed.get('subscriptions/current');
       expect(subRes.ok()).toBeTruthy();
-      const sub = await subRes.json();
-      expect(sub.plan?.name).toBe('BUSINESS');
-      expect(sub.status).toBe('TRIALING');
-      expect(sub.isTrialPeriod).toBe(true);
-      expect(sub.trialStart).toBeTruthy();
-      expect(sub.trialEnd).toBeTruthy();
+      // The handler is a `findFirst`, so "no subscription" comes back as an
+      // empty body — parse defensively instead of calling .json() on ''.
+      const rawSub = (await subRes.text()).trim();
+      const sub = rawSub ? JSON.parse(rawSub) : null;
+      expect(sub, 'a newly registered tenant must not own a subscription').toBeFalsy();
+
+      // ...and the free core is usable immediately, with nothing bought and
+      // no countdown running: the menu is part of the free core, so creating
+      // a category is a plain success rather than an entitlement refusal.
+      const cat = await authed.post('menu/categories', {
+        data: { name: `E2E Free Core ${Date.now()}` },
+      });
+      const catBody = await cat.text();
+      expect(
+        cat.ok(),
+        `free-core menu write was refused: ${cat.status()} ${catBody}`,
+      ).toBeTruthy();
     } finally {
       await authed.dispose();
     }

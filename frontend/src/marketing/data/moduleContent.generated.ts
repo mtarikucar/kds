@@ -373,8 +373,8 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
         a: "Modülün zamanlayıcısı rezervasyon saati yaklaşınca devreye girer ve misafire e-posta, gerekirse SMS ile hatırlatma gönderir; böylece rezervasyonunu unutup gelmeyen misafir azalır. Ayrıca günün listesinden kimin onaylı, kimin beklemede olduğunu görüp masayı boşuna bekletmezsiniz.",
       },
       {
-        q: "Rezervasyon modülü her planda var mı?",
-        a: "Rezervasyon, planınızın reservationSystem özelliğine bağlıdır. Bu özellik açık olan planlarda hem personel hem müşteri tarafı, uygunluk hesaplama, hatırlatma ve sorgulama ekranı tümüyle kullanılabilir. Planınızda yoksa yükseltme ile etkinleştirebilirsiniz.",
+        q: "Rezervasyon ücretsiz çekirdeğe dahil mi?",
+        a: "Hayır; bu ekran Rezervasyon Sistemi modülüne dahildir (yıllık, lisans ön koşuluyla). Modülü açtığınız anda hem personel hem müşteri tarafı, uygunluk hesaplama, hatırlatma ve sorgulama ekranı tümüyle kullanılabilir olur. Masa ve kat planının kendisi ücretsiz çekirdeğe dahildir; modülü eklemeden de masalarınızı yönetmeye devam edersiniz.",
       },
     ],
     ctaTitle:
@@ -942,8 +942,8 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
         a: "Hayır. ADMIN, MANAGER, WAITER ve COURIER rolleriyle herkese yalnızca işiyle ilgili yetkiyi verirsiniz. Kasa, raporlar ve işletme ayarları gibi hassas alanları yetkisiz personele kapatabilirsiniz.",
       },
       {
-        q: "Personel yönetimi hangi planlarda yer alıyor?",
-        a: "Personel yönetimi, bu özelliği içeren abonelik planlarında etkinleşir. Planınızda açıksa vardiya planı, mesai takibi, vardiya değişimi ve performans ekranlarının tamamını kullanır; uygun plan için abonelik sayfanızı kontrol edebilirsiniz.",
+        q: "Personel yönetimi ücretsiz çekirdeğe dahil mi?",
+        a: "Ekip ve rol yönetimi ücretsiz çekirdeğe dahildir; kullanıcı sayınız sınırsızdır. Vardiya planı, mesai takibi, vardiya değişimi ve performans ekranları ise Personel Yönetimi modülüne dahildir (yıllık, lisans ön koşuluyla). Modülü eklediğinizde bu ekranların tamamı açılır.",
       },
     ],
     ctaTitle: "Vardiya kaosuna son verin, ekibinizi tek panelden yönetin",
@@ -1118,7 +1118,7 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
     faq: [
       {
         q: "Kaç şube ekleyebilirim?",
-        a: "Tüm şubelerinizi tek hesabın altında yönetebilirsiniz. Şube sayısı abonelik planınızın kapsamına göre belirlenir; işletmeniz büyüdükçe yeni şubeleri aynı panele eklemeye devam edersiniz.",
+        a: "Tüm şubelerinizi tek hesabın altında yönetebilirsiniz. Şube paneli ücretsiz çekirdeğe dahildir ve ilk şubeniz ücretsizdir; sonraki her şubeyi yıllık Ek Şube kalemiyle (lisans ön koşuluyla) adet adet eklersiniz — 100 şubeye kadar.",
       },
       {
         q: "Bir şubedeki personel diğer şubelerin verilerini görebilir mi?",
@@ -1144,17 +1144,17 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
       eyebrow: "Entegrasyonlar",
       title: "Tüm sipariş kanallarınız ve sistemleriniz tek panelde birleşsin",
       subtitle:
-        "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek'ten gelen paket siparişler, e-Fatura entegratörünüz, partner ekranlarınız ve online tahsilat aynı çatı altında. Ayrı tabletler, elle yeniden giriş ve dağınık sistemler yerine tek, düzenli bir akış.",
+        "Yemeksepeti, Getir ve Trendyol Yemek'ten gelen paket siparişler, e-Fatura entegratörünüz, partner ekranlarınız ve online tahsilat aynı çatı altında. Ayrı tabletler, elle yeniden giriş ve dağınık sistemler yerine tek, düzenli bir akış.",
     },
     intro:
-      "Bir restoran artık tek bir kanaldan yönetilmiyor: paket siparişler dört ayrı teslimat platformundan geliyor, muhasebe e-fatura entegratörünüz üzerinden yürüyor, online ödemeler ayrı bir kanaldan tahsil ediliyor. HummyTummy Entegrasyonlar modülü bu dağınık akışı tek yerde toplar. Her platformun kendi tabletini önünde personel koşturmak, gelen siparişi elle POS'a yeniden girmek ya da her sistem için ayrı takip tutmak yerine; siparişler otomatik olarak sisteme düşer, doğru şubeye yönlendirilir ve mutfak ekranınıza işlenir. Teslimat platformlarını, e-Fatura/e-Arşiv sağlayıcılarını, partner ekranlarını ve PayTR online ödemeyi tek panelden bağlar, açar-kapatır ve izlersiniz.",
+      "Bir restoran artık tek bir kanaldan yönetilmiyor: paket siparişler ayrı ayrı teslimat platformlarından geliyor, muhasebe e-fatura entegratörünüz üzerinden yürüyor, online ödemeler ayrı bir kanaldan tahsil ediliyor. HummyTummy Entegrasyonlar modülü bu dağınık akışı tek yerde toplar. Her platformun kendi tabletini önünde personel koşturmak, gelen siparişi elle POS'a yeniden girmek ya da her sistem için ayrı takip tutmak yerine; siparişler otomatik olarak sisteme düşer, doğru şubeye yönlendirilir ve mutfak ekranınıza işlenir. Teslimat platformlarını, e-Fatura/e-Arşiv sağlayıcılarını, partner ekranlarını ve PayTR online ödemeyi tek panelden bağlar, açar-kapatır ve izlersiniz.",
     blocks: [
       {
-        title: "Dört teslimat platformu, tek sipariş paneli",
-        body: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek'in tümü gerçek üretim adaptörleriyle entegredir. Her platformun ayrı tabletine bakıp siparişi elle adisyona geçirmek yerine, dört kanaldan gelen siparişler HummyTummy'nin tek paneline akar; otomatik olarak sisteme düşer ve mutfak ekranına işlenir. Çok şubeli işletmelerde her şube kendi platform hesaplarıyla eşleşir, böylece gelen her sipariş ait olduğu şubenin mutfağına yönlendirilir. Entegrasyonu canlıya almadan önce sandbox simülatörüyle tüm akışı gerçek sipariş göndermeden deneyebilir, her şeyin doğru çalıştığını görebilirsiniz.",
+        title: "Üç teslimat platformu, tek sipariş paneli",
+        body: "Yemeksepeti, Getir ve Trendyol Yemek gerçek üretim adaptörleriyle entegredir ve her biri yıllık bir entegrasyon kalemidir (lisans ön koşuluyla); yalnızca kullandığınız platformu eklersiniz. Her platformun ayrı tabletine bakıp siparişi elle adisyona geçirmek yerine, bağladığınız kanallardan gelen siparişler HummyTummy'nin tek paneline akar; otomatik olarak sisteme düşer ve mutfak ekranına işlenir. Çok şubeli işletmelerde her şube kendi platform hesaplarıyla eşleşir, böylece gelen her sipariş ait olduğu şubenin mutfağına yönlendirilir. Entegrasyonu canlıya almadan önce sandbox simülatörüyle tüm akışı gerçek sipariş göndermeden deneyebilir, her şeyin doğru çalıştığını görebilirsiniz.",
         bullets: [
-          "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek için gerçek üretim adaptörleri",
-          "Dört platformun siparişi tek panelde birleşir; elle yeniden giriş yok",
+          "Yemeksepeti, Getir ve Trendyol Yemek için gerçek üretim adaptörleri",
+          "Bağladığınız platformların siparişi tek panelde birleşir; elle yeniden giriş yok",
           "Çok şubeli eşleştirme: her sipariş doğru şubenin mutfağına düşer",
           "Sandbox simülatörüyle canlıya geçmeden uçtan uca test",
         ],
@@ -1202,7 +1202,7 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
       ],
     },
     advantages: [
-      "Dört teslimat platformu tek panelde, tablet karmaşasına son",
+      "Üç teslimat platformu tek panelde, tablet karmaşasına son",
       "Çok şubeli mimari: her sipariş otomatik olarak doğru şubeye",
       "Sandbox simülatörüyle canlıya geçmeden risksiz test",
       "e-Fatura / e-Arşiv için Paraşüt, Foriba ve Logo altyapısı",
@@ -1212,7 +1212,7 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
     faq: [
       {
         q: "Hangi teslimat platformları destekleniyor?",
-        a: "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek. Dördü de gerçek üretim adaptörleriyle çalışır ve gelen siparişler tek panelde birleşir.",
+        a: "Yemeksepeti, Getir ve Trendyol Yemek. Üçü de gerçek üretim adaptörleriyle çalışır ve gelen siparişler tek panelde birleşir. Her platform ayrı bir yıllık entegrasyon kalemidir (lisans ön koşuluyla); hangisini kullanıyorsanız yalnızca onu eklersiniz.",
       },
       {
         q: "Siparişleri elle POS'a yeniden girmem gerekir mi?",
@@ -1430,10 +1430,10 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
       title:
         "İşletmenizi büyüten her özelliği tek mağazadan açın, ödediğiniz anda kullanmaya başlayın",
       subtitle:
-        "HummyTummy Marketplace, ihtiyaç duyduğunuz eklentileri yayınlanmış bir katalogdan seçip birkaç tıkla açmanızı sağlar. Planınızda zaten olan özelliği size ikinci kez satmaz; ödemenizi PayTR ile aldığı anda özelliği hesabınıza otomatik tanımlar. İstemediğiniz eklentiyi aynı ekrandan iptal edersiniz.",
+        "HummyTummy Marketplace, ihtiyaç duyduğunuz modülleri, entegrasyonları ve kontörleri yayınlanmış bir katalogdan seçip birkaç tıkla açmanızı sağlar. Zaten sahip olduğunuz — ücretsiz çekirdeğe dahil ya da daha önce aldığınız — bir kalemi size ikinci kez satmaz; ödemenizi PayTR ile aldığı anda kalemi hesabınıza otomatik tanımlar. İstemediğiniz kalemi aynı ekrandan iptal edersiniz.",
     },
     intro:
-      "Restoran ve kafe işiniz büyüdükçe ihtiyaçlarınız da değişir: bir dönem yalnızca sipariş ve mutfak ekranı yeterken, sonra rezervasyon, çoklu şube, gelişmiş raporlama ya da bir donanım entegrasyonu gündeme gelir. HummyTummy Marketplace tam da bu noktada devreye girer. Tüm eklentileri tek bir mağaza vitrininde, ne işe yaradığı ve fiyatıyla birlikte görürsünüz; hangisinin işinize yarayacağına karar verip anında satın alırsınız. Kritik fark şu: sistem, mevcut planınızın kapsamını bilir. Aboneliğinize zaten dahil olan bir özelliği size boşuna satmaya çalışmaz, o eklentiyi 'plana dahil' olarak işaretler ve satın alma butonunu göstermez. Böylece aynı özellik için iki kez ödeme yapma riskiniz ortadan kalkar. Ödemeyi PayTR üzerinden güvenle tamamladığınız an eklenti otomatik olarak hesabınıza tanımlanır, bir e-posta beklemez ya da destek ekibinden manuel açılış istemezsiniz. İhtiyaç değişirse aynı ekrandan iptal eder, mağazayı, donanımı ve siparişlerinizi tek bir merkezden yönetirsiniz.",
+      "Restoran ve kafe işiniz büyüdükçe ihtiyaçlarınız da değişir: bir dönem ücretsiz çekirdek yeterken, sonra rezervasyon, ek şube, gelişmiş raporlama ya da bir teslimat entegrasyonu gündeme gelir. HummyTummy Marketplace tam da bu noktada devreye girer. Satın alınabilir tüm kalemleri tek bir mağaza vitrininde, ne işe yaradığı ve fiyatıyla birlikte görürsünüz; hangisinin işinize yarayacağına karar verip anında satın alırsınız. Kritik fark şu: sistem, hesabınızda hâlihazırda açık olan yetkileri bilir. Ücretsiz çekirdeğe zaten dahil olan ya da daha önce satın aldığınız bir kalemi size boşuna satmaya çalışmaz; onu 'zaten sizde' olarak işaretler ve satın alma butonunu göstermez. Böylece aynı özellik için iki kez ödeme yapma riskiniz ortadan kalkar. Ödemeyi PayTR üzerinden güvenle tamamladığınız an kalem otomatik olarak hesabınıza tanımlanır, bir e-posta beklemez ya da destek ekibinden manuel açılış istemezsiniz. İhtiyaç değişirse aynı ekrandan iptal eder, mağazayı, donanımı ve siparişlerinizi tek bir merkezden yönetirsiniz.",
     blocks: [
       {
         title: "Şeffaf katalog, tek tıkla satın alma ve dilediğinde iptal",
@@ -1446,13 +1446,13 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
         ],
       },
       {
-        title: "Planınızda olanı bir daha satmaz: çift ödeme riski yok",
-        body: "HummyTummy Marketplace'in en önemli özelliği, mevcut abonelik planınızın kapsamını tanımasıdır. Bir eklenti zaten kullandığınız plana dahilse, sistem onu 'plana dahil' olarak işaretler ve satın alma seçeneği sunmaz. Bu sayede, aslında hakkınız olan bir özelliği yanlışlıkla tekrar satın alıp iki kez ödeme yapmanızın önüne geçilir. Vitrinde neyi zaten kullandığınızı, neyin ek satın alma gerektirdiğini bir bakışta ayırt edersiniz. Bu, hem bütçenizi korur hem de hangi özelliğin gerçekten ekstra maliyet demek olduğunu net görmenizi sağlar.",
+        title: "Zaten sizde olanı bir daha satmaz: çift ödeme riski yok",
+        body: "HummyTummy Marketplace'in en önemli özelliği, hesabınızda hâlihazırda açık olan yetkileri tanımasıdır. Bir kalem ücretsiz çekirdeğe dahilse ya da daha önce satın aldıysanız, sistem onu 'zaten sizde' olarak işaretler ve satın alma seçeneği sunmaz. Bu sayede, aslında hakkınız olan bir özelliği yanlışlıkla tekrar satın alıp iki kez ödeme yapmanızın önüne geçilir. Vitrinde neyi zaten kullandığınızı, neyin ek satın alma gerektirdiğini bir bakışta ayırt edersiniz. Bu, hem bütçenizi korur hem de hangi özelliğin gerçekten ekstra maliyet demek olduğunu net görmenizi sağlar.",
         bullets: [
-          "Planınıza dahil eklentiler açıkça 'plana dahil' olarak gösterilir",
+          "Ücretsiz çekirdeğe dahil ya da daha önce alınmış kalemler 'zaten sizde' olarak gösterilir",
           "Zaten sahip olduğunuz özelliğin satın alma butonu gizlenir",
           "Aynı özellik için iki kez ödeme yapma riski ortadan kalkar",
-          "Sahip olmak ile plana dahil olmak birbirine karışmaz, ayrım nettir",
+          "Ek şube gibi adet bazlı kalemler istisnadır: kapasite eklemek için tekrar tekrar alınabilir",
         ],
       },
       {
@@ -1472,7 +1472,7 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
       steps: [
         {
           title: "Katalogda keşfet",
-          body: "Marketplace vitrinini açın ve yayınlanmış eklentileri açıklamaları ve fiyatlarıyla inceleyin. Planınıza zaten dahil olanlar 'plana dahil' olarak işaretlenir, böylece hangisinin ek satın alma gerektirdiğini bir bakışta ayırt edersiniz.",
+          body: "Marketplace vitrinini açın ve yayınlanmış kalemleri açıklamaları ve fiyatlarıyla inceleyin. Zaten sahip olduklarınız 'zaten sizde' olarak işaretlenir, böylece hangisinin ek satın alma gerektirdiğini bir bakışta ayırt edersiniz.",
         },
         {
           title: "Satın al ve PayTR ile öde",
@@ -1490,7 +1490,7 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
     },
     advantages: [
       "Tüm eklentiler tek vitrinde, açıklaması ve fiyatıyla şeffaf biçimde listelenir",
-      "Planınıza dahil özelliği tekrar satmaz; çift ödeme riskini baştan engeller",
+      "Zaten sahip olduğunuz özelliği tekrar satmaz; çift ödeme riskini baştan engeller",
       "PayTR ile ödeme alınır ve eklenti ödeme sonrası otomatik olarak açılır",
       "Satın alma ve iptali kendiniz, tek tıkla ve tek ekrandan yönetirsiniz",
       "Mağaza, donanım ve siparişler tek bir hub'da birleştiği için ekran ekran dolaşmazsınız",
@@ -1498,8 +1498,8 @@ export const GENERATED_CONTENT: Record<string, ModuleCopy> = {
     ],
     faq: [
       {
-        q: "Planıma zaten dahil olan bir eklentiyi yanlışlıkla tekrar satın alabilir miyim?",
-        a: "Hayır. Marketplace, abonelik planınızın kapsamını bilir. Bir eklenti planınıza dahilse onu 'plana dahil' olarak işaretler ve satın alma seçeneğini göstermez. Böylece aynı özellik için ikinci kez ödeme yapma riski ortadan kalkar.",
+        q: "Zaten sahip olduğum bir kalemi yanlışlıkla tekrar satın alabilir miyim?",
+        a: "Hayır. Marketplace, hesabınızda hâlihazırda açık olan yetkileri bilir. Bir kalem ücretsiz çekirdeğe dahilse ya da daha önce aldıysanız onu 'zaten sizde' olarak işaretler ve satın alma seçeneğini göstermez. Böylece aynı özellik için ikinci kez ödeme yapma riski ortadan kalkar.",
       },
       {
         q: "Eklenti satın aldıktan sonra ne zaman kullanmaya başlarım?",

@@ -207,12 +207,12 @@
     "finalizing": "Downloading / saving…",
     "quotaPhotos": "Photos",
     "quotaVideos": "Videos",
-    "quotaExhaustedPhotos": "Your monthly AI photo allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap.",
-    "quotaExhaustedVideos": "Your monthly AI video allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
+    "quotaExhaustedPhotos": "You are out of AI image credits. Buy a 100-image credit pack in the Store (690 TRY, one-time, VAT included) — credits never expire and stay valid until consumed.",
+    "quotaExhaustedVideos": "You are out of AI video credits. Buy a 20-video credit pack in the Store (890 TRY, one-time, VAT included) — credits never expire and stay valid until consumed."
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "Your monthly AI 3D-model allowance is used up — it renews at the start of next month. Upgrade your plan for a higher cap."
+    "quotaExhausted": "You are out of AI 3D-model credits. Buy a 10-model credit pack in the Store (790 TRY, one-time, VAT included) — credits never expire and stay valid until consumed."
   },
   "import": {
     "invalidRows": "{{n}} rows are incomplete or invalid (empty name or negative price) — fix or remove them"

@@ -8,17 +8,13 @@
     "cancel": "إلغاء الاشتراك",
     "renew": "تجديد",
     "billing": "الفوترة",
-    "billingCycle": "دورة الفوترة",
-    "monthly": "شهري",
     "yearly": "سنوي",
-    "nextBillingDate": "تاريخ الفوترة التالي",
     "paymentMethod": "طريقة الدفع",
     "updatePaymentMethod": "اختيار طريقة الدفع",
     "invoices": "الفواتير",
     "downloadInvoice": "تحميل الفاتورة",
     "features": "الميزات",
     "price": "السعر",
-    "perMonth": "شهرياً",
     "perYear": "سنوياً",
     "selectPlan": "اختر الوحدة",
     "currentlyActive": "نشطة حالياً",
@@ -38,7 +34,6 @@
     "viewAllPlans": "عرض جميع الوحدات",
     "status": {
       "active": "نشط",
-      "trial": "نشط",
       "cancelled": "ملغي",
       "expired": "منتهي",
       "pastDue": "متأخر",
@@ -52,9 +47,7 @@
       "uncollectible": "غير قابلة للتحصيل"
     },
     "currentSubscription": "الاشتراك الحالي",
-    "month": "شهر",
     "year": "سنة",
-    "trialEnds": "صالح حتى",
     "cancelsOn": "يُلغى في",
     "planLimitsFeatures": "السعة والميزات",
     "planLimits": {
@@ -90,13 +83,11 @@
       "other": "أخرى"
     },
     "selectNewPlan": "اختر الوحدة التي تريد إضافتها:",
-    "perMonthShort": "شهر",
     "perYearShort": "سنة",
     "keepSubscription": "الإبقاء على الاشتراك",
     "management": "إدارة الاشتراك",
     "viewAllPlansBtn": "عرض جميع الوحدات",
     "unknownPlan": "وحدة غير معروفة",
-    "nextBilling": "الفوترة التالية",
     "plansPage": {
       "title": "اختر وحداتك",
       "subtitle": "النواة مجانية. ادفع فقط مقابل الوحدات التي تحتاجها.",
@@ -127,7 +118,6 @@
       "backToPlans": "العودة للوحدات",
       "securePaymentWith": "دفع آمن مع",
       "securePaymentTitle": "دفع آمن",
-      "securePaymentDescStripe": "تتم عمليات الدفع عبر بنية PayTR الآمنة فقط. لا نقوم بتخزين تفاصيل بطاقتك.",
       "securePaymentDescPaytr": "يتم معالجة معلومات الدفع الخاصة بك بشكل آمن من قبل PayTR. لا نقوم بتخزين تفاصيل بطاقتك.",
       "paymentApproved": "تمت الموافقة على الدفع!",
       "activatingSubscription": "تمت الموافقة على الدفع! جاري تفعيل الاشتراك...",
@@ -156,7 +146,6 @@
         "goToDashboard": "الذهاب للوحة التحكم"
       }
     },
-    "savePercent": "وفّر {{percent}}%",
     "changePlanTitle": "إدارة وحداتك",
     "currentPlanLabel": "الترخيص الحالي",
     "backToSubscription": "العودة إلى الاشتراك",
@@ -246,7 +235,6 @@
       "tryAgain": "حاول مرة أخرى"
     },
     "statusBanner": {
-      "trialCountdown": "يجب تجديد ترخيص {{plan}} خلال {{days}} يوماً",
       "gracePeriod": "بانتظار دفعة التجديد — ادفع خلال {{days}} يوماً وإلا توقّف الوصول إلى الوحدات المدفوعة. بياناتك لا تُحذف.",
       "subscribeNow": "احصل على ترخيص",
       "payNow": "ادفع الآن",

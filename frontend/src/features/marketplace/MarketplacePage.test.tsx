@@ -104,19 +104,24 @@ describe('MarketplacePage catalogue rendering', () => {
     ).toBeInTheDocument();
   });
 
-  it('formats price in the add-on currency and appends "/ mo" only for recurring billing', () => {
+  it('formats price in the product currency and appends "/yıl" only for annual billing', () => {
     catalog = [
       addon({ code: 'once', name: 'One Time', priceCents: 9900, currency: 'TRY', billing: 'oneTime' }),
-      addon({ code: 'sub', name: 'Monthly', priceCents: 4900, currency: 'TRY', billing: 'recurring' }),
+      addon({ code: 'sub', name: 'Annual', priceCents: 4900, currency: 'TRY', billing: 'annual' }),
     ];
     render(<MemoryRouter><MarketplacePage /></MemoryRouter>);
 
-    const onceCard = screen.getByText('One Time').closest('article') as HTMLElement;
-    // 9900 cents → 99,00 ₺ (tr-TR currency formatting); no "/ mo" suffix.
-    expect(within(onceCard).queryByText('/ mo')).not.toBeInTheDocument();
+    // `t` is mocked to echo the key, so the suffix shows up as its key.
+    const perYear = 'hummytummy.marketplace.perYear';
 
-    const subCard = screen.getByText('Monthly').closest('article') as HTMLElement;
-    expect(within(subCard).getByText('/ mo')).toBeInTheDocument();
+    const onceCard = screen.getByText('One Time').closest('article') as HTMLElement;
+    // Credit packs and services are flat charges — 9900 cents → 99,00 ₺
+    // (tr-TR currency formatting), with no period suffix.
+    expect(within(onceCard).queryByText(perYear)).not.toBeInTheDocument();
+
+    // Everything else in the catalogue is quoted per licensing year.
+    const annualCard = screen.getByText('Annual').closest('article') as HTMLElement;
+    expect(within(annualCard).getByText(perYear)).toBeInTheDocument();
   });
 });
 

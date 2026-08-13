@@ -1,53 +1,55 @@
 {
   "page": {
-    "title": "Tarif va kirish",
-    "subtitle": "Joriy tarifingiz, foydalanish kvotalari va faol qoʻshimchalarni bir joyda boshqaring."
+    "title": "Litsenziya va kirish",
+    "subtitle": "Litsenziyangiz, sizdagi modullar va kredit balanslari bir joyda."
   },
   "plan": {
-    "current": "Joriy tarif",
-    "nextBilling": "Keyingi toʻlov: {{date}}",
-    "trialEnds": "Sinov muddati tugaydi: {{date}}",
-    "changePlanCta": "Tarifni oʻzgartirish"
+    "current": "Joriy litsenziyangiz",
+    "nextBilling": "Keyingi yangilash: {{date}}",
+    "changePlanCta": "Modullarni boshqarish"
   },
   "quota": {
-    "title": "Foydalanish kvotalari",
+    "title": "Foydalanish",
     "users": "Foydalanuvchilar",
     "branches": "Filiallar",
     "products": "Mahsulotlar",
     "monthlyOrders": "Oylik buyurtmalar",
     "unlimited": "Cheksiz",
-    "upgradeCta": "Yuqori tarifga oʻting →"
+    "upgradeCta": "Doʻkonni ochish →"
   },
   "included": {
-    "title": "Tarifingizga kiritilgan"
+    "title": "Bepul yadroga kiritilgan"
   },
-  "perMonthSuffix": "/oy",
   "activeAddOns": {
-    "title": "Faol qoʻshimchalar",
-    "empty": "Hozircha hech qanday qoʻshimcha sotib olmadingiz. Quyidagi tavsiyalarni koʻring.",
+    "title": "Sizdagi modullar",
+    "empty": "Hozircha pullik modulingiz yoʻq. Quyidagi tavsiyalarni koʻring.",
     "col": {
-      "name": "Qoʻshimcha",
+      "name": "Mahsulot",
       "price": "Narx",
       "renewal": "Yangilash"
     },
-    "scheduledToCancel": "Davr oxirida bekor qilinadi",
-    "cancelCta": "Bekor qilish"
+    "scheduledToCancel": "Davr oxirida yangilanmaydi",
+    "cancelCta": "Yangilashni toʻxtatish"
   },
   "suggested": {
-    "title": "Tavsiya etilgan qoʻshimchalar",
-    "viewAll": "Marketplace'ga oʻtish"
+    "title": "Tavsiya etilgan modullar",
+    "viewAll": "Doʻkonga oʻtish"
   },
   "upsell": {
-    "defaultTitle": "Bu funksiya obunangizga kirmaydi",
-    "defaultDescription": "Bu sahifaga kirish uchun tarifingizni yangilashingiz yoki mos qoʻshimchani sotib olishingiz kerak.",
-    "upgradePlanCta": "Tarifni yangilash",
-    "viewAddOnCta": "Qoʻshimchani koʻrish",
+    "defaultTitle": "Bu ekran pullik modulga kiradi",
+    "defaultDescription": "Bu ekranni ochish uchun tegishli yillik modulni sotib olishingiz kerak. Pullik modullar yillik litsenziya sharti bilan sotiladi.",
+    "moduleTitle": "{{module}} moduli kerak",
+    "moduleDescription": "Bu ekran {{module}} moduliga kiradi (yillik, litsenziya sharti bilan).",
+    "freeCoreTitle": "Bu ekranga kirishingiz yopiq",
+    "freeCoreDescription": "Bu ekran bepul yadroga kiradi, lekin hisobingizda oʻchirilgan koʻrinadi. Qoʻllab-quvvatlash xizmatiga murojaat qiling.",
+    "viewLicenceCta": "Litsenziyam va modullarim",
+    "viewAddOnCta": "Doʻkonda koʻrish",
     "helpHint": "Savollaringiz boʻlsa, qoʻllab-quvvatlash xizmatiga murojaat qiling.",
     "buyCta": "Sotib olish",
     "renewCta": "Yangilash",
     "perYear": "/yil",
     "proratedPrice": "Bugun olsangiz {{prorated}} ({{annual}}/yil)",
-    "licenceRequired": "Bu funksiya uchun faol yillik litsenziya kerak.",
+    "licenceRequired": "Har qanday pullik moduldan oldin faol yillik litsenziya kerak.",
     "limitReached": "Limitga yetdingiz ({{current}}/{{limit}})."
   },
   "branchPicker": {

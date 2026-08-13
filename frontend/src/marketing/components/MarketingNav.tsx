@@ -129,7 +129,7 @@ export default function MarketingNav() {
             to="/register"
             className="rounded-lg bg-[#1c1917] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3a3531]"
           >
-            7 Gün Ücretsiz Dene
+            Ücretsiz Başla
           </Link>
         </div>
 
@@ -217,7 +217,7 @@ export default function MarketingNav() {
               onClick={() => setOpen(false)}
               className="rounded-xl bg-[#f97316] px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#ea580c]"
             >
-              7 Gün Ücretsiz Dene
+              Ücretsiz Başla
             </Link>
           </div>
         </div>

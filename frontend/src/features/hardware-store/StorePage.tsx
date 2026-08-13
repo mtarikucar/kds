@@ -376,10 +376,11 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
             <>
               <ul className="space-y-2">
                 {lines.map((l) => {
-                  const lineCents =
-                    l.type === 'hardware' && l.acquisition === 'rent' && l.product.rentalMonthlyCents
-                      ? l.product.rentalMonthlyCents * l.qty
-                      : l.product.priceCents * l.qty;
+                  // Hardware rental was retired in July 2026: no storefront CTA
+                  // produces an `acquisition: 'rent'` line any more and every
+                  // catalogue row carries rentalMonthlyCents = null. Every line
+                  // therefore prices off the one-time sale price.
+                  const lineCents = l.product.priceCents * l.qty;
                   return (
                     <li key={`${l.product.id}-${l.type === 'service' ? l.branchId ?? '_' : l.acquisition}`} className="flex items-start justify-between gap-2 text-sm">
                       <div className="flex-1 min-w-0">
@@ -411,9 +412,6 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
                           </div>
                         ) : (
                           <span className="text-gray-500">× {l.qty}</span>
-                        )}
-                        {l.type === 'hardware' && l.acquisition === 'rent' && (
-                          <div className="text-[11px] text-gray-500">{t('store.rentMonthly')}</div>
                         )}
                         {l.type === 'service' && (
                           <div className="text-[11px] text-gray-500">

@@ -30,7 +30,7 @@ const PrivacyPolicyPage: React.FC = () => {
             {isEnglish ? 'Privacy Policy' : 'Gizlilik Politikası'}
           </h1>
           <p className="text-slate-500 mb-8">
-            {isEnglish ? 'Last updated: December 2024' : 'Son güncelleme: Aralık 2024'}
+            {isEnglish ? 'Last updated: August 2026' : 'Son güncelleme: Ağustos 2026'}
           </p>
 
           <div className="prose prose-gray max-w-none">
@@ -60,7 +60,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   <li>To gather analysis or valuable information to improve our Service</li>
                   <li>To monitor the usage of our Service</li>
                   <li>To detect, prevent and address technical issues</li>
-                  <li>To process payments and manage subscriptions</li>
+                  <li>To process payments and manage the licence, modules and credits on your account</li>
                 </ul>
 
                 <h2>4. Data Security</h2>
@@ -94,7 +94,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   We may use third-party service providers to monitor and analyze the use of our Service, process payments, and provide other services:
                 </p>
                 <ul>
-                  <li><strong>Payment Processors:</strong> PayTR, Stripe</li>
+                  <li><strong>Payment Processor:</strong> PayTR — the only processor we use, both for the licence, module and credit payments you make to us and for guest payments taken through the QR menu. Card details are never stored on our servers.</li>
                   <li><strong>Analytics:</strong> Google Analytics</li>
                   <li><strong>Cloud Services:</strong> For hosting and data storage</li>
                 </ul>
@@ -144,7 +144,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   <li>Hizmetimizi iyileştirmek için analiz veya değerli bilgiler toplamak</li>
                   <li>Hizmetimizin kullanımını izlemek</li>
                   <li>Teknik sorunları tespit etmek, önlemek ve gidermek</li>
-                  <li>Ödemeleri işlemek ve abonelikleri yönetmek</li>
+                  <li>Ödemeleri işlemek; hesabınızdaki lisans, modül ve kontörleri yönetmek</li>
                 </ul>
 
                 <h2>4. Veri Güvenliği</h2>
@@ -178,7 +178,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   Hizmetimizin kullanımını izlemek ve analiz etmek, ödemeleri işlemek ve diğer hizmetleri sağlamak için üçüncü taraf hizmet sağlayıcıları kullanabiliriz:
                 </p>
                 <ul>
-                  <li><strong>Ödeme İşlemcileri:</strong> PayTR, Stripe</li>
+                  <li><strong>Ödeme İşlemcisi:</strong> PayTR — kullandığımız tek ödeme işlemcisidir; hem bize yaptığınız lisans, modül ve kontör ödemeleri hem de QR menü üzerinden alınan misafir ödemeleri PayTR üzerinden tahsil edilir. Kart bilgileriniz sunucularımızda saklanmaz.</li>
                   <li><strong>Analitik:</strong> Google Analytics</li>
                   <li><strong>Bulut Hizmetleri:</strong> Barındırma ve veri depolama için</li>
                 </ul>
