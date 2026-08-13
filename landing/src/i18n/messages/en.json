@@ -250,10 +250,10 @@
   "cta": {
     "title": "Ready to transform your restaurant?",
     "subtitle": "Join {count} restaurants already using HummyTummy to streamline operations and grow their business.",
-    "primaryBtn": "Start free trial",
+    "primaryBtn": "Start free",
     "secondaryBtn": "Talk to sales",
     "trustBadge1": "No credit card required",
-    "trustBadge2": "14-day free trial",
+    "trustBadge2": "Free core, forever",
     "trustBadge3": "Cancel anytime"
   },
   "mascot": {

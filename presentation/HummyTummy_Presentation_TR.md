@@ -19,10 +19,11 @@
 
 ✓ **Sıfır Donanım Maliyeti** - Tamamen bulut tabanlı, her cihazdan erişim
 ✓ **Hızlı Kurulum** - 1 saatte kurulum, aynı gün kullanmaya başlayın
-✓ **Uygun Fiyat** - Ücretsiz plandan başlayarak ölçeklenebilir fiyatlandırma
+✓ **Çekirdek Ücretsiz** - Restoranı çalıştıran her şey süresiz ücretsiz ve sınırsız
+✓ **Sadece Kullandığınızı Ödeyin** - Paket yok, kademe yok; ağır modülleri tek tek alırsınız
 ✓ **Tam Entegrasyon** - POS + KDS + CRM + Sadakat Programı tek sistemde
 ✓ **Gerçek Zamanlı** - Anlık güncelleme ve senkronizasyon
-✓ **14 Gün Ücretsiz Deneme** - Kredi kartı bilgisi olmadan test edin
+✓ **Kayıt Olmadan Deneyin** - Paylaşımlı demo restoranımızda kredi kartı istemeden gezinin
 
 ---
 
@@ -39,11 +40,12 @@ Geleneksel POS sistemleri:
 
 ### HummyTummy Çözümü
 ✓ **Sıfır donanım maliyeti** - Mevcut bilgisayar, tablet veya telefonlarınızı kullanın
-✓ **Aylık abonelik modeli** - Öngörülebilir maliyetler
+✓ **Ücretsiz çekirdek** - POS, KDS, menü, masa, QR menü, sipariş, kasa ve temel raporlar için hiç ödemezsiniz
+✓ **Sadece kullandığınıza ödeme** - İhtiyacınız olmayan modülün ücretini ödemezsiniz
 ✓ **Self-servis kurulum** - Teknik bilgi gerektirmeyen kolay kurulum
 ✓ **Bulut tabanlı** - Lokasyon bağımsız, her yerden erişim
 
-**ROI Örneği**: Orta ölçekli bir restoran ilk yıl 50,000₺+ tasarruf eder.
+**Somut fark**: Başlangıç yazılım maliyeti 0₺. Kredi kartı bilgisi istenmez, lisans gerekmez, süre sınırı yoktur. Ödeme yalnızca stok, rezervasyon, personel gibi ek modülleri açmayı seçtiğinizde başlar.
 
 ## 2. Müşteri Sadakati ve Geri Dönüş
 
@@ -59,7 +61,7 @@ Geleneksel POS sistemleri:
 ✓ **Referans Sistemi** - Müşterileriniz sizin için yeni müşteri getirir
 ✓ **Müşteri Analitiği** - Detaylı müşteri davranış raporları
 
-**ROI Örneği**: Ortalama %15-25 müşteri geri dönüş oranı artışı, yıllık 100,000₺+ ek gelir.
+**Somut fark**: Sadakat, puan, kademe ve referans sistemi ücretsiz çekirdeğin içindedir — ayrı modül ücreti yoktur. Kaç müşterinin geri döndüğünü tahmin etmiyoruz, ölçüyoruz: RFM analizi ve kayıp müşteri raporu ile.
 
 ## 3. Sipariş ve Mutfak İletişimi
 
@@ -75,7 +77,7 @@ Geleneksel POS sistemleri:
 ✓ **Hatasız İletişim** - Dijital sipariş transferi
 ✓ **Ürün Bazlı Takip** - Her ürünün ayrı durum takibi
 
-**ROI Örneği**: %30 daha hızlı servis, %40 daha az sipariş hatası, saatte 15-20 daha fazla müşteri.
+**Somut fark**: El yazısı sipariş fişi tamamen ortadan kalkar; sipariş POS'ta onaylandığı anda mutfak ekranına düşer. Mutfak ekranı ücretsiz çekirdeğe dahildir, ekran başına ücret alınmaz.
 
 ## 4. Temassız Hizmet ve QR Menü
 
@@ -92,7 +94,7 @@ Geleneksel POS sistemleri:
 ✓ **Garson ve Hesap Talebi** - Tek dokunuşla garson çağırma
 ✓ **Özelleştirilebilir Tasarım** - Markanıza özel renk, logo, düzen
 
-**ROI Örneği**: Yılda 5,000₺+ menü baskı tasarrufu, %20 daha hızlı sipariş alma.
+**Somut fark**: Fiyat değişikliğinde menü yeniden bastırmazsınız; QR menü, özel marka ve alan adı ücretsiz çekirdeğe dahildir. Baskı tasarrufu doğrudan mevcut baskı maliyetiniz kadardır.
 
 ## 5. Stok ve Envanter Kontrolü
 
@@ -108,7 +110,7 @@ Geleneksel POS sistemleri:
 ✓ **Hareket Geçmişi** - Tüm stok hareketlerinin detaylı kaydı
 ✓ **Fire Takibi** - Kayıp ve fire analizi
 
-**ROI Örneği**: %15 stok maliyeti azalması, yıllık 30,000₺+ tasarruf.
+**Maliyeti**: Stok & Maliyet modülü 1.490₺/yıl (+ ön koşul olan 2.990₺/yıl lisans). Reçete, sayım, satın alma siparişi, tedarikçi ve şubeler arası transfer bu modülün içindedir. Sağlayacağı tasarruf mevcut fire oranınıza bağlıdır; sistem fireyi ölçülebilir hale getirir.
 
 ## 6. Raporlama ve Karar Destek
 
@@ -125,7 +127,7 @@ Geleneksel POS sistemleri:
 ✓ **Ödeme Yöntemi Analizi** - Nakit, kart, dijital ödeme dağılımı
 ✓ **Excel/PDF Export** - Muhasebe için hazır raporlar
 
-**ROI Örneği**: Günde 30-45 dakika zaman tasarrufu, ayda 15+ saat.
+**Somut fark**: Z-Raporu, kasa mutabakatı ve temel satış raporları ücretsiz çekirdeğe dahildir. Ürün kârlılığı, personel performansı ve muhasebe back-office gibi derin analitik için Gelişmiş Rapor & Analitik modülü (1.290₺/yıl) gerekir.
 
 ---
 
@@ -197,6 +199,8 @@ Geleneksel POS sistemleri:
 
 ## 4. CRM ve Müşteri Sadakat Programı
 
+> Bu bölümün tamamı ücretsiz çekirdeğe dahildir — sadakat, puan, kademe ve referans için ayrı modül ücreti yoktur.
+
 ### Müşteri Profili
 - **Otomatik Kayıt**: İlk siparişte otomatik müşteri kaydı
 - **İletişim Bilgileri**: Ad, telefon, e-posta
@@ -207,7 +211,7 @@ Geleneksel POS sistemleri:
 - **Otomatik Puan Kazanma**: Her 1₺ harcamada 1 puan
 - **Kademeli Sistem**:
   - 🥉 **Bronz** (0-499 puan): 1.0x çarpan
-  - 🥈 **Gümüş** (500-1999 puan): 1.2x çarpan
+  - 🥈 **Gümüş** (500-1999 puan): 1.25x çarpan
   - 🥇 **Altın** (2000-4999 puan): 1.5x çarpan
   - 💎 **Platin** (5000+ puan): 2.0x çarpan
 - **Puan Kullanma**: 100 puan = 10₺ indirim
@@ -227,6 +231,8 @@ Geleneksel POS sistemleri:
 - **Kampanya Hedefleme**: Belirli segmentlere özel kampanyalar
 
 ## 5. Envanter ve Stok Yönetimi
+
+> **Stok & Maliyet Yönetimi** modülü — 1.490₺/yıl. Lisans ön koşuldur.
 
 ### Stok Takibi
 - **Ürün Bazlı Envanter**: Her ürün için stok seviyesi
@@ -252,6 +258,9 @@ Geleneksel POS sistemleri:
 - **Değer Hesaplama**: Toplam stok değeri (maliyet bazlı)
 
 ## 6. Raporlama ve Analitik
+
+> **Ücretsiz çekirdek**: Z-Raporu (gün sonu), kasa mutabakatı ve temel satış özetleri.
+> **Gelişmiş Rapor & Analitik** modülü (1.290₺/yıl): ürün kârlılığı, kâr-zarar, menü mühendisliği, personel performansı, satış tahmini, konsolide çok şubeli P&L ve muhasebe back-office.
 
 ### Günlük Raporlar
 - **Satış Özeti**: Günlük toplam satış, işlem sayısı, ortalama sepet
@@ -279,30 +288,35 @@ Geleneksel POS sistemleri:
 - **PDF ve Excel Export**: Muhasebe için hazır formatlar
 - **İmza Alanı**: Vardiya sorumlusu imzası için alan
 
-## 7. Abonelik ve Fatura Yönetimi
+## 7. Lisans, Modül ve Fatura Yönetimi
 
-### Abonelik Planları
-- **FREE**: Ücretsiz başlangıç planı (2 kullanıcı, 5 masa, 25 ürün)
-- **BASIC**: $29.99/ay (5 kullanıcı, 20 masa, 100 ürün)
-- **PRO**: $79.99/ay (15 kullanıcı, 50 masa, 500 ürün, gelişmiş raporlar)
-- **BUSINESS**: $199.99/ay (Sınırsız, API erişimi, öncelikli destek)
+### Ticari Model
+- **Ücretsiz çekirdek**: Süresiz, sınırsız, kredi kartsız. Lisans gerekmez.
+- **Lisans**: 2.990₺/yıl. Yalnızca ücretli modülleri açmak için gereken ön koşuldur.
+- **Modüller ve entegrasyonlar**: Tek tek, yıllık satın alınır. Paket, kademe veya plan yoktur.
+- **Kontör**: AI görsel/video/3D üretimi ve SMS için tek seferlik, süresiz kontör paketleri.
+- Tüm fiyatlar TL ve **KDV dahildir**.
 
-### Ödeme Entegrasyonu
-- **Stripe**: Uluslararası kredi kartı ödemeleri
-- **PayTR**: Türkiye'ye özel ödeme sistemi
-- **Otomatik Yönlendirme**: Müşterinin konumuna göre otomatik provider seçimi
+### Yıl Dönümü ve Orantılı Fiyatlandırma
+- **Değişmez yıl dönümü**: Lisansı aldığınız gün hesabınızın yıl dönümü olur.
+- **Gün bazlı orantı**: Yıl içinde aldığınız her yıllık kalem, yıl dönümüne kalan gün kadar fiyatlanır.
+- **Kısa kalan süre koruması**: Yıl dönümüne 14 günden az kalmışsa kalem bir sonraki tam döngüye taşınır — kimseye birkaç günlük anlamsız bir kalem satılmaz.
+- **Alt sınır**: Hiçbir fatura satırı 1₺'nin altına inmez.
+- **Tek fatura, tek tarih**: Ne alırsanız alın, hesabınız tek bir günde tek bir faturayla yenilenir.
+
+### Yenileme ve Ödeme
+- **Yenileme manueldir**: Kartınızdan otomatik çekim yapılmaz.
+- **Hatırlatma**: Yıl dönümüne **30, 7 ve 1 gün** kala e-posta hatırlatması gönderilir.
+- **Ödeme sağlayıcısı**: PayTR (Türkiye).
+- **Ek süre**: Ödenmezse 7 günlük ek süre tanınır.
+- **Veri asla silinmez**: Ek süre de dolarsa yalnızca ücretli modüllerin **erişimi** kararır. Stok kayıtlarınız, rezervasyonlarınız, personel verileriniz ve ürettiğiniz medya yerinde durur; ödeme yaptığınız anda aynen geri açılır.
+- **Ücretsiz çekirdek hiçbir koşulda kapanmaz** — lisans olmasa da POS'unuz çalışmaya devam eder.
 
 ### Fatura Sistemi
-- **Otomatik Fatura**: Her ödeme için otomatik PDF fatura
+- **Kalem bazlı fatura**: Hangi modül, hangi dönem, kaç gün — hepsi tek tek görünür.
 - **E-posta Gönderimi**: Fatura otomatik olarak e-posta ile gönderilir
 - **Fatura Arşivi**: Tüm faturaların sistem içinde saklanması
-- **Vergi Hesaplama**: KDV dahil/hariç seçenekleri
-
-### Deneme ve Yükseltme
-- **14 Gün Ücretsiz Deneme**: Her ücretli plan için bir kez
-- **Kolay Yükseltme**: Tek tıkla plan yükseltme
-- **Orantılı Ücretlendirme**: Ay ortası değişikliklerde adil fiyatlandırma
-- **İptal Garantisi**: İstediğiniz zaman iptal edebilirsiniz
+- **KDV dahil fiyatlandırma**: Listelenen fiyat ödediğiniz fiyattır.
 
 ## 8. Kullanıcı ve Yetki Yönetimi
 
@@ -314,7 +328,7 @@ Geleneksel POS sistemleri:
 - **COURIER**: Kurye (Paket servis siparişleri)
 
 ### Kullanıcı Hesapları
-- **Çoklu Kullanıcı**: Plan bazlı kullanıcı limitleri
+- **Sınırsız Kullanıcı**: Kullanıcı sayısında üst sınır yoktur, kişi başı ücret alınmaz
 - **E-posta Doğrulama**: 6 haneli doğrulama kodu
 - **Şifre Sıfırlama**: Token bazlı güvenli sıfırlama
 - **Son Giriş Takibi**: Güvenlik için giriş geçmişi
@@ -335,12 +349,11 @@ Geleneksel POS sistemleri:
 - **Linux**: AppImage paketi
 
 ### Özellikler
-- **Küçük Boyut**: ~10MB (Electron'un %10'u kadar)
+- **Küçük Boyut**: Electron tabanlı uygulamalara göre çok daha hafif paket
 - **Hızlı Performans**: Rust tabanlı native hız
-- **Otomatik Güncelleme**: İmza doğrulama ile güvenli güncelleme
-- **Çevrimdışı Destek**: Yerel veri önbellekleme
-- **Yazıcı Entegrasyonu**: Native yazıcı desteği
-- **Sistem Tepsisi**: Arka planda çalışma desteği
+- **Otomatik Güncelleme**: Sürüm sunucusundan imzalı güncelleme manifesti
+- **Yazıcı Entegrasyonu**: Native ESC/POS yazıcı desteği
+- **Bluetooth Cihaz Desteği**: Bluetooth yazıcı tarama ve eşleştirme
 
 ### Avantajlar
 - Daha hızlı başlangıç
@@ -371,18 +384,22 @@ Geleneksel POS sistemleri:
 
 # Rakiplerden Farklarımız
 
-## 1. Küresel Ödeme Kapsama Alanı
+## 1. Ücretsiz Çekirdek ve À-la-carte Model
 
 ### Geleneksel Sistemler
-- Tek bir ödeme sağlayıcısı
-- Bölgesel kısıtlamalar
-- Yüksek uluslararası işlem ücretleri
+- Paket/kademe zorunluluğu — kullanmadığınız özellikler için de ödersiniz
+- Kullanıcı, masa veya sipariş başına artan aylık ücretler
+- Otomatik yenilenen abonelik, iptal etmeyi unutursanız çekim
+- Ödeme durursa sistemin tamamı kapanır
 
 ### HummyTummy Farkı
-✓ **Dual Payment Processing**: Stripe (uluslararası) + PayTR (Türkiye)
-✓ **Otomatik Yönlendirme**: Müşterinin konumuna göre en uygun sağlayıcı
-✓ **Tek Kod Tabanı**: Her iki sağlayıcıyı destekleyen birleşik sistem
-✓ **Optimum Maliyetler**: Bölgesel avantajlardan faydalanma
+✓ **Çekirdek ücretsiz ve sınırsız**: POS, KDS, menü, masa, QR menü, sipariş, kasa, temel raporlar, ekip, müşteriler, cihaz/şube paneli, özel marka — süresiz, kredi kartsız
+✓ **Kalem kalem satın alma**: Sadece gerçekten kullanacağınız modülü açarsınız
+✓ **Otomatik çekim yok**: Yenileme manueldir; 30/7/1 gün kala hatırlatılır
+✓ **Veri rehin alınmaz**: Ödenmezse yalnızca ücretli modüllerin erişimi kararır, veri silinmez, POS çalışmaya devam eder
+✓ **Tek fatura, tek yenileme tarihi**: Yıl içinde alınan her kalem yıl dönümüne orantılanır
+
+**Tahsilat**: Bizim tahsilatımız PayTR üzerinden yapılır. Stripe, dilerseniz kendi hesabınızı bağlayabileceğiniz bir üçüncü taraf entegrasyonudur — bizim faturalandırmamızda yer almaz.
 
 ## 2. Gelişmiş QR Menü ile Direkt Sipariş
 
@@ -397,7 +414,7 @@ Geleneksel POS sistemleri:
 ✓ **Oturum Tabanlı Güvenlik**: Telefon doğrulama ile güvenli oturumlar
 ✓ **Sadakat Entegrasyonu**: Puanlar gerçek zamanlı görünür ve kullanılır
 
-**Rakip Karşılaştırma**: Toast, Square, Lightspeed - temel QR menü, sipariş yok
+**Ve en önemlisi**: QR menü, direkt sipariş ve marka özelleştirmesi ücretsiz çekirdeğe dahildir — masa başına veya sipariş başına ücret alınmaz.
 
 ## 3. Kapsamlı Sadakat ve Referans Sistemi
 
@@ -407,12 +424,12 @@ Geleneksel POS sistemleri:
 - Otomatik ödül yönetimi yok
 
 ### HummyTummy Farkı
-✓ **Kademeli Ödüller**: Bronz, Gümüş, Altın, Platin çarpanlarla
-✓ **Referans Programı**: Viral büyüme mekanizması entegre
+✓ **Kademeli Ödüller**: Bronz (1.0x), Gümüş (1.25x), Altın (1.5x), Platin (2.0x) çarpanlarla
+✓ **Referans Programı**: Her müşteriye özel kod, çift taraflı ödül
 ✓ **Otomatik Hesaplama**: Puan, kademe ve ödüller otomatik yönetilir
-✓ **Müşteri Analitiği**: Müşteri davranışına derin içgörüler
+✓ **Müşteri Analitiği**: RFM segmentasyonu ve kayıp müşteri analizi
 
-**Rakip Karşılaştırma**: Loyverse (temel sadakat), Square (ek ücretle), Toast (eklenti gerekli)
+**Ve en önemlisi**: Sadakat ve referans, bizde ücretsiz çekirdeğin parçasıdır — açmak için lisans veya modül satın almanız gerekmez.
 
 ## 4. Modern Masaüstü Uygulaması (Tauri)
 
@@ -422,9 +439,9 @@ Geleneksel POS sistemleri:
 - Yavaş başlangıç ve yüksek bellek kullanımı
 
 ### HummyTummy Farkı
-✓ **10x Daha Küçük**: ~10MB vs 100+MB Electron uygulamaları
-✓ **Otomatik Güncellemeler**: İmza doğrulama ile güvenli
-✓ **Native Performans**: Rust backend ile yüksek hız
+✓ **Belirgin Şekilde Hafif**: Rust + Tauri, Electron paketlerinin çok altında bir boyut
+✓ **Otomatik Güncellemeler**: İmzalı güncelleme manifesti ile güvenli
+✓ **Native Donanım**: ESC/POS ve Bluetooth yazıcı desteği doğrudan uygulamada
 ✓ **Çapraz Platform**: Windows, macOS, Linux için tek kod tabanı
 
 ## 5. Profesyonel Z-Rapor Sistemi
@@ -466,18 +483,19 @@ Geleneksel POS sistemleri:
 ✓ **Fiyat Ayarlamaları**: Modifikasyon başına fiyatlandırma
 ✓ **İç İçe Görünüm**: Görünen adlarla gruplandırılmış modifikasyonlar
 
-## 8. Plan Bazlı Özellik Erişimi
+## 8. Modül Bazlı Yetkilendirme (Entitlement Motoru)
 
 ### Geleneksel Sistemler
 - Hepsi ya da hiçbiri erişimi
-- Kademeli planlama yok
-- Kullanım limiti takibi yok
+- Kullanıcı/masa/ürün başına sayaçlar ve sürpriz limit duvarları
+- Ödeme aksarsa sistemin tamamının kapanması
 
 ### HummyTummy Farkı
-✓ **Ayrıntılı Kontrol**: Abonelik planına göre özellik bayrakları
-✓ **Kullanım Limitleri**: Otomatik uygulama (kullanıcılar, masalar, ürünler, siparişler)
-✓ **Dekoratörler ve Korumalar**: @RequiresPlan, @RequiresFeature, @CheckLimit
-✓ **Zarif Bozulma**: Limitlere ulaşıldığında net mesajlar
+✓ **Sahip Olduğunuz Kadar Erişim**: Yetki, plan adına değil satın aldığınız kaleme bağlıdır
+✓ **Ücretsiz Taban Her Zaman Açık**: Çekirdek yetkiler her hesaba koşulsuz verilir; kullanıcı, masa, ürün, kategori ve aylık sipariş sınırsızdır
+✓ **Tek Doğrulanmış Anahtar Sözlüğü**: Satılan her yetki anahtarı kod tarafından tanınmak zorundadır — "sattık ama hiçbir şey açmadı" hatası mümkün değildir
+✓ **Lisans Sönerse Sadece Ücretli Yüzey Kararır**: Ücretli modüller erişime kapanır, veri yerinde kalır, POS çalışmaya devam eder
+✓ **Aynı Yetki Kümesi Her Yerde**: Arayüz ile sunucu tarafı korumaları aynı kaynağı okur — ekranda görünüp API'de reddedilen özellik olmaz
 
 ## 9. Kurumsal Seviye Hata Takibi
 
@@ -507,311 +525,286 @@ Geleneksel POS sistemleri:
 
 ---
 
-# Abonelik Planları ve Fiyatlandırma
+# Fiyatlandırma
 
-## Plan Karşılaştırma Tablosu
+## Çekirdek ücretsiz. Sadece kullandığınızı ödeyin.
 
-| Özellik | FREE | BASIC | PRO | BUSINESS |
-|---------|:----:|:-----:|:---:|:--------:|
-| **Aylık Fiyat** | ₺0 | ₺999 | ₺2.499 | ₺5.999 |
-| **Yıllık Fiyat** | ₺0 | ₺9.990 | ₺24.990 | ₺59.990 |
-| **Yıllık Tasarruf** | - | **₺2.000** | **₺5.000** | **₺12.000** |
-| **Deneme Süresi** | - | 14 gün | 14 gün | 14 gün |
-| | | | | |
-| **KULLANICI LİMİTLERİ** | | | | |
-| Kullanıcı Sayısı | 2 | 5 | 15 | ∞ |
-| Masa Sayısı | 5 | 20 | 50 | ∞ |
-| Ürün Sayısı | 25 | 100 | 500 | ∞ |
-| Kategori Sayısı | 10 | 20 | 50 | ∞ |
-| Aylık Sipariş | 100 | 500 | 2.000 | ∞ |
-| | | | | |
-| **TEMEL ÖZELLİKLER** | | | | |
-| POS Sistemi | ✓ | ✓ | ✓ | ✓ |
-| Mutfak Ekranı (KDS) | ✓ | ✓ | ✓ | ✓ |
-| QR Menü | ✓ | ✓ | ✓ | ✓ |
-| Masa Yönetimi | ✓ | ✓ | ✓ | ✓ |
-| Sipariş Yönetimi | ✓ | ✓ | ✓ | ✓ |
-| Ödeme İşlemleri | ✓ | ✓ | ✓ | ✓ |
-| Temel Raporlar | ✓ | ✓ | ✓ | ✓ |
-| Mobil Erişim | ✓ | ✓ | ✓ | ✓ |
-| | | | | |
-| **GELİŞMİŞ ÖZELLİKLER** | | | | |
-| Envanter Takibi | ✗ | ✓ | ✓ | ✓ |
-| Stok Uyarıları | ✗ | ✓ | ✓ | ✓ |
-| Müşteri CRM | ✗ | ✓ | ✓ | ✓ |
-| Sadakat Programı | ✗ | ✓ | ✓ | ✓ |
-| Referans Sistemi | ✗ | ✓ | ✓ | ✓ |
-| Z-Rapor (Gün Sonu) | ✗ | ✓ | ✓ | ✓ |
-| | | | | |
-| **PROFESYONEL** | | | | |
-| Gelişmiş Raporlar | ✗ | ✗ | ✓ | ✓ |
-| Personel Performansı | ✗ | ✗ | ✓ | ✓ |
-| Çoklu Lokasyon | ✗ | ✗ | ✓ | ✓ |
-| Özel Marka | ✗ | ✗ | ✓ | ✓ |
-| Export (Excel/PDF) | ✗ | ✗ | ✓ | ✓ |
-| | | | | |
-| **KURUMsal** | | | | |
-| API Erişimi | ✗ | ✗ | ✗ | ✓ |
-| Webhook Entegrasyonları | ✗ | ✗ | ✗ | ✓ |
-| Öncelikli Destek | ✗ | ✗ | ✗ | ✓ |
-| Özel Eğitim | ✗ | ✗ | ✗ | ✓ |
-| Hesap Yöneticisi | ✗ | ✗ | ✗ | ✓ |
+Paket yok, kademe yok, plan yok. Restoranı çalıştıran her şey ücretsiz ve sınırsız; ağır modülleri tek tek, yıllık alırsınız.
 
-## Hangi Plan Size Uygun?
+## Ücretsiz ve Sınırsız Çekirdek
 
-### 🆓 FREE - Küçük İşletmeler İçin
-**İdeal Kullanıcılar:**
-- Tek lokasyonlu küçük kafeler
-- 1-5 masa arası işletmeler
-- Günde 10-15 sipariş alan mekanlar
-- Sistemi test etmek isteyenler
+**0₺ · Süresiz · Kredi kartı istenmez · Lisans gerekmez**
 
-**Öne Çıkan Özellikler:**
-- Tam POS ve KDS sistemi
-- QR menü ile dijital menü
-- Sınırsız süre ücretsiz
-- Kredi kartı gerektirmez
+| Ücretsiz çekirdekte ne var? | |
+|---|---|
+| POS ve adisyon | Kasa ve nakit yönetimi |
+| Mutfak ekranı (KDS) | Temel raporlar ve Z-Raporu |
+| Menü yönetimi | Ekip ve rol yönetimi |
+| Masa ve kat planı | Müşteriler, sadakat ve referans |
+| QR menü | Cihaz ve şube paneli |
+| Sipariş yönetimi | Özel marka ve alan adı |
 
-### 💼 BASIC - Orta Ölçekli Restoranlar İçin
-**İdeal Kullanıcılar:**
-- 6-20 masa arası restoranlar
-- 3-5 personel çalıştıran işletmeler
-- Günde 30-50 sipariş alan mekanlar
-- Müşteri sadakati oluşturmak isteyenler
+**Sayısal sınırlar:** Kullanıcı, masa, ürün, kategori ve aylık sipariş sayısı **sınırsızdır**. İlk şube ücretsizdir.
 
-**Öne Çıkan Özellikler:**
-- Envanter ve stok takibi
-- CRM ve sadakat programı
-- Referans sistemi ile yeni müşteri kazanımı
-- Z-Rapor ile profesyonel gün sonu
+## Ücretli Katalog
 
-**Aylık Maliyet Karşılaştırması:**
-- Geleneksel sistem: 2.500-4.000₺/ay
-- HummyTummy BASIC: 999₺/ay
-- **Tasarruf: 1.500-3.000₺/ay**
+Tüm fiyatlar **TL ve KDV dahildir**. "/yıl" işaretli kalemler yıllıktır.
 
-### 🏆 PRO - Büyük Restoranlar ve Zincirler İçin
-**İdeal Kullanıcılar:**
-- 21-50 masa arası büyük restoranlar
-- Çoklu lokasyonlu işletmeler (2-5 şube)
-- 10+ personel çalıştıran işletmeler
-- Detaylı analitik isteyen yöneticiler
+### Lisans
 
-**Öne Çıkan Özellikler:**
-- Gelişmiş raporlama ve analitik
-- Personel performans takibi
-- Çoklu lokasyon desteği
-- Özel marka tasarımı
-- Excel ve PDF export
+| Kalem | Fiyat | Not |
+|---|---:|---|
+| **HummyTummy Lisansı** | **2.990₺/yıl** | Ücretli modülleri açmak için ön koşul. Alındığı gün hesabınızın değişmez yıl dönümü olur. |
 
-**ROI Hesaplama:**
-```
-Yıllık Maliyet: 24.990₺ (aylık 2.083₺)
+### Modüller
 
-Tasarruflar:
-- Menü baskı maliyeti: 6.000₺/yıl
-- Stok kaybı azalması (%15): 30.000₺/yıl
-- Zaman tasarrufu (30 dk/gün): 45.000₺/yıl
-- Sadakat ile gelir artışı (%20): 120.000₺/yıl
+| Modül | Fiyat | Ne yapar? |
+|---|---:|---|
+| Gelişmiş Rapor & Analitik | 1.290₺/yıl | Ürün/personel/müşteri analitiği, kâr-zarar, menü mühendisliği, muhasebe back-office |
+| Stok & Maliyet | 1.490₺/yıl | Reçete, sayım, satın alma siparişi, fire, tedarikçi, şubeler arası transfer |
+| Rezervasyon | 990₺/yıl | Rezervasyon takvimi, müsaitlik hesabı, online rezervasyon sayfası |
+| Personel | 990₺/yıl | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
+| AI Menü Stüdyosu | 1.990₺/yıl | AI ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretim kontörle) |
+| API & Webhook | 2.490₺/yıl | REST API anahtarları ve giden webhook'lar |
+| Partner Ekran API | 1.990₺/yıl | Üçüncü taraf ekranların menünüzü göstermesi için ekran bazlı API |
+| Öncelikli Destek | 1.990₺/yıl | Öncelikli sıra ve garantili yanıt süresi |
 
-Toplam Yıllık Fayda: 201.000₺
-Net ROI: 176.000₺ (700% getiri)
-```
+### Entegrasyonlar
 
-### 🎯 BUSINESS - Kurumsal Çözümler İçin
-**İdeal Kullanıcılar:**
-- 50+ masa veya çoklu lokasyon (5+ şube)
-- Franchise restoran zincirleri
-- Özel entegrasyonlar gerektiren işletmeler
-- API ile kendi sistemleriyle entegrasyon isteyenler
+| Entegrasyon | Fiyat | Ne yapar? |
+|---|---:|---|
+| Yemeksepeti | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
+| Getir | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
+| Trendyol Yemek | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
+| e-Fatura (Nilvera) | 1.990₺/yıl | Satış faturalarının e-Fatura / e-Arşiv olarak GİB'e gönderimi |
+| ÖKC / Yazarkasa (Hugin) | 2.990₺/yıl | Yazarkasa ile entegre fiş kesimi ve mali rapor senkronizasyonu |
+| Çağrı-ID | 1.490₺/yıl | Gelen çağrıda müşteriyi tanıma, tek tıkla sipariş açma |
+| SMS | 990₺/yıl | Sipariş, rezervasyon ve kampanya SMS'i (gönderim kontörle) |
 
-**Öne Çıkan Özellikler:**
-- Sınırsız her şey
-- Full API erişimi
-- Webhook entegrasyonları
-- Öncelikli 7/24 destek
-- Özel eğitim ve onboarding
-- Özel hesap yöneticisi
+### Kapasite
 
-**Kurumsal Avantajlar:**
-- Özel SLA (Service Level Agreement)
-- Aylık iş gözden geçirme toplantıları
-- Yeni özellik taleplerinde öncelik
-- Özel entegrasyon geliştirme
+| Kalem | Fiyat | Not |
+|---|---:|---|
+| Ek Şube | 3.990₺/yıl/adet | İlk şube ücretsiz, en fazla 100 şube |
+
+### Kontör (tek seferlik, süresiz, tükenene kadar geçerli)
+
+| Kontör | Fiyat |
+|---|---:|
+| 100 AI görsel | 690₺ |
+| 20 AI video | 890₺ |
+| 10 AI 3D model | 790₺ |
+| 500 SMS | 490₺ |
+
+### Hizmet
+
+| Hizmet | Fiyat |
+|---|---:|
+| Yerinde Kurulum & Eğitim (tam gün) | 7.500₺ tek seferlik |
+
+## Faturalama Nasıl İşler?
+
+- **Değişmez yıl dönümü**: Lisansı aldığınız gün hesabınızın yıl dönümüdür.
+- **Orantılı fiyatlama**: Yıl içinde aldığınız her yıllık kalem, yıl dönümüne kalan gün kadar fiyatlanır. Yıl dönümüne 14 günden az kalmışsa kalem bir sonraki tam döngüye taşınır. Hiçbir satır 1₺'nin altına inmez.
+- **Tek fatura, tek yenileme tarihi.**
+- **Yenileme manueldir** — otomatik kart çekimi yoktur. 30, 7 ve 1 gün kala hatırlatma gönderilir.
+- **Ödenmezse 7 gün ek süre**; sonrasında yalnızca ücretli modüllerin **erişimi** kararır, **veri silinmez**. Ödeme yapıldığında stok, rezervasyon, personel ve üretilmiş medya aynen geri açılır.
+- **Ödeme sağlayıcısı**: PayTR.
+
+## Hangi Modüller Size Uygun?
+
+Aşağıdakiler öneridir, zorunluluk değil. İstediğiniz kalemi istediğiniz zaman ekleyebilir, hiç eklemeden ücretsiz çekirdekte kalabilirsiniz.
+
+### 🆓 Yeni açılan kafe / küçük mekan — **0₺**
+**Profil:** Tek şube, birkaç masa, sade menü, tek kişilik yönetim.
+
+**Öneri:** Hiçbir şey satın almayın. Ücretsiz çekirdek POS, KDS, QR menü, masa planı, kasa, Z-Raporu, müşteri ve sadakat için fazlasıyla yeter.
+
+**Yıllık maliyet: 0₺**
+
+### 🍽️ Menüsünü ve maliyetini kontrol etmek isteyen restoran
+**Profil:** Tek şube, sabit menü, malzeme maliyeti ciddi bir kalem.
+
+**Öneri:** Lisans + Stok & Maliyet + Gelişmiş Rapor & Analitik
+
+| Kalem | Fiyat |
+|---|---:|
+| Lisans | 2.990₺/yıl |
+| Stok & Maliyet | 1.490₺/yıl |
+| Gelişmiş Rapor & Analitik | 1.290₺/yıl |
+| **Toplam** | **5.770₺/yıl** (aylığa bölündüğünde ~481₺) |
+
+### 📞 Paket servis ve online sipariş ağırlıklı işletme
+**Profil:** Yemeksepeti/Getir/Trendyol siparişleri, telefonla sipariş, kurye.
+
+**Öneri:** Lisans + kullandığınız pazaryeri entegrasyonları + Çağrı-ID + SMS
+
+| Kalem | Fiyat |
+|---|---:|
+| Lisans | 2.990₺/yıl |
+| Yemeksepeti | 2.490₺/yıl |
+| Getir | 2.490₺/yıl |
+| Çağrı-ID | 1.490₺/yıl |
+| SMS | 990₺/yıl |
+| **Toplam** | **10.450₺/yıl** |
+
+Not: SMS gönderimleri kontörle harcanır (500 SMS = 490₺, süresiz).
+
+### 🍷 Rezervasyonla çalışan a la carte restoran
+**Profil:** Akşam servisi, masa rezervasyonu, vardiyalı ekip.
+
+**Öneri:** Lisans + Rezervasyon + Personel
+
+| Kalem | Fiyat |
+|---|---:|
+| Lisans | 2.990₺/yıl |
+| Rezervasyon | 990₺/yıl |
+| Personel | 990₺/yıl |
+| **Toplam** | **4.970₺/yıl** |
+
+### 🏢 Çok şubeli zincir
+**Profil:** 3 şube, merkezi yönetim, muhasebe ve mali uyum ihtiyacı.
+
+**Öneri:** Lisans + 2 Ek Şube + Gelişmiş Rapor + Stok & Maliyet + e-Fatura + Öncelikli Destek
+
+| Kalem | Fiyat |
+|---|---:|
+| Lisans | 2.990₺/yıl |
+| Ek Şube × 2 | 7.980₺/yıl |
+| Gelişmiş Rapor & Analitik | 1.290₺/yıl |
+| Stok & Maliyet | 1.490₺/yıl |
+| e-Fatura (Nilvera) | 1.990₺/yıl |
+| Öncelikli Destek | 1.990₺/yıl |
+| **Toplam** | **17.730₺/yıl** |
+
+Şube sayısı ne olursa olsun kullanıcı, masa, ürün ve sipariş sınırı yoktur; yalnızca ikinci ve sonraki şubeler ücretlidir.
+
+### 🤖 Menü görselleri zayıf olan işletme
+**Profil:** Fotoğrafçı bütçesi yok, QR menüde ürün görseli eksik.
+
+**Öneri:** Lisans + AI Menü Stüdyosu + kontör
+
+| Kalem | Fiyat |
+|---|---:|
+| Lisans | 2.990₺/yıl |
+| AI Menü Stüdyosu | 1.990₺/yıl |
+| 100 AI görsel kontörü | 690₺ tek seferlik |
+| **İlk yıl** | **5.670₺** |
+
+Kontörün süresi yoktur; tükenene kadar geçerlidir.
 
 ---
 
-# ROI (Yatırım Getirisi) Örnekleri
+# Maliyet Örnekleri
+
+Aşağıda üç işletme profilinin **gerçek yıllık yazılım maliyeti** verilmiştir. Kasten getiri tahmini yapmıyoruz: elde edeceğiniz tasarruf mevcut fire oranınıza, personel maliyetinize ve baskı giderinize bağlıdır — bunları biz bilemeyiz, sistem ölçmenizi sağlar.
 
 ## Senaryo 1: Küçük Kafe (10 Masa)
 
-**Profil:**
-- 10 masa
-- 3 personel
-- Günde 40 müşteri
-- Ortalama hesap: 150₺
-- Aylık ciro: 180.000₺
+**Profil:** 10 masa, 3 personel, tek şube, sade menü.
 
-**Önerilen Plan:** BASIC (999₺/ay)
+**Seçim:** Ücretsiz çekirdek — hiçbir şey satın alınmadı.
 
-**Yıllık Tasarruflar:**
-- **Menü Baskı**: 3.000₺ (önceki maliyet 5.000₺/yıl)
-- **Stok Kaybı Azalması** (%10): 18.000₺
-- **Zaman Tasarrufu**: 20.000₺ (gün sonu kapanışı 30 dk → 5 dk)
-- **Sadakat Programı ile Gelir Artışı** (%15): 270.000₺ → 310.500₺ = **40.500₺**
+| Kalem | Yıllık |
+|---|---:|
+| POS, KDS, QR menü, masa planı, kasa, Z-Raporu, müşteri + sadakat | 0₺ |
+| **Toplam yazılım maliyeti** | **0₺** |
 
-**Toplam Yıllık Fayda:** 81.500₺
-**Yıllık Maliyet:** 11.990₺
-**Net Kazanç:** 69.510₺
-**ROI:** **580%**
+**Neyi ölçebilir hale gelirsiniz:** günlük ciro, saatlik yoğunluk, ödeme yöntemi dağılımı, gün sonu kasa mutabakatı, müşteri geri dönüş sıklığı.
 
 ## Senaryo 2: Orta Ölçekli Restoran (25 Masa)
 
-**Profil:**
-- 25 masa
-- 8 personel
-- Günde 100 müşteri
-- Ortalama hesap: 200₺
-- Aylık ciro: 600.000₺
+**Profil:** 25 masa, 8 personel, tek şube, malzeme maliyeti takibi ve vardiya planlaması ihtiyacı.
 
-**Önerilen Plan:** PRO (2.499₺/ay)
+**Seçim:** Lisans + Stok & Maliyet + Gelişmiş Rapor & Analitik + Personel + Rezervasyon
 
-**Yıllık Tasarruflar:**
-- **Menü Baskı**: 6.000₺
-- **Stok Kaybı Azalması** (%15): 90.000₺
-- **Zaman Tasarrufu**: 45.000₺ (günde 1 saat tasarruf)
-- **Sipariş Hataları Azalması** (%40): 36.000₺
-- **Sadakat ile Gelir Artışı** (%20): 600.000₺ → 720.000₺ = **120.000₺**
-- **QR Menü ile Hızlı Servis** (%25 daha fazla müşteri): **150.000₺**
+| Kalem | Yıllık |
+|---|---:|
+| Lisans | 2.990₺ |
+| Stok & Maliyet | 1.490₺ |
+| Gelişmiş Rapor & Analitik | 1.290₺ |
+| Personel | 990₺ |
+| Rezervasyon | 990₺ |
+| **Toplam** | **7.750₺/yıl** |
 
-**Toplam Yıllık Fayda:** 447.000₺
-**Yıllık Maliyet:** 29.990₺
-**Net Kazanç:** 417.010₺
-**ROI:** **1.390%**
+Aylığa bölündüğünde yaklaşık **646₺**. Kullanıcı, masa, ürün ve sipariş sayısına bağlı ek ücret yoktur.
 
-## Senaryo 3: Restoran Zinciri (5 Şube, 150 Masa)
+**Neyi ölçebilir hale gelirsiniz:** ürün bazlı kâr marjı, reçete maliyeti, fire tutarı, personel başına satış, kâr-zarar tablosu, menü mühendisliği matrisi.
 
-**Profil:**
-- 5 lokasyon, toplam 150 masa
-- 40 personel
-- Günde 500 müşteri
-- Ortalama hesap: 180₺
-- Aylık ciro: 2.700.000₺
+## Senaryo 3: Restoran Zinciri (5 Şube)
 
-**Önerilen Plan:** BUSINESS (5.999₺/ay)
+**Profil:** 5 lokasyon, merkezi yönetim, pazaryeri siparişleri, e-belge zorunluluğu.
 
-**Yıllık Tasarruflar:**
-- **Menü Baskı**: 30.000₺ (5 lokasyon × 6.000₺)
-- **Stok Kaybı Azalması** (%15): 450.000₺
-- **Merkezi Yönetim Tasarrufu**: 120.000₺
-- **Personel Verimliliği** (%20 artış): 200.000₺
-- **Zaman Tasarrufu**: 180.000₺
-- **Sadakat ile Gelir Artışı** (%20): **540.000₺/ay = 6.480.000₺/yıl**
-- **Referans Sistemi ile Yeni Müşteri** (%10 artış): **270.000₺/ay = 3.240.000₺/yıl**
+**Seçim:** Lisans + 4 Ek Şube + Gelişmiş Rapor + Stok & Maliyet + Personel + e-Fatura + 3 pazaryeri entegrasyonu + Öncelikli Destek
 
-**Toplam Yıllık Fayda:** 10.700.000₺
-**Yıllık Maliyet:** 71.990₺
-**Net Kazanç:** 10.628.010₺
-**ROI:** **14.760%**
+| Kalem | Yıllık |
+|---|---:|
+| Lisans | 2.990₺ |
+| Ek Şube × 4 | 15.960₺ |
+| Gelişmiş Rapor & Analitik | 1.290₺ |
+| Stok & Maliyet | 1.490₺ |
+| Personel | 990₺ |
+| e-Fatura (Nilvera) | 1.990₺ |
+| Yemeksepeti + Getir + Trendyol Yemek | 7.470₺ |
+| Öncelikli Destek | 1.990₺ |
+| **Toplam** | **34.170₺/yıl** |
+
+5 şube için şube başına yaklaşık **6.834₺/yıl**. Bu tutar toplam personel, masa, ürün ve sipariş hacminden bağımsızdır.
+
+**Neyi ölçebilir hale gelirsiniz:** şubeler arası performans karşılaştırması, konsolide kâr-zarar, şubeler arası stok transferi, kanal bazlı (salon / paket / pazaryeri) ciro dağılımı.
+
+> **Neden getiri yüzdesi vermiyoruz?** Çünkü veremeyiz. "%700 getiri" tarzı rakamlar hiçbir işletmenin gerçek verisine dayanmaz. Size verebileceğimiz kesin sayı maliyet tarafıdır — ve o da yukarıda, KDV dahil olarak yazılıdır.
 
 ---
 
-# Başarı Hikayeleri ve Kullanım Senaryoları
+# Kullanım Senaryoları
 
-## Kullanım Senaryosu 1: Butik Kafe - "Kahve Durağı"
+> Aşağıdaki üç profil, sistemin işletmede pratikte neyi değiştirdiğini anlatır. Ciro artışı veya getiri oranı vaat etmiyoruz — bunlar işletmeden işletmeye değişir ve garanti edilemez. Verilen tek kesin sayı, yazılım maliyetidir.
 
-**Durum Öncesi:**
-- 8 masa, 2 barista
-- Kağıt siparişler, sık hatalar
-- Stok kontrolü yok, fazla fire
-- Müşteri takibi yapılamıyor
-- Aylık ciro: 120.000₺
+## Senaryo 1: Butik Kafe — 8 masa, 2 barista
 
-**HummyTummy ile Değişim (BASIC Plan):**
-- ✓ Sipariş hataları %90 azaldı
-- ✓ Stok takibi ile fire %15 azaldı (1.800₺/ay tasarruf)
-- ✓ QR menü ile garson iş yükü %30 azaldı
-- ✓ Sadakat programı ile müşteri geri dönüşü %35 arttı
-- ✓ Ortalama hesap %12 arttı (ürün önerileri ile)
+**Bugünkü durum:** Kağıt siparişler, stok kontrolü yok, müşteri takibi yapılamıyor.
 
-**Sonuç:**
-- Aylık ciro: 120.000₺ → 160.000₺ (%33 artış)
-- Net aylık kazanç: +38.000₺
-- ROI: İlk ayda sistem kendini amorti etti
+**HummyTummy ile ne değişir:**
+- ✓ Sipariş kağıttan çıkar, POS'tan mutfak ekranına anında düşer
+- ✓ QR menü ile müşteri garson beklemeden sipariş verebilir
+- ✓ Telefon numarasıyla otomatik müşteri kaydı, puan ve kademe takibi başlar
+- ✓ Gün sonu kapanışı Z-Raporu ile tek ekrandan yapılır
+- ✓ Menü fiyatı değiştiğinde yeniden baskı gerekmez
 
-**İşletme Sahibinin Yorumu:**
-> "HummyTummy ile hem zamandan hem paradan tasarruf ettik. En çok sadakat programını beğendim - müşteriler sürekli puan durumlarını soruyor ve bu onları tekrar getiriyor!"
+**Yazılım maliyeti: 0₺.** Bu senaryonun tamamı ücretsiz çekirdekte çalışır.
 
-## Kullanım Senaryosu 2: Aile Restoranı - "Lezzet Sofrası"
+## Senaryo 2: Aile Restoranı — 20 masa, 5 garson, 3 aşçı
 
-**Durum Öncesi:**
-- 20 masa, 5 garson, 3 aşçı
-- Manuel mutfak iletişimi, uzun bekleme süreleri
-- Gün sonu kapanışı 1.5 saat sürüyor
-- Hangi ürünlerin ne kadar sattığı bilinmiyor
-- Aylık ciro: 400.000₺
+**Bugünkü durum:** Mutfak iletişimi sözlü, gün sonu kapanışı uzun sürüyor, hangi ürünün kâr ettirdiği bilinmiyor.
 
-**HummyTummy ile Değişim (PRO Plan):**
-- ✓ Gerçek zamanlı KDS ile sipariş hazırlık süresi %35 azaldı
-- ✓ Masa devir hızı arttı (saatte 12 → 18 müşteri)
-- ✓ Gün sonu kapanışı 15 dakikaya düştü (günde 1.25 saat tasarruf)
-- ✓ Z-Rapor ile en çok/az satan ürünler belirlendi
-- ✓ Envanter ile stok maliyeti %18 azaldı
-- ✓ QR menü ile müşteri sipariş verme hızı %40 arttı
+**HummyTummy ile ne değişir:**
+- ✓ Gerçek zamanlı KDS: sipariş kaybolmaz, ürün ürün durum işaretlenir
+- ✓ Geciken sipariş uyarısı ile bekleyen masalar görünür hale gelir
+- ✓ Z-Rapor ve kasa mutabakatı gün sonunu tek akışa indirir
+- ✓ Reçete ve fire takibi ile porsiyon maliyeti hesaplanır
+- ✓ Menü mühendisliği raporu hangi ürünün kâr ettirdiğini gösterir
+- ✓ Vardiya planlama ve puantaj tek yerden yönetilir
 
-**Sonuç:**
-- Aylık ciro: 400.000₺ → 540.000₺ (%35 artış)
-- Operasyonel maliyet %15 azaldı
-- Net aylık kazanç: +118.000₺
-- Yıllık ROI: 4.700%
+**Yazılım maliyeti: 7.750₺/yıl** (Lisans + Stok & Maliyet + Gelişmiş Rapor + Personel + Rezervasyon).
 
-**İşletme Sahibinin Yorumu:**
-> "Mutfak ile garsonlar arasındaki iletişim tam bir devrim oldu. Artık siparişler kaybedilmiyor, müşteriler çok daha mutlu. Raporlar sayesinde menümüzü optimize ettik ve karlılığımız %25 arttı."
+## Senaryo 3: Restoran Zinciri — 5 şube
 
-## Kullanım Senaryosu 3: Restoran Zinciri - "Burger House"
+**Bugünkü durum:** Her şubede farklı sistem, merkezi takip yok, pazaryeri siparişleri elle giriliyor.
 
-**Durum Öncesi:**
-- 4 şube, toplam 80 masa
-- Her şubede farklı sistem, merkezi takip yok
-- Stok yönetimi karmaşık
-- Müşteri sadakati düşük, yüksek churn
-- Toplam aylık ciro: 1.600.000₺
+**HummyTummy ile ne değişir:**
+- ✓ Tüm şubeler tek panelden izlenir, şubeler arası performans karşılaştırılır
+- ✓ Konsolide kâr-zarar tablosu tek raporda toplanır
+- ✓ Yemeksepeti / Getir / Trendyol Yemek siparişleri otomatik POS ve mutfağa düşer
+- ✓ Şubeler arası stok transferi kayıt altına alınır
+- ✓ Satış faturaları Nilvera üzerinden e-Fatura / e-Arşiv olarak gönderilir
+- ✓ Sadakat programı tüm şubelerde ortak çalışır
 
-**HummyTummy ile Değişim (BUSINESS Plan):**
-- ✓ Merkezi yönetim ile tüm şubeleri tek ekrandan takip
-- ✓ Şubeler arası performans karşılaştırması
-- ✓ Çoklu lokasyon sadakat programı (tüm şubelerde geçerli)
-- ✓ API ile muhasebe sistemi entegrasyonu
-- ✓ Personel performans takibi ile eğitim ihtiyaçları belirlendi
-- ✓ Envanter optimizasyonu ile şubeler arası stok transferi
+**Yazılım maliyeti: 34.170₺/yıl** — şube başına yaklaşık 6.834₺.
 
-**Sonuç:**
-- Toplam aylık ciro: 1.600.000₺ → 2.240.000₺ (%40 artış)
-- Operasyonel verimlilik %30 arttı
-- Müşteri geri dönüş oranı %45 arttı
-- Franchise için hazır altyapı oluştu
-- Net aylık kazanç: +634.000₺
+## Kayıt Olmadan Kendiniz Deneyin
 
-**İşletme Sahibinin Yorumu:**
-> "HummyTummy ile zincir yönetimi çok kolaylaştı. Hangi şubede ne olduğunu anında görüyorum. Sadakat programı marka bağlılığı yarattı - müşteriler artık 'Burger House müşterisi' olarak kendilerini tanımlıyor."
-
-## Gerçek Kullanıcı Geribildirimleri
-
-### ⭐⭐⭐⭐⭐ "Kurulumu çok kolay!"
-> "Teknik bilgim yok ama 2 saatte kurdum ve kullanmaya başladım. Arayüz çok sezgisel, personel eğitimi sadece 15 dakika sürdü."
-> - *Mehmet K., Kafe Sahibi*
-
-### ⭐⭐⭐⭐⭐ "QR menü müşterilerimizin favorisi"
-> "Müşteriler garson beklemeden sipariş veriyor, biz de daha hızlı servis yapıyoruz. Hem müşteri memnuniyeti hem ciro arttı."
-> - *Ayşe Y., Restoran Müdürü*
-
-### ⭐⭐⭐⭐⭐ "Raporlar inanılmaz detaylı"
-> "İlk defa hangi ürünlerimizin gerçekten kar ettirdiğini gördüm. Menümüzü optimize ettik ve karlılık %20 arttı."
-> - *Can D., İşletme Sahibi*
-
-### ⭐⭐⭐⭐⭐ "Sadakat programı gerçekten çalışıyor"
-> "Müşterilerimiz puan toplamak için daha sık geliyor. 3 ayda sadakat sayesinde %30 daha fazla düzenli müşterimiz oldu."
-> - *Zeynep S., Kafe İşletmecisi*
+Sunuma güvenmek zorunda değilsiniz. Paylaşımlı demo restoranımızda kayıt olmadan, kredi kartı vermeden gezinebilir; POS'u, mutfak ekranını ve QR menüyü gerçek veriyle görebilirsiniz.
 
 ---
 
@@ -835,10 +828,10 @@ Net ROI: 176.000₺ (700% getiri)
 ✓ **Oturum Yönetimi**: 30 günlük yenileme, 7 günlük erişim token
 
 ### Veri Yedekleme
-✓ **Otomatik Yedekleme**: Günlük otomatik database backup
-✓ **Production Öncesi Yedek**: Deployment öncesi otomatik yedekleme
-✓ **Çoklu Bölge**: Farklı lokasyonlarda yedek kopyalar
-✓ **Kolay Geri Yükleme**: Tek tıkla geri yükleme imkanı
+✓ **Otomatik Yedekleme**: Düzenli, doğrulanmış veritabanı yedeği (gzip bütünlüğü ve şema kontrolü ile)
+✓ **Production Öncesi Yedek**: Her dağıtım öncesi otomatik yedek; yedek alınamazsa dağıtım durdurulur
+✓ **14 Günlük Saklama**: Üretim yedekleri 14 gün geriye dönük saklanır
+✓ **Geri Yükleme Desteği**: Geri yükleme talebiniz destek ekibimiz tarafından yürütülür
 
 ## Performans ve Ölçeklenebilirlik
 
@@ -857,10 +850,10 @@ Net ROI: 176.000₺ (700% getiri)
 ✓ **Load Balancing**: Yük dengeleme için hazır
 
 ### Uptime (Çalışma Süresi)
-✓ **%99.9 Uptime Garantisi**: Yılda sadece 8.7 saat downtime
+✓ **%99.9 Çalışma Süresi Hedefi**: Yılda yaklaşık 8.7 saat kesinti bütçesi
 ✓ **Sağlık Kontrolleri**: Otomatik CI/CD pipeline health check
-✓ **Otomatik Failover**: Hata durumunda otomatik geçiş
-✓ **İzleme**: 7/24 sistem izleme ve uyarı sistemi
+✓ **Sürekli İzleme**: Sistem izleme, hata takibi (Sentry) ve uyarı bildirimleri
+✓ **Sözleşmeli SLA**: Öncelikli Destek modülü ile garantili yanıt süresi
 
 ## Bulut Tabanlı Avantajlar
 
@@ -903,7 +896,7 @@ HummyTummy, restoran işletmelerinin tüm operasyonlarını tek bir platformda y
 Hayır. HummyTummy sezgiel arayüzü ile teknik bilgi gerektirmez. Kurulum ve kullanım çok kolaydır. Ortalama öğrenme süresi 15-30 dakikadır.
 
 ### İnternet bağlantısı olmadan çalışır mı?
-Masaüstü uygulaması sınırlı offline destek sunar. Ancak tam performans için internet bağlantısı önerilir. İnternet kesilse bile veriler cihazda saklanır ve bağlantı geldiğinde senkronize edilir.
+Hayır. HummyTummy bulut tabanlıdır ve çalışmak için internet bağlantısı gerektirir. Masaüstü uygulaması yazıcı ve Bluetooth cihaz desteğini yerel olarak sağlar, ancak sipariş ve satış verisi çevrimdışı tutulmaz. Kesintiye karşı yedek bir bağlantı (örneğin mobil veri) öneririz.
 
 ## Kurulum ve Başlangıç
 
@@ -922,26 +915,33 @@ Ortalama kurulum süresi 1-2 saattir. Bu süre şunları içerir:
 - **Mutfak Ekranı**: Herhangi bir ekran + bilgisayar/tablet
 
 ### Mevcut sistemimden veri aktarımı yapılabilir mi?
-Evet. BUSINESS planında veri import/export desteği vardır. Destek ekibimiz mevcut verilerinizi aktarmanıza yardımcı olur.
+Menünüzü AI Menü Stüdyosu'nun OCR içe aktarma özelliğiyle mevcut menü görselinizden aktarabilirsiniz. Raporlarınızı CSV ve Excel olarak dışa aktarabilirsiniz. Bunun dışındaki veri taşıma işlerinde destek ekibimiz yardımcı olur; kapsamı verinizin biçimine göre birlikte belirleriz.
 
 ## Fiyatlandırma ve Ödeme
 
-### Ücretsiz plan süresiz mi?
-Evet. FREE plan süresiz olarak ücretsizdir. Kredi kartı bilgisi gerektirmez.
+### Ücretsiz çekirdek gerçekten süresiz mi?
+Evet. POS, KDS, menü, masa planı, QR menü, sipariş, kasa, temel raporlar, ekip yönetimi, müşteriler ve sadakat süresiz ücretsizdir. Kredi kartı bilgisi istenmez, lisans gerekmez. Kullanıcı, masa, ürün, kategori ve aylık sipariş sayısında sınır yoktur; ilk şube ücretsizdir.
 
-### Deneme süresi nasıl çalışır?
-Ücretli planlar (BASIC, PRO, BUSINESS) 14 gün ücretsiz deneme ile başlar. Deneme süresi sonunda plan otomatik olarak başlar. İsterseniz deneme süresinde iptal edebilirsiniz, ücret alınmaz.
+### Deneme süresi var mı?
+Deneme süresi kavramı yoktur — çünkü gerek yoktur. Çekirdek zaten süresiz ücretsizdir; ayrıca kayıt olmadan gezebileceğiniz paylaşımlı bir demo restoranı sunuyoruz.
+
+### Lisans ne işe yarıyor, almak zorunda mıyım?
+Lisans (2.990₺/yıl) yalnızca **ücretli modülleri** açmak için gereken ön koşuldur. Ücretsiz çekirdekte kalacaksanız lisans almanıza gerek yoktur.
 
 ### Ödeme yöntemleri nelerdir?
-- Kredi kartı (Visa, Mastercard, American Express)
-- Banka kartı
-- Aylık veya yıllık ödeme seçeneği
+Ödemeler PayTR üzerinden kredi kartı veya banka kartı ile yapılır. Tüm ücretli kalemler yıllıktır (kontör ve yerinde kurulum tek seferliktir). Aylık abonelik seçeneği yoktur.
 
-### İptal edersem ne olur?
-İstediğiniz zaman iptal edebilirsiniz. İptal ettiğinizde mevcut dönem sonuna kadar sistemi kullanmaya devam edersiniz. Iade yapılmaz, ancak kalan sürede tüm özellikleriniz aktif kalır.
+### Otomatik olarak kartımdan çekim yapılır mı?
+Hayır. Yenileme manueldir. Yıl dönümüne 30, 7 ve 1 gün kala e-posta hatırlatması gönderilir; ödemeyi siz başlatırsınız.
 
-### Plan yükseltme nasıl yapılır?
-Tek tıkla plan yükseltebilirsiniz. Ödediğiniz ücret orantılı olarak hesaplanır (kullanılmayan eski plan ücreti düşülür).
+### Yıl ortasında modül alırsam ne oluyor?
+Yıl dönümünüze kalan gün sayısı kadar orantılı ücretlendirilir; böylece hesabınız tek tarihte, tek faturayla yenilenir. Yıl dönümüne 14 günden az kalmışsa kalem bir sonraki tam döngüye taşınır. Hiçbir satır 1₺'nin altına inmez.
+
+### Yenilemezsem ne olur?
+7 günlük ek süre tanınır. Sonrasında yalnızca ücretli modüllerin **erişimi** kararır. Verileriniz silinmez: stok kayıtlarınız, rezervasyonlarınız, personel verileriniz ve ürettiğiniz medya yerinde durur, ödeme yaptığınız anda aynen geri açılır. Ücretsiz çekirdek çalışmaya devam eder — POS'unuz kapanmaz.
+
+### İhtiyacım kalmayan bir modülü bırakabilir miyim?
+Evet. Yenilemediğiniz kalem bir sonraki dönemde faturanızdan düşer. Ara dönemde iade yapılmaz, satın aldığınız dönem sonuna kadar kullanmaya devam edersiniz.
 
 ## Özellikler ve Kullanım
 
@@ -957,17 +957,20 @@ Tek tıkla plan yükseltebilirsiniz. Ödediğiniz ücret orantılı olarak hesap
 - Her 1₺ harcamada otomatik puan kazanır (kademeye göre 1.0x - 2.0x)
 - Puanlar otomatik olarak hesaba eklenir
 - 100 puan = 10₺ indirim olarak kullanılabilir
-- Kademeler: Bronz (1.0x) → Gümüş (1.2x) → Altın (1.5x) → Platin (2.0x)
+- Kademeler: Bronz (1.0x) → Gümüş (1.25x) → Altın (1.5x) → Platin (2.0x)
+- Sadakat programı ücretsiz çekirdeğe dahildir, ek ücreti yoktur
 
 ### Mutfak ekranında sipariş sırası nasıl belirlenir?
 Siparişler giriş sırasına göre listelenir. Uzun süre bekleyen siparişler otomatik olarak vurgulanır. Mutfak personeli siparişleri "Hazırlanıyor" ve "Hazır" olarak işaretler.
 
 ### Personel performansını nasıl takip edebilirim?
-PRO ve BUSINESS planlarında personel raporları vardır:
+Personel satış raporları **Gelişmiş Rapor & Analitik** modülüne (1.290₺/yıl) dahildir:
 - Kişi bazında toplam satış
 - Sipariş sayıları
 - Ortalama sepet değeri
 - En çok satan personel sıralaması
+
+Puantaj, vardiya planlama ve vardiya değişimi için **Personel** modülü (990₺/yıl) gerekir.
 
 ### Yazıcı desteği var mı?
 Evet. Herhangi bir USB termal yazıcı (58mm veya 80mm) ile çalışır. Masaüstü uygulaması native yazıcı desteği sunar.
@@ -985,25 +988,18 @@ Evet. Verileriniz:
 Sadece restoran yetkilileriniz (kullanıcı rolüne göre). Verileriniz diğer restoranlardan tamamen izole edilmiştir. HummyTummy ekibi sadece destek taleplerinizde erişim sağlayabilir.
 
 ### Ödeme bilgilerim saklanır mı?
-Hayır. Ödeme bilgileri Stripe ve PayTR tarafından saklanır. HummyTummy'de kredi kartı bilgileri saklanmaz.
+Hayır. Ödeme, ödeme sağlayıcımız PayTR üzerinden alınır; kart bilgileri HummyTummy'de saklanmaz.
 
 ## Teknik Destek
 
 ### Destek nasıl alınır?
-- **E-posta**: support@hummytummy.com
-- **Canlı Sohbet**: Web sitesinden (PRO ve BUSINESS planlarında)
-- **Telefon**: BUSINESS planında özel destek hattı
-- **Dokümantasyon**: Kapsamlı kullanım kılavuzu ve video eğitimler
-
-### Destek saatleri nedir?
-- **FREE ve BASIC**: Hafta içi 09:00-18:00 (e-posta)
-- **PRO**: Hafta içi 09:00-20:00 + Cumartesi 10:00-16:00 (e-posta + chat)
-- **BUSINESS**: 7/24 öncelikli destek (e-posta + chat + telefon)
+- **E-posta**: support@hummytummy.com — her hesap için, ücretsiz çekirdek dahil
+- **Dokümantasyon**: Kapsamlı kullanım kılavuzu ve yardım içerikleri
+- **Öncelikli Destek** (1.990₺/yıl): Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi
 
 ### Eğitim veriliyor mu?
-- Tüm planlarda: Online dokümantasyon ve video eğitimler
-- PRO ve BUSINESS: Canlı online eğitim (1 saat)
-- BUSINESS: Yerinde eğitim seçeneği (ek ücretle)
+- **Tüm hesaplar**: Online dokümantasyon ve yardım içerikleri
+- **Yerinde Kurulum & Eğitim** (7.500₺ tek seferlik): Tam gün yerinde kurulum, cihaz devreye alma ve personel eğitimi
 
 ---
 
@@ -1013,8 +1009,8 @@ Hayır. Ödeme bilgileri Stripe ve PayTR tarafından saklanır. HummyTummy'de kr
 
 ### 1. Hızlı Başlangıç
 ✓ 1 saatte kurulum
-✓ 14 gün ücretsiz deneme
-✓ Kredi kartı gerektirmez (FREE plan)
+✓ Kayıt olmadan demo restoranında gezinme
+✓ Kredi kartı gerektirmez, lisans gerekmez
 ✓ Kolay personel eğitimi (15-30 dakika)
 
 ### 2. Kapsamlı Çözüm
@@ -1029,17 +1025,17 @@ Hayır. Ödeme bilgileri Stripe ve PayTR tarafından saklanır. HummyTummy'de kr
 ✓ Mobil uyumlu
 ✓ Otomatik güncellemeler
 
-### 4. Ölçeklenebilir Fiyatlandırma
-✓ Ücretsizden başlayın
-✓ İhtiyacınıza göre büyüyün
-✓ Öngörülebilir maliyetler
-✓ Gizli ücret yok
+### 4. Dürüst Fiyatlandırma
+✓ Çekirdek süresiz ücretsiz ve sınırsız
+✓ Sadece açtığınız modülü ödersiniz — paket, kademe, plan yok
+✓ Tüm fiyatlar TL ve KDV dahil; gizli ücret yok
+✓ Otomatik kart çekimi yok; yenilemeyi siz başlatırsınız
 
-### 5. Kanıtlanmış ROI
-✓ İlk 3 ayda ortalama %25 ciro artışı
-✓ %15-20 operasyonel maliyet azalması
-✓ Günde 1+ saat zaman tasarrufu
-✓ Müşteri memnuniyetinde %40 artış
+### 5. Kilitlenme Yok
+✓ Ödeme aksasa da POS'unuz çalışmaya devam eder
+✓ Veriniz silinmez, rehin alınmaz
+✓ Kullanıcı, masa, ürün ve sipariş başına ücret yok
+✓ İhtiyacınız kalmayan modülü yenilemezsiniz, faturadan düşer
 
 ## Hemen Başlayın
 
@@ -1068,11 +1064,13 @@ Hayır. Ödeme bilgileri Stripe ve PayTR tarafından saklanır. HummyTummy'de kr
 → Müşterilere QR menüyü tanıtın
 → Sonuçları izleyin
 
-## Demo Talep Edin
+## Demo
 
-Canlı demo görmek ister misiniz?
+**Kendiniz deneyin:** Paylaşımlı demo restoranımızda kayıt olmadan, kredi kartı vermeden gezinebilirsiniz.
+
+**Ya da bizimle deneyin:**
 → 30 dakikalık online demo
-→ Tüm özellikleri görelim
+→ İşletme profilinize göre hangi modüllere gerçekten ihtiyacınız olduğunu birlikte belirleyelim
 → Sorularınızı cevaplayalım
 
 **Demo Talep:** [demo@hummytummy.com](mailto:demo@hummytummy.com)
@@ -1093,16 +1091,14 @@ Web: www.hummytummy.com
 
 ---
 
-## Özel Teklif!
+## Başlamak İçin Ödemeniz Gereken Tutar: 0₺
 
-**Bu sunumu okuyan restoranlar için özel:**
+🎁 **Çekirdek süresiz ücretsiz** — POS, KDS, QR menü, masa planı, kasa, raporlar, ekip, müşteriler, sadakat
+🎁 **Kredi kartı istenmez, lisans gerekmez, süre sınırı yoktur**
+🎁 **Kayıt olmadan demo restoranında hemen gezinebilirsiniz**
+🎁 **İlk şube ücretsiz** — kullanıcı, masa, ürün ve sipariş sınırsız
 
-🎁 **İlk 3 Aya %20 İndirim**
-🎁 **Ücretsiz Yerinde Eğitim** (PRO ve BUSINESS)
-🎁 **İlk 100 Müşteri İçin Ekstra 500 Sadakat Puanı**
-
-**Promosyon Kodu:** SUNUM2024
-**Son Geçerlilik:** [Tarih]
+Ücretli bir modüle ihtiyaç duyduğunuz gün konuşuruz. O güne kadar hiçbir şey ödemezsiniz.
 
 ---
 
@@ -1111,15 +1107,15 @@ Web: www.hummytummy.com
 **HummyTummy ile:**
 - ✅ Operasyonları otomatikleştirin
 - ✅ Müşteri memnuniyetini artırın
-- ✅ Gelirlerinizi maksimize edin
-- ✅ Rakiplerinizin önüne geçin
+- ✅ Neyin kâr ettirdiğini ölçerek karar verin
+- ✅ Yazılıma bütçe ayırmadan başlayın
 
-**Bugün başlayın, yarın farkı görün!**
+**Çekirdek ücretsiz. Sadece kullandığınızı ödeyin.**
 
-[**HEMEN ÜCRETSIZ DENEYIN →**](https://hummytummy.com/signup)
+[**HEMEN ÜCRETSIZ BAŞLAYIN →**](https://hummytummy.com/signup)
 
 ---
 
-*Bu doküman HummyTummy sistemi hakkında genel bilgi içermektedir. Özellikler ve fiyatlar önceden haber verilmeksizin değiştirilebilir. En güncel bilgiler için www.hummytummy.com adresini ziyaret ediniz.*
+*Bu doküman HummyTummy sistemi hakkında genel bilgi içermektedir. Fiyatlar TL ve KDV dahildir; özellikler ve fiyatlar önceden haber verilmeksizin değiştirilebilir. Kullanım senaryolarındaki operasyonel iyileşmeler örnek niteliğindedir ve garanti edilmez. En güncel fiyat listesi için www.hummytummy.com adresini ziyaret ediniz.*
 
-*Son Güncelleme: 2025 | Versiyon: 1.0 | © 2025 HummyTummy Teknoloji A.Ş. Tüm hakları saklıdır.*
+*Son Güncelleme: Ağustos 2026 | Versiyon: 2.0 (à-la-carte fiyatlandırma) | © 2026 HummyTummy Teknoloji A.Ş. Tüm hakları saklıdır.*

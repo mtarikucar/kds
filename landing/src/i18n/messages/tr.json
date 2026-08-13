@@ -250,10 +250,10 @@
   "cta": {
     "title": "Restoranınızı dönüştürmeye hazır mısınız?",
     "subtitle": "Operasyonları kolaylaştırmak ve işlerini büyütmek için HummyTummy kullanan {count} restorana katılın.",
-    "primaryBtn": "Ücretsiz denemeye başla",
+    "primaryBtn": "Ücretsiz başla",
     "secondaryBtn": "Satışla konuş",
     "trustBadge1": "Kredi kartı gerekmez",
-    "trustBadge2": "14 günlük ücretsiz deneme",
+    "trustBadge2": "Süresiz ücretsiz çekirdek",
     "trustBadge3": "İstediğiniz zaman iptal"
   },
   "mascot": {
