@@ -1,63 +1,110 @@
 ---
 title: Özellik matrisi
-description: Başlangıç, Profesyonel ve Kurumsal paketlerinin tam özellik ve limit karşılaştırması.
+description: Hangi özellik ücretsiz çekirdekte, hangisi hangi ücretli modülle açılıyor — limitlerle birlikte tam liste.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Özellik matrisi
 
-Aşağıdaki tablolar üç satılabilir paketin (**Başlangıç / Profesyonel / Kurumsal**) hangi özellikleri içerdiğini ve kullanım limitlerini karşılaştırır. Hangi paketin size uygun olduğuna karar verirken bu sayfayı kullanabilirsiniz.
+Karşılaştırılacak paket yoktur. Tek soru şudur: **bu özellik ücretsiz
+çekirdekte mi, yoksa hangi ücretli modülle açılıyor?** Aşağıdaki tablolar
+tam listeyi verir.
 
-## Özellikler
+## Ücretsiz çekirdek
 
-| Özellik | Başlangıç | Profesyonel | Kurumsal |
-| --- | :---: | :---: | :---: |
-| POS (satış ekranı) erişimi | ✓ | ✓ | ✓ |
-| KDS (mutfak ekranı) entegrasyonu | ✓ | ✓ | ✓ |
-| Stok takibi | ✓ | ✓ | ✓ |
-| Gelişmiş raporlar | ✗ | ✓ | ✓ |
-| Çok şube | ✗ | ✓ | ✓ |
-| Özel marka (branding) | ✗ | ✓ | ✓ |
-| Öncelikli destek | ✗ | ✓ | ✓ |
-| Rezervasyon sistemi | ✗ | ✓ | ✓ |
-| Personel yönetimi | ✗ | ✓ | ✓ |
-| Delivery entegrasyonu | ✗ | ✓ | ✓ |
-| API erişimi | ✗ | ✗ | ✓ |
-| Harici ekran (Partner Display) | ✗ | ✗ | ✓ |
+Bu özellikler her işletmede açıktır; lisans gerekmez, süre sınırı yoktur.
+
+| Özellik | Durum |
+| --- | :---: |
+| POS (satış ekranı) ve adisyon | Ücretsiz |
+| Mutfak ekranı (KDS) | Ücretsiz |
+| Menü yönetimi | Ücretsiz |
+| Masa ve kat planı | Ücretsiz |
+| QR menü | Ücretsiz |
+| Sipariş yönetimi | Ücretsiz |
+| Kasa ve nakit | Ücretsiz |
+| Temel raporlar | Ücretsiz |
+| Ekip ve rol yönetimi | Ücretsiz |
+| Müşteriler | Ücretsiz |
+| Cihaz ve şube paneli (çoklu lokasyon arayüzü) | Ücretsiz |
+| Özel marka ve alt alan adı (subdomain) | Ücretsiz |
+
+## Ücretli özellikler ve onları açan modüller
+
+Her satırdaki özellik, karşısındaki ürün satın alındığında açılır. Hepsi
+yıllıktır ve **lisans (₺2.990/yıl)** ön koşuluna tabidir.
+
+| Özellik | Açan ürün | Yıllık |
+| --- | --- | ---: |
+| Gelişmiş raporlar ve analitik, muhasebe back-office | Gelişmiş Rapor & Analitik | ₺1.290 |
+| Stok, reçete, maliyet, satın alma, fire, tedarikçi | Stok & Maliyet Yönetimi | ₺1.490 |
+| Rezervasyon sistemi ve online rezervasyon sayfası | Rezervasyon Sistemi | ₺990 |
+| Personel yönetimi (puantaj, vardiya, performans) | Personel Yönetimi | ₺990 |
+| AI içerik üretimi ve menü OCR | AI Menü Stüdyosu | ₺1.990 |
+| API erişimi ve giden webhook'lar | API & Webhook Erişimi | ₺2.490 |
+| Harici / partner ekran API'si | Partner Ekran API | ₺1.990 |
+| Öncelikli destek | Öncelikli Destek | ₺1.990 |
+| Teslimat entegrasyonu | Yemeksepeti · Getir · Trendyol Yemek | ₺2.490 (her biri) |
+| e-Belge (e-Fatura / e-Arşiv) | e-Fatura (Nilvera) | ₺1.990 |
+| ÖKC / yazarkasa entegrasyonu | ÖKC / Yazarkasa (Hugin) | ₺2.990 |
+| Çağrı-ID ile müşteri tanıma | Çağrı-ID Entegrasyonu | ₺1.490 |
+| SMS gönderimi | SMS Bildirimleri | ₺990 |
 
 <Callout type="info">
-  **API erişimi** ve **harici ekran (Partner Display)** yalnızca Kurumsal pakette açıktır. Bu iki yetenek, üçüncü taraf entegrasyonlarını ve uzak/masaüstü ekran oturumlarını kapsar.
+  Teslimat entegrasyonlarından **herhangi birini** almanız teslimat arayüzünü
+  açar; ikinci bir platform eklediğinizde ikisi yan yana çalışır. Aynı şekilde
+  e-Fatura ve ÖKC ayrı ürünlerdir, biri diğerini kapsamaz.
 </Callout>
 
 ## Limitler
 
 Sonsuzluk işareti (**∞**) o limitin **sınırsız** olduğunu gösterir.
 
-| Limit | Başlangıç | Profesyonel | Kurumsal |
-| --- | :---: | :---: | :---: |
-| Maksimum kullanıcı | 5 | 15 | ∞ |
-| Maksimum masa | 20 | 50 | ∞ |
-| Maksimum şube | 1 | 3 | ∞ |
-| Maksimum ürün | 100 | 500 | ∞ |
-| Maksimum kategori | 20 | 50 | ∞ |
-| Aylık maksimum sipariş | 500 | 2.000 | ∞ |
+| Limit | Ücretsiz çekirdek | Nasıl artar |
+| --- | :---: | --- |
+| Kullanıcı | ∞ | — |
+| Masa | ∞ | — |
+| Ürün | ∞ | — |
+| Kategori | ∞ | — |
+| Aylık sipariş | ∞ | — |
+| Şube | 1 | Her **Ek Şube** (₺3.990/yıl/adet) şube hakkınızı bir artırır; hesap başına en fazla 100 adet |
 
-## Deneme paketi
+Şube, fiyatlandırılan tek kapasite kalemidir. Şube panelinin ve şube
+değiştiricinin kendisi ücretsizdir — ödediğiniz şey **ikinci ve sonraki
+şubelerdir**.
 
-Her yeni işletmenin başladığı **Deneme** paketi, 7 gün boyunca **Kurumsal'ın tüm özelliklerine ve sınırsız limitlerine** sahiptir. Satılan bir paket olmadığı için plan seçim ekranında listelenmez ve fiyatlandırma karşılaştırmasının dışındadır. Ayrıntılar için bkz. [Deneme ve faturalama](/tr/plans/trial-and-billing).
+## Kontörle çalışan özellikler
+
+İki özellik, açıldıktan sonra kullanım başına **kontör** harcar:
+
+- **AI Menü Stüdyosu** — görsel, video ve 3D model üretimleri kontörden düşer.
+  Kontör paketleri: 100 görsel ₺690 · 20 video ₺890 · 10 3D model ₺790.
+- **SMS Bildirimleri** — her gönderim kontörden düşer. 500 SMS ₺490.
+
+Kontörler tek seferliktir, süresi yoktur ve tükenene kadar geçerlidir; yıllık
+yenilemeye girmezler. Kontör satın alabilmek için ilgili modüle/entegrasyona
+sahip olmanız gerekir.
 
 ## O an hangi özelliklere sahibim?
 
-İşletmenizin o an aktif olan özelliklerini panelden görebilirsiniz. Panelde gördüğünüz erişim; paketinizin özelliklerine, varsa Marketplace’ten eklediğiniz eklentilere ve size özel açılmış yetkilere göre birleştirilmiş **gerçek erişiminizdir** — yalnızca paketin varsayılan listesini değil, fiilen kullanabildiklerinizi yansıtır.
+**Lisans & Erişim** (`/admin/license`) sayfası, sahip olduğunuz ürünleri, her
+birinin bitiş tarihini ve yenileme tutarını listeler; kontör bakiyeleriniz de
+aynı sayfadadır.
 
-<Callout type="info">
-  Bir özelliğin paketinizde kapalı olduğunu görüyorsanız, o özelliği **plan yükselterek** veya **Marketplace eklentisiyle** açabilirsiniz. Bkz. [Plan seçimi ve yükseltme](/tr/plans/choosing-and-upgrading) ve [Marketplace](/tr/marketplace).
+Panelde gördüğünüz erişim, **fiilen kullanabildiklerinizdir**: satın aldığınız
+ürünler, size özel açılmış (hediye edilmiş) haklar ve ücretsiz çekirdek
+birleştirilerek hesaplanır.
+
+<Callout type="warning">
+  Lisansınız aktif değilken, lisans gerektiren ürünlerin hakları verilmez — ürün
+  satırı listede kalır ama özellik kapalı görünür. Lisans yenilendiğinde hepsi
+  aynen geri açılır.
 </Callout>
 
 ## İlgili sayfalar
 
-- Plan seçme, yükseltme ve ödeme akışları: **[Plan seçimi ve yükseltme](/tr/plans/choosing-and-upgrading)**
-- Deneme süreci ve faturalama: **[Deneme ve faturalama](/tr/plans/trial-and-billing)**
+- Hangi modüllerin size uygun olduğu: **[Hangi modüller size uygun](/tr/plans/choosing-and-upgrading)**
+- Orantılı fiyatlama, yıl dönümü ve yenileme: **[Faturalama ve yenileme](/tr/plans/trial-and-billing)**
 
 Geliştirici/entegrasyon detayları (yetkili özelliklerin API’den sorgulanması dahil): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

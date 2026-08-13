@@ -1,6 +1,6 @@
 ---
 title: Tables & Floor Plan
-description: HummyTummy table management — add/edit/delete tables, capacity, one-tap status changes, occupancy stats and plan limits. Purpose, usage and tips.
+description: HummyTummy table management — add/edit/delete tables, capacity, one-tap status changes and occupancy stats. Purpose, usage and tips.
 ---
 
 import { Callout } from 'nextra/components'
@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components'
 
 **Menu path:** Menu & Tables → Tables &nbsp;•&nbsp; **URL:** `/admin/tables`
 **Access:** ADMIN, MANAGER
-**Plan:** Available on all plans (table count **depends on plan**)
+**Requires:** Included in the free core (table count is **unlimited**)
 
 ## Purpose
 
@@ -19,7 +19,7 @@ This screen defines your restaurant's **tables** and manages their status. The t
 
 - **Stats strip at the top:** total tables, **free**, **occupied**, **reserved** counts and a live **occupancy percentage** (share of seated tables).
 - **Table card grid:** each card shows the table number, status (colored badge), capacity and action buttons.
-- **Plan-limit banner:** warns you as you approach your plan's table limit; once the limit is reached "Add Table" is locked and an upgrade prompt appears.
+- **Usage banner:** shows how many tables you've defined; because the table count is unlimited, "Add Table" never locks against a quota.
 
 ## Table statuses
 
@@ -37,9 +37,9 @@ This screen defines your restaurant's **tables** and manages their status. The t
 - **Upcoming-reservation badge:** if a confirmed/pending reservation starts soon (within ~2 hours), the card shows the time + customer name — staff can see at a glance which table has an incoming guest.
 
 <Callout type="info">
-  **The table limit depends on the plan:** Starter (BASIC) **20 tables**, Professional
-  (PRO) **50 tables**, Enterprise (BUSINESS) **unlimited**. Once at the limit you can't
-  add a new table; upgrade the plan or delete unused tables. For exact limits see
+  **The table count is unlimited:** tables and the floor plan are part of the free core;
+  there is no per-table fee and no tier to move up to. The only paid capacity item is the
+  **second branch onwards** (**Extra Branch**, ₺3,990/year each) — see
   **[Plans](/en/plans)**.
 </Callout>
 
@@ -53,5 +53,5 @@ This screen defines your restaurant's **tables** and manages their status. The t
 ## Related screens
 
 - **[POS](/en/admin-guide/pos)** — table selection, transfer, merge and bill splitting happen here.
-- **[Reservations](/en/admin-guide/reservations)** — table-based reservations and auto-hold (PRO).
+- **[Reservations](/en/admin-guide/reservations)** — table-based reservations and auto-hold (Reservation System module).
 - **[Reports & Analytics](/en/admin-guide/reports)** — table utilization/occupancy analysis.

@@ -1,77 +1,249 @@
 ---
-title: Plan Matrix
-description: The feature × plan table, plan limits, and prices (TRY). The onboarding TRIAL plan and the Starter / Professional / Enterprise tiers.
+title: Entitlement Matrix
+description: What the free core grants, what each catalog product grants, and how feature.* / limit.* / integration.* keys are folded together.
 ---
 
 import { Callout } from 'nextra/components'
 
-# Plan Matrix
+# Entitlement Matrix
 
-This page is a compact recap of which features and limits each plan carries.
-For plan details, pricing changes, and the purchase flow, see
-[Plans](https://help.hummytummy.com/en/plans).
+This page summarises the one mechanism that decides what a business can reach:
+**entitlement keys** and who grants them.
+
+There are **no plans, tiers, or bundles**. The core product is free forever;
+paid capabilities are bought individually from the catalog, and each product
+joins the entitlement set through the keys it grants (`grants`).
 
 <Callout type="info">
-  New tenants start on a 7-day, fully-featured **TRIAL** plan. When the trial
-  ends, the tenant moves to **TRIAL_ENDED** and the app is locked to the
-  plan-selection + checkout flow — a paid plan must be chosen to continue. The
-  old **FREE** plan is retired (kept only as an enum tombstone; no tenant lands
-  on FREE).
+  Sources of truth: the free core in
+  `backend/src/modules/entitlements/free-baseline.const.ts`, the catalog and its
+  grants in `backend/src/modules/marketplace/alacarte-catalog.const.ts`, and the
+  valid key vocabulary in
+  `backend/src/modules/entitlements/entitlement-keys.const.ts`.
 </Callout>
 
-## Prices
+## Key namespace and the fold
 
-All prices are in **TRY** and are **KDV-inclusive** (the advertised gross). The
-KDV split is reverse-engineered at invoicing time.
+The entitlement set is the fold of grant rows coming from several sources. The
+combine rule depends on the key prefix:
 
-| Plan | `name` | Monthly | Yearly | Trial |
-| --- | --- | --- | --- | --- |
-| Trial | `TRIAL` | ₺0 | ₺0 | 7 days |
-| Starter | `BASIC` | ₺499 | ₺4,490 | — |
-| Professional | `PRO` | ₺1,299 | ₺12,990 | — |
-| Enterprise | `BUSINESS` | ₺2,999 | ₺29,990 | — |
+| Prefix | Type | Combine | Notes |
+| --- | --- | --- | --- |
+| `feature.*` | boolean | **OR** | If any source grants `true`, the feature is on. |
+| `limit.*` | number | **SUM** | `-1` is the "unlimited" sentinel and **dominates** the sum. |
+| `integration.*` | string[] | **UNION** | Union of vendor ids. |
 
-_Paid tiers have **no separate trial** (`trialDays = 0`); the dedicated **TRIAL** plan is the only trial (7 days), and every new tenant starts there._
+There are three grant sources: `free:baseline` (the free core),
+`addon:<code>:<id>` (one source per owned product), and `override:admin`
+(superadmin intervention; for `limit.*` / `integration.*` it can **replace** the
+running value via the `{ __replace: … }` wrapper).
 
-## Limits
+<Callout type="info">
+  Credits (`credit.PHOTO`, `credit.VIDEO`, `credit.MODEL3D`, `credit.SMS`) are
+  **not** entitlements. Catalog validation rejects `credit.*` as a grant key;
+  credit packs are sold as `kind: "credit"` with `creditKind` / `creditUnits`,
+  and the balance is read live at spend time (a 30s-cached number in front of a
+  real vendor charge would be a money bug).
+</Callout>
 
-`-1` = unlimited.
+## The free core (`free:baseline`)
 
-| Limit | TRIAL | BASIC | PRO | BUSINESS |
-| --- | --- | --- | --- | --- |
-| `maxUsers` | ∞ | 5 | 15 | ∞ |
-| `maxBranches` | ∞ | 1 | 3 | ∞ |
-| `maxTables` | ∞ | 20 | 50 | ∞ |
-| `maxProducts` | ∞ | 100 | 500 | ∞ |
-| `maxCategories` | ∞ | 20 | 50 | ∞ |
-| `maxMonthlyOrders` | ∞ | 500 | 2,000 | ∞ |
+Projected for every tenant, **unconditionally, forever**, with no licence
+required.
 
-## Feature × plan
+| Key | Value | Meaning |
+| --- | --- | --- |
+| `feature.posAccess` | `true` | POS / sales screen |
+| `feature.kdsIntegration` | `true` | Kitchen display (KDS) |
+| `feature.customBranding` | `true` | Custom brand and domain |
+| `feature.multiLocation` | `true` | Branch hub, branch picker, switcher UI |
+| `limit.maxUsers` | `-1` | Unlimited |
+| `limit.maxTables` | `-1` | Unlimited |
+| `limit.maxProducts` | `-1` | Unlimited |
+| `limit.maxCategories` | `-1` | Unlimited |
+| `limit.maxMonthlyOrders` | `-1` | Unlimited |
+| `limit.maxBranches` | `1` | The first branch is free; the only priced cap |
 
-| Feature (`flag`) | TRIAL | BASIC | PRO | BUSINESS |
-| --- | --- | --- | --- | --- |
-| POS access (`posAccess`) | ✅ | ✅ | ✅ | ✅ |
-| KDS integration (`kdsIntegration`) | ✅ | ✅ | ✅ | ✅ |
-| Inventory tracking (`inventoryTracking`) | ✅ | ✅ | ✅ | ✅ |
-| Advanced reports (`advancedReports`) | ✅ | ❌ | ✅ | ✅ |
-| Multi-location (`multiLocation`) | ✅ | ❌ | ✅ | ✅ |
-| Custom branding (`customBranding`) | ✅ | ❌ | ✅ | ✅ |
-| Reservation system (`reservationSystem`) | ✅ | ❌ | ✅ | ✅ |
-| Personnel management (`personnelManagement`) | ✅ | ❌ | ✅ | ✅ |
-| Delivery integration (`deliveryIntegration`) | ✅ | ❌ | ✅ | ✅ |
-| Priority support (`prioritySupport`) | ✅ | ❌ | ✅ | ✅ |
-| API access (`apiAccess`) | ✅ | ❌ | ❌ | ✅ |
-| External display / Partner Display (`externalDisplay`) | ✅ | ❌ | ❌ | ✅ |
+<Callout type="info">
+  The split on branches is deliberate: the **multi-branch UI is free**
+  (`feature.multiLocation`); what is paid for is **the second branch itself**
+  (`limit.maxBranches`). That is exactly why `extra_branch` grants both keys.
+</Callout>
+
+The rest of the free core (menu management, tables and floor plan, QR menu,
+order management, cash drawer, basic reports, team and roles, customers, the
+device and branch panel) is not tied to any entitlement key at all — those
+routes carry no `@RequireEntitlement`. Entitlement gates are **opt-in per
+route**; a route without the decorator denies nobody.
+
+## Catalog products and what they grant
+
+Prices are **TRY**, **VAT-inclusive**, and stored in the catalog as cents
+(`priceCents`): `299000` = ₺2,990.00. `annual` lines are day-prorated to the
+account anniversary — see the
+[Licensing & Billing API](/en/developer/billing-api).
+
+### Licence
+
+| Code | Price | Grants | Requires licence |
+| --- | --- | --- | --- |
+| `license_annual` | ₺2,990/yr | `feature.license` | — |
+
+### Modules
+
+| Code | Price | Grants | Requires licence |
+| --- | --- | --- | --- |
+| `advanced_reports` | ₺1,290/yr | `feature.advancedReports` | ✅ |
+| `module_inventory` | ₺1,490/yr | `feature.inventoryTracking` | ✅ |
+| `module_reservations` | ₺990/yr | `feature.reservationSystem` | ✅ |
+| `module_personnel` | ₺990/yr | `feature.personnelManagement` | ✅ |
+| `module_ai_studio` | ₺1,990/yr | `feature.aiContentGeneration` | ✅ |
+| `api_access` | ₺2,490/yr | `feature.apiAccess` | ✅ |
+| `module_external_display` | ₺1,990/yr | `feature.externalDisplay` | ✅ |
+| `priority_support` | ₺1,990/yr | `feature.prioritySupport` | ✅ |
+
+### Integrations
+
+| Code | Price | Grants | Requires licence |
+| --- | --- | --- | --- |
+| `delivery_yemeksepeti` | ₺2,490/yr | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ |
+| `delivery_getir` | ₺2,490/yr | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ |
+| `delivery_trendyol_yemek` | ₺2,490/yr | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ |
+| `fiscal_efatura` | ₺1,990/yr | `integration.fiscal` += `efatura` | ✅ |
+| `fiscal_hugin` | ₺2,990/yr | `integration.fiscal` += `hugin` | ✅ |
+| `caller_id_integration` | ₺1,490/yr | `integration.caller` += `generic` | ✅ |
+| `sms_integration` | ₺990/yr | `integration.sms` += `*` | ✅ |
+
+<Callout type="info">
+  All three `delivery_*` products write to the same `integration.delivery` key
+  and are union-ed; the `feature.deliveryIntegration` flag they carry alongside
+  folds with OR, so buying a second platform is idempotent for that flag.
+  `fiscal_hugin`'s old `plan:PRO` dependency is **gone** — plans are retired, so
+  catalog validation now rejects any `plan:`-prefixed dep at write time.
+</Callout>
+
+### Capacity
+
+| Code | Price | Grants | Requires licence |
+| --- | --- | --- | --- |
+| `extra_branch` | ₺3,990/yr each | `limit.maxBranches` +1, `feature.multiLocation` | ✅ |
+
+`maxQuantity: 100`. Bought by the unit: the projector multiplies the `limit.*`
+value by the row's `quantity`, and the engine sums that on top of the free
+baseline's `1`.
+
+### Credits (one-time, no expiry)
+
+| Code | Price | Balance | Dependency |
+| --- | --- | --- | --- |
+| `credit_ai_photo_100` | ₺690 | 100 `PHOTO` | `module_ai_studio` |
+| `credit_ai_video_20` | ₺890 | 20 `VIDEO` | `module_ai_studio` |
+| `credit_ai_3d_10` | ₺790 | 10 `MODEL3D` | `module_ai_studio` |
+| `credit_sms_500` | ₺490 | 500 `SMS` | `sms_integration` |
+
+Credit packs grant **no entitlement** (`grants: {}`); they top up a balance that
+is valid until consumed. A dependency can be satisfied by an active product the
+tenant already owns **or by a sibling line in the same cart**.
+
+### Service
+
+| Code | Price | Grants | Requires licence |
+| --- | --- | --- | --- |
+| `onsite_install_full` | ₺7,500 (one-time) | — (`grants: {}`) | — |
 
 <Callout type="warning">
-  The **Partner Display API** (external display, third-party tablets) depends on
-  the `externalDisplay` feature and is available only on **BUSINESS** (and on the
-  onboarding TRIAL). It gates partner API-key issuance and screen-token minting.
-  Likewise, `apiAccess` exists only on BUSINESS.
+  `onsite_install_full` is a **service** line: it is paid and invoiced but grants
+  no entitlement. It is one-time and gets no period-end window
+  (`currentPeriodEnd: null`).
 </Callout>
 
-<Callout type="info">
-  The TRIAL plan unlocks **all** premium features and unlimited limits for 7
-  days so a tenant can fully evaluate the product. It is not a permanent tier —
-  a paid plan must be chosen when it expires.
+## Licence suppression
+
+While the licence is not live, the grants of every `requiresLicense: true`
+product are **withheld**. The projector still writes the ownership source (so
+the owned-products list stays complete) but with an empty grant array.
+
+- No business data is deleted: stock, reservations, personnel, generated AI
+  media and `chargedCents` all stay put. Paying the licence back re-lights
+  everything on the next projection.
+- The cart-level `LICENSE_REQUIRED` check stops the **sale**; this is what stops
+  **access** — which is what matters when a business renews some lines of its
+  anniversary invoice but not the licence itself.
+- A `past_due` row keeps granting for **7 days** (`ADDON_GRACE_DAYS`); the
+  entitlement drops when the sweeper flips the row to `expired`. `active` rows
+  get the same 7-day horizon, so nobody is locked out for the hours between the
+  engine's 5-minute expiry sweep and the daily sweeper on anniversary night.
+
+## Reading entitlements
+
+| Method | Path | Returns |
+| --- | --- | --- |
+| `GET` | `/api/v1/entitlements/me` | The folded set: `features`, `limits`, `integrations`, `computedAt` |
+| `GET` | `/api/v1/me/licensing` | Licence state, owned products, credit balances, renewal, offers and purchasability |
+| `GET` | `/api/v1/catalog/pricing` | The public price list (published catalog) |
+
+`/v1/entitlements/me` and `/v1/me/licensing` are tenant-level and do not expect
+`X-Branch-Id`.
+
+<Callout type="warning">
+  The legacy `GET /api/subscriptions/effective-features` route is still mounted
+  but depends on the plan rails: it throws `404` when the tenant has no
+  `currentPlan`. The v3.3.0 migration set `currentPlanId` to `NULL` for every
+  tenant and signup no longer stamps one — so for an ordinary business this
+  endpoint returns `404`. New integrations should use `/v1/entitlements/me` (or
+  `/v1/me/licensing`, which returns everything in one call).
 </Callout>
+
+## Entitlement denial (403)
+
+A gated route returns a `403` carrying the missing entitlement **and the product
+that unlocks it**:
+
+```json
+{
+  "statusCode": 403,
+  "message": "Bu özellik hesabınızda etkin değil.",
+  "error": "Entitlement Required",
+  "errorCode": "ENTITLEMENT_REQUIRED",
+  "timestamp": "2026-08-13T08:14:05.123Z",
+  "path": "/api/reports/advanced",
+  "requestId": "1786…-a1b2c3d4e",
+  "actionable": {
+    "requirement": { "type": "feature", "key": "feature.advancedReports" },
+    "offer": {
+      "code": "advanced_reports",
+      "name": "Advanced Reports & Analytics",
+      "kind": "module",
+      "annualPriceCents": 129000,
+      "proratedCents": 74123,
+      "currency": "TRY",
+      "periodEnd": "2027-03-10T00:00:00.000Z"
+    },
+    "licenseRequired": false,
+    "reason": "not_owned"
+  }
+}
+```
+
+The remediation payload travels under `actionable`, through the global error
+filter's **allowlist** (only `requirement`, `offer`, `licenseRequired`,
+`reason`):
+
+- `requirement.type`: `feature` | `limit` | `integration`. A `limit` denial also
+  carries `usage` and `cap`.
+- `offer`: the **cheapest** product that provides the key, priced for **this
+  tenant today**. The price shown and the price charged at checkout come from
+  the same catalog read.
+- `licenseRequired: true` means the real blocker is the **missing licence**, not
+  the product — the offer switches to the licence.
+- `reason`: `not_owned` (never bought) or `lapsed` (expired), which is what lets
+  a client choose between "Buy" and "Renew".
+
+## Related
+
+- [Licensing & Billing API](/en/developer/billing-api) — the checkout rail,
+  proration, the anniversary and renewals.
+- [Marketplace API](/en/developer/marketplace-api) — catalog, purchase and
+  cancellation endpoints.
+- [Error Codes](/en/reference/error-codes) — the standard error envelope and the
+  stable `errorCode` values.

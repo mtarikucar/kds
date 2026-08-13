@@ -9,16 +9,16 @@ import { Callout } from 'nextra/components'
 
 **Menu path:** Menu & Tables → Reservations &nbsp;•&nbsp; **URL:** `/admin/reservations`
 **Access:** ADMIN, MANAGER
-**Plan:** `reservationSystem` — **Professional (PRO)** and above
+**Requires:** `reservationSystem` — the **Reservation System** module (₺990/year, with the licence as a prerequisite)
 
 ## Purpose
 
 The reservations screen manages table bookings — taken online (via the public reservation page) or by hand: you confirm them, assign tables, seat guests, and flag no-shows.
 
 <Callout type="info">
-  The reservation system is unlocked on **Professional (PRO)** and higher plans. If your
-  plan doesn't include it, Reservations is hidden from the menu and the direct URL shows
-  an upgrade card.
+  The reservation system is unlocked by the **Reservation System** module (₺990/year;
+  the HummyTummy Licence at ₺2,990/year is a prerequisite). Without the module,
+  Reservations is hidden from the menu and the direct URL shows a purchase card.
 
   **Public (customer-facing) reservation pages:** `/reserve/:tenantId` (new reservation)
   and `/reserve/:tenantId/lookup` (look up a reservation). Customers use them without

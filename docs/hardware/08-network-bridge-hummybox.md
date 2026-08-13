@@ -75,14 +75,16 @@ Yani bir şubede internete çıkan tabletler/KDS ekranı için köprü şart de�
 
 ### 2.3 Ticari koşullar (sabit)
 
-| Model | SKU (katalog) | Ürün | Satış | Kira | Taahhüt | `Device.ownership` |
-|---|---|---|---|---|---|---|
-| BOX-LITE-01 | `hummybox-lite` | HummyBox Lite | 4.800 TL | 99 TL/ay | 24 ay | `sold` veya `rented` |
-| BOX-PRO-01 | `hummybox-pro` | HummyBox Pro | 9.500 TL | 199 TL/ay | 24 ay | `sold` veya `rented` |
+| Model | SKU (katalog) | Ürün | Satış (tek seferlik) | Garanti | `Device.ownership` |
+|---|---|---|---|---|---|
+| BOX-LITE-01 | `hummybox-lite` | HummyBox Lite | 4.800 TL | 24 ay | `sold` |
+| BOX-PRO-01 | `hummybox-pro` | HummyBox Pro | 9.500 TL | 24 ay | `sold` |
 
 > **Not (model ≠ SKU):** `BOX-LITE-01` / `BOX-PRO-01`, katalogdaki `HardwareProduct.model` alanıdır; sepet/teklif motorunun çözdüğü gerçek **SKU** ise küçük harfli `hummybox-lite` / `hummybox-pro`'dur (`findBySkuOrThrow`). Sipariş/teklif oluştururken **SKU** kullanılmalıdır; model kodu bir SKU olarak çözülmez.
 
-> **Peşin/kira karşılaştırması (düzeltilmiş):** Verilen rakamlarla **kira toplamı, peşin satış fiyatının ALTINDADIR** (yaklaşık yarısı): Lite 99 TL × 24 = **2.376 TL** < 4.800 TL; Pro 199 TL × 24 = **4.776 TL** < 9.500 TL. Yani bu haliyle kira, peşin fiyatın üstünde bir "finansman/hizmet primi" içermez; tersine, 24 ay boyunca donanım + RMA/servis riskini taşıdığınız için **kira ekonomisinin marjı, güncel katalog fiyatı ve gerçek COGS üzerinden yeniden değerlendirilmelidir** (marj bu belgede bağlayıcı değildir; ODM/distribütör teklifi ve katalogdan hesaplanır). İki seçenek: (a) müşteriye sunumda peşin/kira farkını olduğu gibi (kira ucuzdur) anlatın; (b) kira ekonomisini CapEx + RMA + finansman maliyetini karşılayacak seviyeye çekin (ör. aylık ücretin yükseltilmesi). Aylık kira rakamları ticari kararla netleştirilmeli **(finansal modelden teyit edilmeli)**. Müşteriye sunumda fiyatların **KDV dahil/hariç** gösterimi ve taahhüt/ön bilgilendirme yükümlülükleri de netleştirilmelidir **(resmi kaynaktan teyit edilmeli)**.
+> **Kiralama KAPATILDI (Temmuz 2026):** Önceki taslakta HummyBox için aylık kira (Lite 99 TL/ay, Pro 199 TL/ay, 24 ay taahhüt) yazıyordu. **Böyle bir seçenek artık yoktur.** Katalogdaki `rentalMonthlyCents` her iki satır için de NULL'landı (`prisma/seeds/seed-marketplace.ts`, migration `20260722140000_hardware_drop_rent_offering`); gerekçe: tahsilat rayı **PayTR** ve PayTR yalnız **tek seferlik** çekim destekler — arkasında aylık faturalama rayı olmadığı için "kira" seçen alıcı bir kez ödeyip bir daha faturalanmıyordu. Bugün donanım **yalnız peşin satılır**. (Şema/DTO tarafındaki `rentalMonthlyCents` alanı ve `QuoteService`'in `acquisition === 'rent'` dalı ileride bir kira projesi gelirse diye duruyor ama katalog bunu **sunmuyor**; storefront `acquisition:'rent'` göndermez ve gönderirse teklif motoru hata verir. `Device.ownership` şemasındaki `rented` değeri de aynı şekilde artık üretilmez — bugün `sold` ya da müşteri kendi kutusunu getirdiyse `byo`.)
+
+> **Fiyat kaynağı:** Yukarıdaki tutarlar katalog satırlarının bir görünümüdür (**KDV %20 dahil**); tek yetkili kaynak `HardwareProduct.priceCents` + checkout `QuoteService`'tir. **Alış maliyeti (COGS) ve marj** ODM/distribütör teklifine bağlıdır ve bu belgede bağlayıcı değildir. Müşteriye sunumda fiyatların **KDV dahil/hariç** gösterimi ve ön bilgilendirme yükümlülükleri netleştirilmelidir **(resmi kaynaktan teyit edilmeli)**.
 
 ---
 
@@ -121,7 +123,7 @@ HummyTummy'de **iki ayrı ray** vardır. HummyBox **köprü rayını** (provisio
 Mağaza (`/admin/store`) → sepet → **PayTR ödemesi** → sipariş **ÖDENİNCE** device-mesh cihaz slotu **otomatik** açılır. Provizyon deterministik `provisionKey` (`${hardwareOrderId}:${productId}:${unitIndex}`) + PostgreSQL advisory-lock ile **idempotent**'tir (tekrar denemede çift slot açılmaz). Kategori `bridge` → `Device.kind = local_bridge` eşlenir.
 
 **B) Köprünün devreye alınması (provisioning token → claim):**
-1. Yönetici (yalnız **ADMIN**, plan özelliği **MULTI_LOCATION** gerekli) köprü slotunu açar; sunucu bir **provisioning token** üretir.
+1. Yönetici (yalnız **ADMIN** rolü) köprü slotunu açar; sunucu bir **provisioning token** üretir. (`POST /v1/bridges` rotası `feature.multiLocation` yetkisine bağlıdır; bu yetki **ücretsiz çekirdeğin** parçasıdır — `FREE_BASELINE_GRANTS`, her kiracıda açıktır — yani ek bir satın alma gerektirmez.)
 2. Bu **provisioning token operatöre yalnız BİR KEZ gösterilir** (paketleme fişine basılır ya da üretimde gömülür). Sunucuda **sha256-hash'li** saklanır; sonradan geri alınamaz.
 3. Köprü ilk açılışta `POST /v1/bridges/claim { provisioningToken, hostname, os, agentVersion }` çağırır.
 4. Sunucu **atomik tek-kullanımlık claim** yapar (`updateMany`, yalnız ilk çağrı `count=1` alır; ikinci çağrı temiz "geçersiz/kullanılmış" reddi alır) ve **uzun ömürlü bearer token** döner (varsayılan **30 gün** TTL; `LOCAL_BRIDGE_TOKEN_TTL_MS` ile ayarlanır). **Ham token yalnız bir kez döner**, at-rest sha256-hash'lenir. Provisioning token bu anda tüketilir (`provisioningTokenHash = null`).
@@ -160,8 +162,8 @@ Mağaza (`/admin/store`) → sepet → **PayTR ödemesi** → sipariş **ÖDENİ
 
 ### 5.3 Süre, maliyet ve marj
 - **Tedarik süresi:** ODM ilk parti + numune + sertifikasyon dahil tipik olarak birkaç ay; seri üretim tekrar siparişleri daha kısa. **(ODM sözleşmesinden teyit edilmeli; süre/MOQ taahhütleri sözleşmeye dayanmadan müşteriye verilmemeli.)**
-- **Satış fiyatları (katalogdan):** güncel perakende fiyat ürün katalogundan / `QuoteService`'ten gelir (**KDV %20 dahil**); bu belgedeki Lite 4.800 TL, Pro 9.500 TL peşin ve 99 / 199 TL/ay kira (24 ay) değerleri bu katalog kalemlerinin görünümüdür ve tek başına bağlayıcı değildir.
-- **Alış maliyeti (COGS) ve marj:** Birim COGS, ODM teklifine + ithalat/gümrük + sertifikasyon amortismanı + Rust flash/QA + kasa/kutu/kablo + lojistiğe bağlıdır ve **ODM teklifinden kesinleştirilmelidir (resmi kaynaktan teyit edilmeli)**. Peşin satış marjı = satış fiyatı − (COGS + lojistik + garanti karşılığı). **Kira modelinde** ekonomiyi 24 aya yayılan tahsilat + arıza/değişim (RMA) karşılığı + finansman maliyeti belirler; **mevcut kira rakamları peşin fiyatın altında kaldığından (bkz. Bölüm 2.3), marj modeli kira rakamları düzeltilmeden kapatılmamalıdır.** Bu belgeye tahmini rakam **yazılmamıştır**; her parti için ODM teklifi üzerinden hesaplanmalıdır.
+- **Satış fiyatları (katalogdan):** güncel perakende fiyat ürün katalogundan / `QuoteService`'ten gelir (**KDV %20 dahil**); bu belgedeki Lite 4.800 TL, Pro 9.500 TL peşin değerleri bu katalog kalemlerinin görünümüdür ve tek başına bağlayıcı değildir. **Kira seçeneği yoktur** (bkz. Bölüm 2.3).
+- **Alış maliyeti (COGS) ve marj:** Birim COGS, ODM teklifine + ithalat/gümrük + sertifikasyon amortismanı + Rust flash/QA + kasa/kutu/kablo + lojistiğe bağlıdır ve **ODM teklifinden kesinleştirilmelidir (resmi kaynaktan teyit edilmeli)**. Marj = peşin satış fiyatı − (COGS + lojistik + garanti/RMA karşılığı). Bu belgeye tahmini rakam **yazılmamıştır**; her parti için ODM teklifi üzerinden hesaplanmalıdır.
 
 ---
 
@@ -279,7 +281,7 @@ HummyBox, LAN'da **sipariş, ödeme ve fiş** trafiğini taşır; bu nedenle ki�
 **Satış / uygunluk (bayi):**
 - [ ] Şubede LAN yazarkasa/ESC-POS/kart terminali var mı → köprü **gerekli** mi doğrulandı (yalnız tablet/KDS ise gerekmeyebilir).
 - [ ] Lite mi Pro mu (çevre birimi sayısı/yoğunluk) seçildi.
-- [ ] Peşin/kira modeli ve 24 ay taahhüt müşteriye net anlatıldı (fiyatların KDV dahil/hariç gösterimi netleştirildi).
+- [ ] Donanımın **peşin satış** olduğu (kira seçeneği bulunmadığı) ve 24 ay garanti süresi müşteriye net anlatıldı (fiyatların KDV dahil/hariç gösterimi netleştirildi).
 - [ ] CE/DoC + AEEE üretici kaydı + WEEE simgesi + Türkçe kılavuz + garanti belgesi hazır (Bölüm 9); B2B/B2C garanti rejimi teyit edildi.
 
 **Kurulum:**
@@ -288,7 +290,7 @@ HummyBox, LAN'da **sipariş, ödeme ve fiş** trafiğini taşır; bu nedenle ki�
 - [ ] Güvenlik duvarında **443 giden HTTPS** açık doğrulandı; köprü→yazıcı 9100 erişimi doğrulandı.
 
 **Provizyon / eşleştirme:**
-- [ ] (Satış akışı) PayTR ödemesi sonrası slot otomatik açıldı **veya** admin'de köprü slotu açıldı (ADMIN + MULTI_LOCATION).
+- [ ] (Satış akışı) PayTR ödemesi sonrası slot otomatik açıldı **veya** admin'de köprü slotu açıldı (ADMIN rolü; `feature.multiLocation` ücretsiz çekirdekte açıktır).
 - [ ] **Provisioning token bir kez alındı** ve güvenli saklandı (tekrar gösterilmez).
 - [ ] Köprü ilk boot'ta `POST /v1/bridges/claim` yaptı; bearer sağlandı (bugün `HUMMY_BRIDGE_TOKEN`; keyring planlanan).
 - [ ] Admin'de köprü **`online`**, heartbeat geliyor, sürüm/host doğru.

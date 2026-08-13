@@ -1,225 +1,359 @@
 ---
-title: Products (Add-ons)
-description: A short card per add-on — what it does, price, recurring vs one-time, dependency.
+title: Products (Catalogue)
+description: A short card per item — what it does, price, annual vs one-time, dependency.
 ---
 
 import { Callout } from 'nextra/components'
 
-# Products (Add-ons)
+# Products (Catalogue)
 
 **Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
-**Access:** ADMIN, MANAGER • **Plan:** All plans
+**Access:** ADMIN, MANAGER • **Module required:** None — the Marketplace is part of the free core
 
 Every item you can buy in the Marketplace is documented below, one by one. Each
-card lists: **what it does**, **price**, **recurring vs one-time**, and any
-**dependency**.
+card lists: **what it does**, **price**, **annual vs one-time**, and any
+**dependency**. The core (POS, KDS, menu, tables, QR menu, cash, basic reports,
+team management) is already free forever and is not sold here.
 
 <Callout type="info">
-  The purchase path is the same for every add-on: add it to the cart in the
+  The purchase path is the same for every item: add it to the cart in the
   Marketplace → pay via PayTR → the entitlement activates automatically. For the
   step-by-step walkthrough see [Purchase Flow](/en/marketplace/purchase-flow).
-  Prices are TRY, KDV-inclusive.
+  Prices are TRY, KDV-inclusive; annual items cover one licence cycle (a year)
+  and are priced pro rata for the days left until your anniversary when bought
+  mid-year.
 </Callout>
 
 ---
 
-## Capacity packs
+## Licence
 
-### Extra KDS screen
+### HummyTummy Licence
 
-Adds **one** additional kitchen display (KDS) screen slot to your branch.
+The annual licence required to **buy and use** any paid module. The day you buy
+it becomes your account's fixed **anniversary**; every annual item bought later
+is priced pro rata against that date.
 
 | Field | Value |
 | --- | --- |
-| Kind | Capacity |
-| Billing | Recurring |
-| Price | ₺99.00 |
-| What it does | Raises your KDS-screen limit by **one** |
+| Kind | Licence |
+| Billing | Annual |
+| Price | ₺2,990.00 |
+| What it does | The prerequisite for every paid module, integration and capacity item |
 | Dependency | — |
-
-### Extra KDS station
-
-Adds **one** routing station (bar / grill / dessert) on top of the default
-kitchen.
-
-| Field | Value |
-| --- | --- |
-| Kind | Capacity |
-| Billing | Recurring |
-| Price | ₺149.00 |
-| What it does | Raises your KDS-station limit by **one** |
-| Dependency | — |
-
-### Extra waiter tablet
-
-Increases your waiter-tablet limit by **one**.
-
-| Field | Value |
-| --- | --- |
-| Kind | Capacity |
-| Billing | Recurring |
-| Price | ₺79.00 |
-| What it does | Raises your tablet limit by **one** |
-| Dependency | — |
-
-### Extra branch
-
-Adds **one** branch beyond your plan limit. Required for chains. A single
-purchase does two things: it raises your branch limit **and** enables the
-multi-location feature.
-
-| Field | Value |
-| --- | --- |
-| Kind | Capacity |
-| Billing | Recurring |
-| Price | ₺399.00 |
-| What it does | **One** extra branch **and** the multi-location feature |
-| Dependency | — |
-
----
-
-## Integrations
-
-### e-Fatura / e-Arşiv
-
-Issue tax-compliant electronic invoices (cloud-side, no hardware required).
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺199.00 |
-| What it does | Enables e-Fatura / e-Arşiv invoicing |
-| Dependency | — |
-
-### Hugin yazarkasa integration
-
-Drive a Hugin fiscal device via the Local Bridge.
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺299.00 |
-| What it does | Enables the Hugin fiscal-device integration |
-| Dependency | **Requires the PRO plan** |
 
 <Callout type="warning">
-  Hugin yazarkasa is the **only** add-on in the catalogue with a dependency. If
-  you are not on PRO, the purchase is blocked and you're asked to upgrade your
-  plan first.
+  The licence is not just a purchase gate: when the licence term lapses, the
+  grants of the modules that depend on it are suppressed too. The free core is
+  unaffected and your data is never deleted.
 </Callout>
-
-### Yemeksepeti integration
-
-Receive Yemeksepeti orders directly into your KDS.
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺249.00 |
-| What it does | Brings Yemeksepeti orders into the KDS |
-| Dependency | — |
-
-### Getir Yemek integration
-
-Receive Getir Yemek orders directly into your KDS.
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺249.00 |
-| What it does | Brings Getir Yemek orders into the KDS |
-| Dependency | — |
-
-### Trendyol Yemek integration
-
-Receive Trendyol Yemek orders directly into your KDS.
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺249.00 |
-| What it does | Brings Trendyol Yemek orders into the KDS |
-| Dependency | — |
-
-<Callout type="info">
-  You can use all three delivery integrations at the same time; the orders are
-  collected side by side into a single KDS flow.
-</Callout>
-
-### Caller ID / phone-order integration
-
-Open a customer card automatically on every inbound call.
-
-| Field | Value |
-| --- | --- |
-| Kind | Integration |
-| Billing | Recurring |
-| Price | ₺149.00 |
-| What it does | Auto-opens a customer card on inbound calls |
-| Dependency | — |
 
 ---
 
-## Software / features
+## Modules
 
-### Advanced reports
+Every module below is **annual** and requires the **HummyTummy Licence**.
 
-Cohort analysis, custom reports, and scheduled email delivery.
+### Advanced Reports & Analytics
 
-| Field | Value |
-| --- | --- |
-| Kind | Software |
-| Billing | Recurring |
-| Price | ₺129.00 |
-| What it does | Enables the advanced report set |
-| Dependency | — |
-
-### API access
-
-A public API key + outbound webhooks for your integrations.
+Detailed sales, product, staff and customer analytics, plus the accounting
+back-office and e-document settings.
 
 | Field | Value |
 | --- | --- |
-| Kind | Software |
-| Billing | Recurring |
-| Price | ₺249.00 |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺1,290.00 |
+| What it does | Enables the advanced report set and the accounting back-office |
+| Dependency | HummyTummy Licence |
+
+### Inventory & Cost Management
+
+Recipes, stock counts, purchase orders, waste tracking, supplier management and
+inter-branch transfers.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺1,490.00 |
+| What it does | Enables inventory and cost tracking |
+| Dependency | HummyTummy Licence |
+
+### Reservation System
+
+Booking calendar, availability engine, a public online reservation page, and
+staff-side reservation entry.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺990.00 |
+| What it does | Enables the reservation system |
+| Dependency | HummyTummy Licence |
+
+### Staff Management
+
+Attendance, shift planning, shift swaps and staff performance tracking.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺990.00 |
+| What it does | Enables the staff-management module |
+| Dependency | HummyTummy Licence |
+
+### AI Menu Studio
+
+AI-generated product photos, video and 3D models, plus OCR menu import.
+Generations are paid for with **credits**.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺1,990.00 |
+| What it does | Enables AI content generation and OCR menu import |
+| Dependency | HummyTummy Licence |
+
+<Callout type="info">
+  The module itself does not include generations; every generation is deducted
+  from your credit balance. Credit packs are listed in the **Credits** section
+  below.
+</Callout>
+
+### API & Webhook Access
+
+REST API keys and outbound webhooks for connecting your own systems.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺2,490.00 |
 | What it does | Enables the API key + outbound webhooks |
-| Dependency | — |
+| Dependency | HummyTummy Licence |
 
 <Callout type="info">
   For the technical use of API access and webhooks, see the developer docs:
   [Marketplace API](https://developer.hummytummy.com/en/developer/marketplace-api).
 </Callout>
 
+### Partner Display API
+
+Per-screen API access so third-party displays (table tablets, external menu
+screens) can show your menu.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺1,990.00 |
+| What it does | Enables the external-display API |
+| Dependency | HummyTummy Licence |
+
+### Priority Support
+
+Front-of-queue support with a guaranteed response time.
+
+| Field | Value |
+| --- | --- |
+| Kind | Module |
+| Billing | Annual |
+| Price | ₺1,990.00 |
+| What it does | Enables priority support |
+| Dependency | HummyTummy Licence |
+
 ---
 
-## Support
+## Integrations
 
-### Priority support
+Every integration is **annual** and requires the **HummyTummy Licence**.
 
-A 24-hour SLA on critical tickets. Direct line during business hours.
+### Yemeksepeti Integration
 
-| Field | Value |
-| --- | --- |
-| Kind | Support |
-| Billing | Recurring |
-| Price | ₺199.00 |
-| What it does | Priority support / 24-hour SLA |
-| Dependency | — |
-
-### On-site setup (one-time)
-
-A HummyTummy technician comes to your venue, installs the bridge + devices, and
-trains your staff.
+Yemeksepeti orders flow automatically into the POS and the kitchen.
 
 | Field | Value |
 | --- | --- |
-| Kind | Support |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺2,490.00 |
+| What it does | Brings Yemeksepeti orders into the POS and kitchen |
+| Dependency | HummyTummy Licence |
+
+### Getir Integration
+
+Getir orders flow automatically into the POS and the kitchen.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺2,490.00 |
+| What it does | Brings Getir orders into the POS and kitchen |
+| Dependency | HummyTummy Licence |
+
+### Trendyol Yemek Integration
+
+Trendyol Yemek orders flow automatically into the POS and the kitchen.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺2,490.00 |
+| What it does | Brings Trendyol Yemek orders into the POS and kitchen |
+| Dependency | HummyTummy Licence |
+
+<Callout type="info">
+  You can use all three delivery integrations at the same time; the orders are
+  collected side by side into a single flow. Each platform is its own item and is
+  priced separately.
+</Callout>
+
+### e-Invoice (Nilvera)
+
+Your sales invoices are filed with the tax authority as e-Fatura / e-Arşiv
+through Nilvera.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺1,990.00 |
+| What it does | Enables e-Fatura / e-Arşiv filing |
+| Dependency | HummyTummy Licence |
+
+### Fiscal Printer (Hugin)
+
+Integrated receipt printing and fiscal report sync with a Hugin device, driven
+over the Local Bridge.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺2,990.00 |
+| What it does | Enables the Hugin fiscal-device integration |
+| Dependency | HummyTummy Licence |
+
+### Caller-ID Integration
+
+Recognise the customer on an incoming call and open an order in one click.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺1,490.00 |
+| What it does | Auto-recognises the customer on inbound calls |
+| Dependency | HummyTummy Licence |
+
+### SMS Notifications
+
+Order, reservation and campaign SMS. Each send is paid for with **credits**.
+
+| Field | Value |
+| --- | --- |
+| Kind | Integration |
+| Billing | Annual |
+| Price | ₺990.00 |
+| What it does | Enables SMS sending (credits bought separately) |
+| Dependency | HummyTummy Licence |
+
+---
+
+## Capacity
+
+### Extra Branch
+
+Adds one more branch to your account. **The first branch is free**; from the
+second branch on, you buy one unit per branch. You can buy several units in the
+same cart.
+
+| Field | Value |
+| --- | --- |
+| Kind | Capacity |
+| Billing | Annual / unit |
+| Price | ₺3,990.00 |
+| What it does | Raises your branch limit by **one** |
+| Dependency | HummyTummy Licence |
+
+<Callout type="info">
+  Up to **100** branches per account. The branch hub, the branch picker and the
+  multi-location UI are free — what is paid for is **the second and subsequent
+  branches themselves**.
+</Callout>
+
+---
+
+## Credits
+
+Credit packs are bought **once**, **never expire**, and stay valid until
+consumed. A pack itself needs no licence, but the item it depends on (AI Menu
+Studio / SMS Notifications) does.
+
+### 100 AI Image Credits
+
+| Field | Value |
+| --- | --- |
+| Kind | Credits |
+| Billing | **One-time** |
+| Price | ₺690.00 |
+| What it does | 100 AI image generations |
+| Dependency | AI Menu Studio |
+
+### 20 AI Video Credits
+
+| Field | Value |
+| --- | --- |
+| Kind | Credits |
+| Billing | **One-time** |
+| Price | ₺890.00 |
+| What it does | 20 AI video generations |
+| Dependency | AI Menu Studio |
+
+### 10 AI 3D Model Credits
+
+| Field | Value |
+| --- | --- |
+| Kind | Credits |
+| Billing | **One-time** |
+| Price | ₺790.00 |
+| What it does | 10 AI 3D model generations |
+| Dependency | AI Menu Studio |
+
+### 500 SMS Credits
+
+| Field | Value |
+| --- | --- |
+| Kind | Credits |
+| Billing | **One-time** |
+| Price | ₺490.00 |
+| What it does | 500 SMS sends |
+| Dependency | SMS Notifications |
+
+<Callout type="info">
+  Buy another pack whenever one runs out; the second pack adds to whatever is
+  left of the first. You can also put a pack in the same cart as the item it
+  depends on.
+</Callout>
+
+---
+
+## Service
+
+### On-site Installation & Training (one-time)
+
+A HummyTummy technician comes to your venue for a full day of installation and
+device commissioning, and trains your staff.
+
+| Field | Value |
+| --- | --- |
+| Kind | Service |
 | Billing | **One-time** |
 | Price | ₺7,500.00 |
 | What it does | **Grants nothing** — it's an installation/training service |
@@ -228,7 +362,7 @@ trains your staff.
 <Callout type="warning">
   This item does not add a limit or feature to your account; it is paid and
   invoiced but does not change your entitlement set. It is one-time, **not**
-  recurring.
+  annual, and needs no licence.
 </Callout>
 
 ---

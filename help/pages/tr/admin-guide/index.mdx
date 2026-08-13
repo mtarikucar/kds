@@ -1,6 +1,6 @@
 ---
 title: Yönetici Rehberi — Genel Bakış
-description: HummyTummy yönetim panelinin tüm ekranları — POS, QR menü, mutfak, masalar, stok, raporlar ve daha fazlası. Her ekranın amacı, kullanımı ve hangi planla açıldığı.
+description: HummyTummy yönetim panelinin tüm ekranları — POS, QR menü, mutfak, masalar, stok, raporlar ve daha fazlası. Her ekranın amacı, kullanımı ve hangisinin ücretsiz çekirdeğe dahil, hangisinin ücretli modül gerektirdiği.
 ---
 
 import { Callout, Cards } from 'nextra/components'
@@ -14,8 +14,9 @@ Hedef kitle: restoran **sahibi (ADMIN)** ve **yöneticisi (MANAGER)**. Bazı ekr
 <Callout type="info">
   Para birimi **Türk Lirası (TRY)**'dir. Sol menü (Sidebar) ekranları altı bölüme
   ayırır: **İşletme**, **Menü & Masa**, **Operasyon**, **Çoklu Şube**, **Pazaryeri**
-  ve **Ayarlar & Erişim**. Bir ekran sizin planınızda yoksa menüde **hiç görünmez**
-  (403 hatası almazsınız) — yükseltince kendiliğinden belirir.
+  ve **Ayarlar & Erişim**. Çekirdek ekranların tamamı ücretsizdir; yalnızca ücretli
+  bir modüle bağlı ekran, o modül alınmadıkça menüde **hiç görünmez**
+  (403 hatası almazsınız) — modülü aldığınızda kendiliğinden belirir.
 </Callout>
 
 ## Ekranlar
@@ -45,38 +46,43 @@ Hedef kitle: restoran **sahibi (ADMIN)** ve **yöneticisi (MANAGER)**. Bazı ekr
   <Cards.Card title="Ayarlar" href="/tr/admin-guide/settings" arrow />
 </Cards>
 
-## Hangi ekran hangi planla açılır?
+## Hangi ekran ücretsiz, hangisi modül gerektirir?
 
-Her gelişmiş ekran bir **plan özelliği bayrağına** bağlıdır. Aşağıdaki tablo, ekranın hangi paketten itibaren açıldığını ve alternatif olarak hangi **marketplace eklentisiyle** açılabileceğini gösterir.
+Çekirdek ekranlar **süresiz ücretsizdir**: kredi kartı istenmez, lisans gerekmez, kullanıcı / masa / ürün / kategori ve aylık sipariş sayısı **sınırsızdır**. Yalnızca aşağıdaki tabloda modül/entegrasyon yazan ekranlar ücretlidir; her ücretli kalem **yıllıktır** ve **HummyTummy Lisansı (2.990 ₺/yıl)** ön koşuluyla açılır.
 
-| Ekran | Özellik bayrağı | En düşük plan | Eklenti alternatifi |
-| --- | --- | --- | --- |
-| POS (Satış Ekranı) | `posAccess` | **Başlangıç (BASIC)** | — |
-| Mutfak Ekranı (KDS) | `kdsIntegration` | **Tüm planlar** | — |
-| QR Menü | — | **Tüm planlar** | — |
-| Masalar & Kat Planı | — | **Tüm planlar** (limit plana bağlı) | — |
-| Müşteriler | — | **Tüm planlar** | — |
-| Stok & Envanter | `inventoryTracking` | **Başlangıç (BASIC)** | — |
-| Raporlar | `advancedReports` | **Profesyonel (PRO)** | `advanced_reports` |
-| Analitik | `advancedReports` | **Profesyonel (PRO)** | `advanced_reports` |
-| Rezervasyonlar | `reservationSystem` | **Profesyonel (PRO)** | — |
-| Personel | `personnelManagement` | **Profesyonel (PRO)** | — |
-| Şubeler / Bridge'ler | `multiLocation` | **Profesyonel (PRO)** | `extra_branch` |
-| Özel Marka (Branding) | `customBranding` | **Profesyonel (PRO)** | — |
-| Entegrasyonlar / Webhook'lar | `apiAccess` | **Kurumsal (BUSINESS)** | `api_access` |
-| Partner Display API anahtarları | `externalDisplay` | **Kurumsal (BUSINESS)** | — |
+| Ekran | Özellik bayrağı | Gereksinim |
+| --- | --- | --- |
+| POS (Satış Ekranı) | `posAccess` | **Ücretsiz çekirdek** |
+| Mutfak Ekranı (KDS) | `kdsIntegration` | **Ücretsiz çekirdek** |
+| QR Menü / QR Kodları | — | **Ücretsiz çekirdek** |
+| Menü Yönetimi | — | **Ücretsiz çekirdek** (ürün/kategori sınırsız) |
+| Masalar & Kat Planı | — | **Ücretsiz çekirdek** (masa sayısı sınırsız) |
+| Siparişler | — | **Ücretsiz çekirdek** |
+| Müşteriler | — | **Ücretsiz çekirdek** |
+| Kullanıcılar & Roller | — | **Ücretsiz çekirdek** (kullanıcı sayısı sınırsız) |
+| Cihazlar, Bridge'ler, Sistem Durumu, Şube paneli | `multiLocation` | **Ücretsiz çekirdek** (ilk şube ücretsiz) |
+| Özel Marka (Branding) | `customBranding` | **Ücretsiz çekirdek** |
+| Stok & Envanter | `inventoryTracking` | **Stok & Maliyet Yönetimi** modülü — 1.490 ₺/yıl |
+| Raporlar & Analitik | `advancedReports` | **Gelişmiş Rapor & Analitik** modülü — 1.290 ₺/yıl |
+| Rezervasyonlar | `reservationSystem` | **Rezervasyon Sistemi** modülü — 990 ₺/yıl |
+| Personel | `personnelManagement` | **Personel Yönetimi** modülü — 990 ₺/yıl |
+| Entegrasyonlar / Webhook'lar | `apiAccess` | **API & Webhook Erişimi** modülü — 2.490 ₺/yıl |
+| Partner Ekran API anahtarları | `externalDisplay` | **Partner Ekran API** modülü — 1.990 ₺/yıl |
+| Online Sipariş (teslimat platformları) | `deliveryIntegration` | Platform entegrasyonu — **2.490 ₺/yıl** (Yemeksepeti, Getir, Trendyol Yemek; platform başına) |
+| İkinci ve sonraki şubeler | `limit.maxBranches` | **Ek Şube** — 3.990 ₺/yıl/adet (ilk şube ücretsiz) |
 
 <Callout type="info">
-  Planların tam karşılaştırması, fiyatlar ve kullanım limitleri için
-  **[Planlar](/tr/plans)** bölümüne bakın. Delivery (Yemeksepeti/Getir), SMS,
-  e-Fatura ve Çağrı Kimliği gibi dış servis bağlantılarının adım adım kurulumu için
-  **[Entegrasyonlar](https://developer.hummytummy.com/tr/integrations)** bölümüne, satın alınabilir eklentiler için
+  Ücretli kalemlerin tam listesi ve fiyatları için **[Planlar](/tr/plans)** bölümüne
+  bakın. Delivery (Yemeksepeti/Getir), SMS, e-Fatura ve Çağrı Kimliği gibi dış servis
+  bağlantılarının adım adım kurulumu için
+  **[Entegrasyonlar](https://developer.hummytummy.com/tr/integrations)** bölümüne, satın alınabilir modül ve entegrasyonlar için
   **[Marketplace](/tr/marketplace)** bölümüne bakın.
 </Callout>
 
 <Callout type="warning">
-  Plan kapısı (FeatureGate) yalnızca **görsel** bir korumadır — gerçek yetki kontrolü
-  her zaman sunucudadır. Bir ekranı tarayıcı hilesiyle açsanız bile arka uç
-  (PlanFeatureGuard) yetkisiz isteği reddeder. Bu yüzden planınızda olmayan bir
-  modülü "açmaya" çalışmak işe yaramaz; doğru yol planı yükseltmektir.
+  Modül kapısı (FeatureGate) yalnızca **görsel** bir korumadır — gerçek yetki kontrolü
+  her zaman sunucudadır. Bir ekranı tarayıcı hilesiyle açsanız bile arka uç yetkisiz
+  isteği reddeder. Bu yüzden sahip olmadığınız bir modülü "açmaya" çalışmak işe
+  yaramaz; doğru yol ilgili modülü satın almaktır. Ücretsiz çekirdek ekranlarda böyle
+  bir kapı zaten yoktur.
 </Callout>

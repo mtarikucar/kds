@@ -8,7 +8,7 @@ import { Callout, Steps } from 'nextra/components'
 # Invoices
 
 **Menu path:** Back Office → Invoices &nbsp;•&nbsp; **URL:** `/admin/invoices`
-**Access:** ADMIN, MANAGER  •  **Plan:** All plans (issuing an e-Invoice requires a fiscal integration)
+**Access:** ADMIN, MANAGER  •  **Requires:** the invoice list is included in the free core; official **e-Invoice issuance** needs the e-Invoice (Nilvera) integration (₺1,990/year, with the licence as a prerequisite)
 
 ## Purpose
 
@@ -63,7 +63,7 @@ The icons at the end of each row let you perform two actions:
 <Callout type="warning">
   Cancel and sync actions can have consequences that are hard to undo — especially
   after an invoice has been **sent** to the provider. Make sure you're on the correct
-  invoice before confirming. Even though the plan and permission checks run in the UI,
+  invoice before confirming. Even though the permission checks run in the UI,
   the final decision is made **on the server**: an unauthorized action or one that
   breaks the rules is rejected server-side.
 </Callout>

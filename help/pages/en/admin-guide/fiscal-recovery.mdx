@@ -8,16 +8,17 @@ import { Callout, Steps } from 'nextra/components'
 # Fiscal Recovery
 
 **Menu path:** Settings & Access → Fiscal Recovery &nbsp;•&nbsp; **URL:** `/admin/fiscal-recovery`
-**Access:** ADMIN, MANAGER &nbsp;•&nbsp; **Plan:** Fiscal integration (`fiscal`) must be active
+**Access:** ADMIN, MANAGER &nbsp;•&nbsp; **Requires:** an active fiscal integration (`fiscal`) — **e-Invoice (Nilvera)** at ₺1,990/year or **Fiscal Printer (Hugin)** at ₺2,990/year, with the licence as a prerequisite
 
 ## Purpose
 
 Fiscal Recovery gathers, in a single table, every receipt that **could not be issued successfully** to the fiscal device (the cash register / fiscal receipt provider). Receipts left queued or failed due to a network drop, a device error, or a provider outage all show up here, and you **retry them with a single tap**. Use it to clear up any fiscal hiccups that come up during service.
 
 <Callout type="info">
-  This screen only appears for businesses with **fiscal integration active**. If it
-  isn't in the menu, no integration is defined yet. This gate is for the interface
-  only; the real authorization check always lives on the server.
+  This screen only appears for businesses with **fiscal integration active** — that is,
+  you have bought either the **e-Invoice (Nilvera)** or the **Fiscal Printer (Hugin)**
+  integration. If it isn't in the menu, no integration is defined yet. This gate is for
+  the interface only; the real authorization check always lives on the server.
 </Callout>
 
 ## What the table shows

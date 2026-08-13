@@ -1,224 +1,355 @@
 ---
-title: Ürünler (Add-on'lar)
-description: Her add-on için kısa kart — ne işe yarar, fiyat, tekrarlayan mı tek seferlik mi, bağımlılık.
+title: Ürünler (Katalog)
+description: Her kalem için kısa kart — ne işe yarar, fiyat, yıllık mı tek seferlik mi, bağımlılık.
 ---
 
 import { Callout } from 'nextra/components'
 
-# Ürünler (Add-on'lar)
+# Ürünler (Katalog)
 
 **Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
-**Erişim:** ADMIN, MANAGER • **Plan:** Tüm planlar
+**Erişim:** ADMIN, MANAGER • **Gerekli modül:** Yok — Marketplace ücretsiz çekirdekte açıktır
 
 Marketplace'te satın alabileceğiniz her kalem aşağıda tek tek anlatılmıştır. Her
-kartta: **ne işe yarar**, **fiyat**, **tekrarlayan mı tek seferlik mi** ve varsa
-**bağımlılık**.
+kartta: **ne işe yarar**, **fiyat**, **yıllık mı tek seferlik mi** ve varsa
+**bağımlılık**. Çekirdek (POS, KDS, menü, masa, QR menü, kasa, temel raporlar,
+ekip yönetimi) zaten süresiz ücretsizdir ve burada satılmaz.
 
 <Callout type="info">
-  Satın alma yolu her add-on için aynıdır: Marketplace'te sepete ekleyin →
+  Satın alma yolu her kalem için aynıdır: Marketplace'te sepete ekleyin →
   PayTR ile ödeyin → hak otomatik etkinleşir. Adım adım anlatım için
-  [Satın Alma Akışı](/tr/marketplace/purchase-flow). Fiyatlar TRY, KDV dahil.
+  [Satın Alma Akışı](/tr/marketplace/purchase-flow). Fiyatlar TRY, KDV dahil;
+  yıllık kalemler bir lisans dönemi (yıl) içindir ve yıl içinde alındığında yıl
+  dönümünüze kalan gün kadar orantılı fiyatlanır.
 </Callout>
 
 ---
 
-## Kapasite paketleri
+## Lisans
 
-### Ekstra KDS ekranı
+### HummyTummy Lisansı
 
-Şubenize **bir adet** ek mutfak ekranı (KDS) slotu ekler.
+Ücretli modülleri **satın alabilmek ve kullanabilmek** için gereken yıllık
+lisans. Satın aldığınız gün hesabınızın değişmez **yıl dönümü** olur; sonradan
+aldığınız her yıllık kalem bu tarihe orantılı fiyatlanır.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | Kapasite |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺99,00 |
-| Ne işe yarar | KDS ekranı limitinizi **bir** artırır |
+| Tür | Lisans |
+| Fatura | Yıllık |
+| Fiyat | ₺2.990,00 |
+| Ne işe yarar | Ücretli modül, entegrasyon ve kapasite kalemlerinin ön koşulu |
 | Bağımlılık | — |
-
-### Ekstra KDS istasyonu
-
-Varsayılan mutfağın üstüne **bir adet** yönlendirme istasyonu (bar / ızgara /
-tatlı) ekler.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Kapasite |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺149,00 |
-| Ne işe yarar | KDS istasyonu limitinizi **bir** artırır |
-| Bağımlılık | — |
-
-### Ekstra garson tableti
-
-Garson-tablet limitinizi **bir** artırır.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Kapasite |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺79,00 |
-| Ne işe yarar | Tablet limitinizi **bir** artırır |
-| Bağımlılık | — |
-
-### Ekstra şube
-
-Plan limitinizin ötesine **bir** şube ekler. Zincirler için gereklidir. Tek
-satın almada iki şey yapar: hem şube limitinizi artırır hem de çoklu-lokasyon
-özelliğini açar.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Kapasite |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺399,00 |
-| Ne işe yarar | **Bir** ek şube **ve** çoklu-lokasyon özelliği |
-| Bağımlılık | — |
-
----
-
-## Entegrasyonlar
-
-### e-Fatura / e-Arşiv
-
-Vergi-uyumlu elektronik fatura kesmenizi sağlar (bulut tabanlı, donanım
-gerekmez).
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺199,00 |
-| Ne işe yarar | e-Fatura / e-Arşiv kesimini açar |
-| Bağımlılık | — |
-
-### Hugin yazarkasa entegrasyonu
-
-Local Bridge üzerinden bir Hugin yazarkasa cihazını sürer.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺299,00 |
-| Ne işe yarar | Hugin yazarkasa entegrasyonunu açar |
-| Bağımlılık | **PRO planı gerekir** |
 
 <Callout type="warning">
-  Hugin yazarkasa, kataloğdaki **tek** bağımlılığı olan add-on'dur. PRO planında
-  değilseniz satın alma engellenir ve önce planınızı yükseltmeniz istenir.
+  Lisans yalnızca bir satın alma kapısı değildir: lisans dönemi bittiğinde
+  lisansa bağlı modüllerin hakları da bastırılır. Ücretsiz çekirdek bundan
+  etkilenmez, verileriniz silinmez.
 </Callout>
-
-### Yemeksepeti entegrasyonu
-
-Yemeksepeti siparişlerini doğrudan KDS'inize alır.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺249,00 |
-| Ne işe yarar | Yemeksepeti siparişlerini KDS'e taşır |
-| Bağımlılık | — |
-
-### Getir Yemek entegrasyonu
-
-Getir Yemek siparişlerini doğrudan KDS'inize alır.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺249,00 |
-| Ne işe yarar | Getir Yemek siparişlerini KDS'e taşır |
-| Bağımlılık | — |
-
-### Trendyol Yemek entegrasyonu
-
-Trendyol Yemek siparişlerini doğrudan KDS'inize alır.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺249,00 |
-| Ne işe yarar | Trendyol Yemek siparişlerini KDS'e taşır |
-| Bağımlılık | — |
-
-<Callout type="info">
-  Üç teslimat entegrasyonunu da aynı anda kullanabilirsiniz; siparişler yan yana
-  tek bir KDS akışında toplanır.
-</Callout>
-
-### Caller ID / telefon-sipariş entegrasyonu
-
-Her gelen çağrıda otomatik olarak bir müşteri kartı açar.
-
-| Alan | Değer |
-| --- | --- |
-| Tür | Entegrasyon |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺149,00 |
-| Ne işe yarar | Gelen çağrıda otomatik müşteri kartı açar |
-| Bağımlılık | — |
 
 ---
 
-## Yazılım / özellikler
+## Modüller
 
-### Gelişmiş raporlar
+Aşağıdaki modüllerin tamamı **yıllık**tır ve **HummyTummy Lisansı** gerektirir.
 
-Kohort analizi, özel raporlar ve zamanlanmış e-posta teslimi.
+### Gelişmiş Rapor & Analitik
 
-| Alan | Değer |
-| --- | --- |
-| Tür | Yazılım |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺129,00 |
-| Ne işe yarar | Gelişmiş rapor setini açar |
-| Bağımlılık | — |
-
-### API erişimi
-
-Entegrasyonlarınız için public API anahtarı + giden (outbound) webhook'lar.
+Detaylı satış, ürün, personel ve müşteri analitiği; muhasebe back-office ve
+e-belge ayarları.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | Yazılım |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺249,00 |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺1.290,00 |
+| Ne işe yarar | Gelişmiş rapor setini ve muhasebe back-office'i açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Stok & Maliyet Yönetimi
+
+Reçete, stok sayımı, satın alma siparişi, fire takibi, tedarikçi yönetimi ve
+şubeler arası transfer.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺1.490,00 |
+| Ne işe yarar | Stok ve maliyet takibini açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Rezervasyon Sistemi
+
+Rezervasyon takvimi, müsaitlik hesabı, halka açık online rezervasyon sayfası ve
+personel rezervasyon girişi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺990,00 |
+| Ne işe yarar | Rezervasyon sistemini açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Personel Yönetimi
+
+Puantaj, vardiya planlama, vardiya değişimi ve personel performans takibi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺990,00 |
+| Ne işe yarar | Personel yönetimi modülünü açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### AI Menü Stüdyosu
+
+Yapay zekâ ile ürün fotoğrafı, video ve 3D model üretimi; menü OCR içe aktarma.
+Üretimler **kontörle** harcanır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺1.990,00 |
+| Ne işe yarar | AI içerik üretimini ve menü OCR'ını açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+<Callout type="info">
+  Modülün kendisi üretim hakkı vermez; her üretim kontörden düşer. Kontör
+  paketleri aşağıdaki **Kontörler** bölümünde listelenir.
+</Callout>
+
+### API & Webhook Erişimi
+
+Kendi sistemlerinizi bağlamak için REST API anahtarları ve giden webhook'lar.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺2.490,00 |
 | Ne işe yarar | API anahtarı + giden webhook'ları açar |
-| Bağımlılık | — |
+| Bağımlılık | HummyTummy Lisansı |
 
 <Callout type="info">
   API erişimi ve webhook'ların teknik kullanımı için geliştirici dokümanına bakın:
   [Marketplace API](https://developer.hummytummy.com/tr/developer/marketplace-api).
 </Callout>
 
+### Partner Ekran API
+
+Üçüncü taraf ekranların (masa tabletleri, harici menü ekranları) menünüzü
+göstermesi için ekran bazlı API erişimi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺1.990,00 |
+| Ne işe yarar | Harici ekran API'sini açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Öncelikli Destek
+
+Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Modül |
+| Fatura | Yıllık |
+| Fiyat | ₺1.990,00 |
+| Ne işe yarar | Öncelikli destek sırasını açar |
+| Bağımlılık | HummyTummy Lisansı |
+
 ---
 
-## Destek
+## Entegrasyonlar
 
-### Öncelikli destek
+Entegrasyonların tamamı **yıllık**tır ve **HummyTummy Lisansı** gerektirir.
 
-Kritik destek talepleri için 24 saatlik SLA. Mesai saatlerinde doğrudan hat.
+### Yemeksepeti Entegrasyonu
 
-| Alan | Değer |
-| --- | --- |
-| Tür | Destek |
-| Fatura | Tekrarlayan |
-| Fiyat | ₺199,00 |
-| Ne işe yarar | Öncelikli destek / 24 saatlik SLA |
-| Bağımlılık | — |
-
-### Yerinde kurulum (tek seferlik)
-
-Bir HummyTummy teknisyeni mekânınıza gelir, bridge + cihazları kurar ve
-personelinizi eğitir.
+Yemeksepeti siparişlerinin otomatik olarak POS ve mutfağa düşmesi.
 
 | Alan | Değer |
 | --- | --- |
-| Tür | Destek |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺2.490,00 |
+| Ne işe yarar | Yemeksepeti siparişlerini POS ve mutfağa taşır |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Getir Entegrasyonu
+
+Getir siparişlerinin otomatik olarak POS ve mutfağa düşmesi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺2.490,00 |
+| Ne işe yarar | Getir siparişlerini POS ve mutfağa taşır |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Trendyol Yemek Entegrasyonu
+
+Trendyol Yemek siparişlerinin otomatik olarak POS ve mutfağa düşmesi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺2.490,00 |
+| Ne işe yarar | Trendyol Yemek siparişlerini POS ve mutfağa taşır |
+| Bağımlılık | HummyTummy Lisansı |
+
+<Callout type="info">
+  Üç teslimat entegrasyonunu da aynı anda kullanabilirsiniz; siparişler yan yana
+  tek bir akışta toplanır. Her platform ayrı bir kalemdir ve ayrı fiyatlanır.
+</Callout>
+
+### e-Fatura (Nilvera)
+
+Satış faturalarınızın Nilvera üzerinden e-Fatura / e-Arşiv olarak GİB'e
+gönderilmesi.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺1.990,00 |
+| Ne işe yarar | e-Fatura / e-Arşiv gönderimini açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### ÖKC / Yazarkasa (Hugin)
+
+Hugin yazarkasa ile entegre fiş kesimi ve mali rapor senkronizasyonu (Local
+Bridge üzerinden).
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺2.990,00 |
+| Ne işe yarar | Hugin yazarkasa entegrasyonunu açar |
+| Bağımlılık | HummyTummy Lisansı |
+
+### Çağrı-ID Entegrasyonu
+
+Gelen telefon çağrılarında müşteriyi otomatik tanıma ve tek tıkla sipariş açma.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺1.490,00 |
+| Ne işe yarar | Gelen çağrıda otomatik müşteri tanıma |
+| Bağımlılık | HummyTummy Lisansı |
+
+### SMS Bildirimleri
+
+Sipariş, rezervasyon ve kampanya SMS'leri. Gönderimler **kontörle** harcanır.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Entegrasyon |
+| Fatura | Yıllık |
+| Fiyat | ₺990,00 |
+| Ne işe yarar | SMS gönderimini açar (kontör ayrıca alınır) |
+| Bağımlılık | HummyTummy Lisansı |
+
+---
+
+## Kapasite
+
+### Ek Şube
+
+Hesabınıza bir şube daha ekler. **İlk şube ücretsizdir**; ikinci şubeden
+itibaren her şube için bir adet alınır. Aynı sepette birden fazla adet
+alabilirsiniz.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kapasite |
+| Fatura | Yıllık / adet |
+| Fiyat | ₺3.990,00 |
+| Ne işe yarar | Şube limitinizi **bir** artırır |
+| Bağımlılık | HummyTummy Lisansı |
+
+<Callout type="info">
+  Hesap başına en fazla **100** şube alınabilir. Şube panelini, şube seçiciyi ve
+  çoklu-lokasyon arayüzünü kullanmak ücretsizdir — ücretli olan **ikinci ve
+  sonraki şubelerin kendisidir**.
+</Callout>
+
+---
+
+## Kontörler
+
+Kontörler **tek seferlik** alınır, **süresi yoktur** ve tükenene kadar
+geçerlidir. Kontörün kendisi lisans istemez, ancak bağlı olduğu kalem
+(AI Menü Stüdyosu / SMS Bildirimleri) lisans gerektirir.
+
+### 100 AI Görsel Kontörü
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kontör |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺690,00 |
+| Ne işe yarar | 100 adet AI görsel üretimi |
+| Bağımlılık | AI Menü Stüdyosu |
+
+### 20 AI Video Kontörü
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kontör |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺890,00 |
+| Ne işe yarar | 20 adet AI video üretimi |
+| Bağımlılık | AI Menü Stüdyosu |
+
+### 10 AI 3D Model Kontörü
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kontör |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺790,00 |
+| Ne işe yarar | 10 adet AI 3D model üretimi |
+| Bağımlılık | AI Menü Stüdyosu |
+
+### 500 SMS Kontörü
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Kontör |
+| Fatura | **Tek seferlik** |
+| Fiyat | ₺490,00 |
+| Ne işe yarar | 500 adet SMS gönderimi |
+| Bağımlılık | SMS Bildirimleri |
+
+<Callout type="info">
+  Kontör paketleri tükendikçe yenisini alabilirsiniz; ikinci paket birincinin
+  kalanına eklenir. Aynı sepete bağlı olduğu kalemle birlikte de koyabilirsiniz.
+</Callout>
+
+---
+
+## Hizmet
+
+### Yerinde Kurulum & Eğitim (tek seferlik)
+
+Bir HummyTummy teknisyeni mekânınıza gelir, tam gün kurulum ve cihaz devreye
+alma yapar, personelinizi eğitir.
+
+| Alan | Değer |
+| --- | --- |
+| Tür | Hizmet |
 | Fatura | **Tek seferlik** |
 | Fiyat | ₺7.500,00 |
 | Ne işe yarar | **Hak vermez** — bir kurulum/eğitim hizmetidir |
@@ -226,7 +357,8 @@ personelinizi eğitir.
 
 <Callout type="warning">
   Bu kalem hesabınıza bir limit veya özellik eklemez; ödenir ve faturalanır ama
-  hak setinizi değiştirmez. Tekrarlayan değil, **tek seferliktir**.
+  hak setinizi değiştirmez. Yıllık değil, **tek seferliktir** ve lisans
+  gerektirmez.
 </Callout>
 
 ---

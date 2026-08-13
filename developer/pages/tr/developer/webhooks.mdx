@@ -1,6 +1,6 @@
 ---
 title: Webhook'lar
-description: Sipariş, ödeme ve abonelik olaylarını HMAC-SHA256 imzalı POST'larla uç noktanıza alın.
+description: Sipariş, ödeme ve ürün/yenileme olaylarını HMAC-SHA256 imzalı POST'larla uç noktanıza alın.
 ---
 
 import { Callout, Steps, Tabs } from 'nextra/components'
@@ -8,15 +8,18 @@ import { Callout, Steps, Tabs } from 'nextra/components'
 # Webhook'lar (Giden)
 
 HummyTummy, tenant'ınızda bir olay olduğunda kayıtlı uç noktanıza HMAC-SHA256
-imzalı bir HTTP POST atar. Böylece sipariş, ödeme ve abonelik olaylarına anlık
-tepki verebilir; yoklamaya (polling) ihtiyaç duymazsınız.
+imzalı bir HTTP POST atar. Böylece sipariş, ödeme ve ürün/yenileme olaylarına
+anlık tepki verebilir; yoklamaya (polling) ihtiyaç duymazsınız.
 
 Tüm yollar `/api` global ön eki altındadır.
 
 <Callout type="warning">
-  Webhook abonelikleri **API erişimi** özelliği gerektirir: BUSINESS planı ya da
-  `api_access` (apiAccess) eklentisi. Abonelik uçları **ADMIN rolü** ile
-  personel JWT'si bekler; özellik kapalıysa `403` döner.
+  Webhook abonelikleri **API erişimi** yetkisi (`feature.apiAccess`) gerektirir;
+  bunu **API & Webhook Erişimi** modülü (`api_access`, yıllık, lisans ön
+  koşuluyla) açar. Abonelik uçları **ADMIN rolü** ile personel JWT'si bekler;
+  yetki yoksa `403` `ENTITLEMENT_REQUIRED` döner ve zarf, yetkiyi açan ürünü
+  fiyatıyla birlikte taşır — bkz.
+  [Yetki Matrisi](/tr/reference/plan-matrix).
 </Callout>
 
 ## Abone olun
@@ -220,11 +223,19 @@ olayları yakalayın. Tipler `<alan>.<eylem>.v<sürüm>` biçimindedir.
 | `payment.succeeded.v1` | Ödeme başarılı |
 | `payment.intent_created.v1` | Ödeme niyeti oluştu |
 | `payment.refund_completed.v1` | İade tamamlandı |
-| `checkout.completed.v1` | Checkout tamamlandı |
-| `subscription.activated.v1` | Abonelik aktifleşti |
-| `subscription.upgraded.v1` | Abonelik yükseltildi |
-| `subscription.cancelled.v1` | Abonelik iptal edildi |
-| `feature.entitlement.changed.v1` | Özellik hakkı değişti |
+| `checkout.completed.v1` | Checkout tamamlandı (karma sepet provizyonlandı) |
+| `addon.purchased.v1` | Katalog ürünü satın alındı / yenilendi |
+| `addon.cancelled.v1` | Ürün iptal edildi |
+| `addon.past_due.v1` | Ürünün ödenmiş dönemi bitti; 7 günlük ödemesiz dönem başladı |
+| `renewal.reminder.v1` | Yıl dönümüne 30 / 7 / 1 gün kaldı |
+| `feature.entitlement.changed.v1` | Yetki (entitlement) seti değişti |
+
+<Callout type="info">
+  `subscription.*` tipleri olay sözlüğünde duruyor ama plan rayı emekliye
+  ayrıldığı için ücretli bir yaşam döngüsü artık bunları üretmiyor. Yeni
+  entegrasyonlar `addon.*`, `renewal.*` ve `checkout.completed.v1` olaylarını
+  dinlemelidir.
+</Callout>
 
 ### Engelli (BLOCKED) olaylar
 

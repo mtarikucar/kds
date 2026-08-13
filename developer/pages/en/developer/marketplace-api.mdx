@@ -1,26 +1,28 @@
 ---
 title: Marketplace API
-description: List the add-on catalogue, buy add-ons through the checkout rail, read the add-ons a tenant holds, and cancel them — with the fold rules, idempotency, and concurrency guarantees behind each call.
+description: List the product catalogue, buy through the checkout rail, read the products a tenant holds, and cancel them — with the fold rules, idempotency, and concurrency guarantees behind each call.
 ---
 
 import { Callout, Steps, Tabs } from 'nextra/components'
 
 # Marketplace API
 
-The Marketplace is the catalogue of add-ons a tenant can buy **individually** on
-top of its plan. A plan gives a feature/limit baseline; add-ons **raise** that
-baseline (an extra KDS screen, an extra branch, an e-Fatura integration,
-advanced reports, and so on).
+The Marketplace is the catalogue of products a tenant can buy **individually**.
+The free core gives every tenant an entitlement baseline; catalog products
+**raise** that baseline (an extra branch, an e-Fatura integration, advanced
+reports, AI credits, and so on). There are no plans, tiers, or bundles: every
+paid capability is sold with the annual **licence** (`license_annual`) as its
+prerequisite.
 
-Buying an add-on writes a **`TenantAddOn`** row, and the entitlement projector
+Buying a product writes a **`TenantAddOn`** row, and the entitlement projector
 folds that row's `grants` map into the tenant's existing entitlement set. The
 combine rule depends on the key prefix:
 
 | Prefix | Type | Combine | Example |
 | --- | --- | --- | --- |
-| `limit.*` | number | **SUM** | Plan `limit.kdsScreens: 2` + 1× `kds_extra_screen` (+1) = **3** |
+| `limit.*` | number | **SUM** | Free baseline `limit.maxBranches: 1` + 2× `extra_branch` (+1 each) = **3** |
 | `feature.*` | boolean | **OR** | If any source sets `feature.advancedReports: true` → enabled |
-| `integration.*` | string[] | **UNION** | `efatura` add-on + `hugin` add-on → `integration.fiscal: ["efatura", "hugin"]` |
+| `integration.*` | string[] | **UNION** | `fiscal_efatura` + `fiscal_hugin` → `integration.fiscal: ["efatura", "hugin"]` |
 
 <Callout type="info">
   For `limit.*`, `-1` is the "unlimited" sentinel: if any source grants `-1`, the
@@ -29,15 +31,15 @@ combine rule depends on the key prefix:
 </Callout>
 
 All paths are under the `/api` global prefix. Prices are in **TRY** and stored
-in the catalogue as **cents** (`priceCents`): `9900` = ₺99.00. Amounts are shown
-KDV-inclusive (gross). For base URL, auth realms, the error envelope, and
+in the catalogue as **cents** (`priceCents`): `299000` = ₺2,990.00. Amounts are
+shown KDV-inclusive (gross). For base URL, auth realms, the error envelope, and
 rate-limit tiers, see [API Fundamentals](/en/developer/api-fundamentals).
 
 <Callout type="warning">
   There is **no** tenant-facing "free grant" endpoint. The legacy
   `POST /v1/marketplace/addons/purchase` was **removed** (deep-review C2): it was
   guarded only by `@Roles(ADMIN)` and called `purchase()` with no `paymentRef`,
-  so any owner could activate a paid add-on for free via curl. The paid checkout
+  so any owner could activate a paid product for free via curl. The paid checkout
   flow is now mandatory; operator comps are issued only from the superadmin
   surface.
 </Callout>
@@ -47,7 +49,8 @@ rate-limit tiers, see [API Fundamentals](/en/developer/api-fundamentals).
 | Method | Path | Auth | Roles | Notes |
 | --- | --- | --- | --- | --- |
 | `GET` | `/v1/marketplace/addons` | Public | — | Catalogue; `published` rows only |
-| `GET` | `/v1/marketplace/addons/mine` | Staff JWT | ADMIN, MANAGER | Add-ons the tenant currently holds |
+| `GET` | `/v1/marketplace/addons/available` | Staff JWT | ADMIN, MANAGER | Catalogue annotated with `includedInPlan` for the caller's entitlements |
+| `GET` | `/v1/marketplace/addons/mine` | Staff JWT | ADMIN, MANAGER | Products the tenant currently holds |
 | `POST` | `/v1/checkout/intent` | Staff JWT | ADMIN, MANAGER | Mixed-cart checkout intent (the only buy path) |
 | `DELETE` | `/v1/marketplace/addons/:id` | Staff JWT | ADMIN | Cancel a `TenantAddOn` (period-end or immediate) |
 
@@ -55,19 +58,26 @@ These are tenant-level endpoints: they do **not** expect `X-Branch-Id`. The
 checkout intent and the cancel endpoint move/settle money or entitlements and
 are protected accordingly.
 
+<Callout type="info">
+  To render a storefront in a single call, prefer `GET /v1/me/licensing`: it
+  returns owned products, credit balances, the offer for every entitlement key
+  **priced for this tenant today**, and a purchasability verdict per product.
+  See the [Licensing & Billing API](/en/developer/billing-api).
+</Callout>
+
 ## List the catalogue
 
 The catalogue is public (it also shows on the landing site); no authentication
-is required. Only `published` add-ons are returned, and each row is trimmed for
+is required. Only `published` products are returned, and each row is trimmed for
 the UI.
 
 <Tabs items={['curl', 'TypeScript (fetch)']}>
   <Tabs.Tab>
 ```bash
-# All published add-ons
+# All published products
 curl https://hummytummy.com/api/v1/marketplace/addons
 
-# Filter by kind: capacity | integration | software | support
+# Filter by kind: license | module | integration | capacity | credit | service
 curl "https://hummytummy.com/api/v1/marketplace/addons?kind=integration"
 ```
   </Tabs.Tab>
@@ -86,74 +96,101 @@ Response:
 ```json
 [
   {
-    "code": "kds_extra_screen",
-    "name": "Extra KDS screen",
-    "description": "Adds one additional kitchen display screen slot to your branch.",
-    "kind": "capacity",
-    "billing": "recurring",
-    "priceCents": 9900,
+    "code": "module_inventory",
+    "name": "Stok & Maliyet Yönetimi",
+    "description": "Reçete, stok sayımı, satın alma siparişi, fire takibi, tedarikçi yönetimi ve şubeler arası transfer.",
+    "kind": "module",
+    "billing": "annual",
+    "priceCents": 149000,
     "currency": "TRY",
-    "deps": []
+    "deps": [],
+    "requiresLicense": true,
+    "creditKind": null,
+    "creditUnits": null,
+    "maxQuantity": null,
+    "sortOrder": 11,
+    "i18n": { "tr": { "name": "…", "description": "…" }, "en": { "…": "…" } }
   }
 ]
 ```
 
 <Callout type="info">
   The `grants` field is **not** returned in the public catalogue — only the
-  superadmin surface and the seed file carry the grant map. The catalogue is
-  trimmed for the UI; `priceCents`/`currency` are the source of truth for price.
+  superadmin surface and the catalog source file carry the grant map. The
+  catalogue is trimmed for the UI; `priceCents`/`currency` are the source of
+  truth for price. The **prorated price for this tenant today** comes from
+  `offers[...].proratedCents` in `GET /v1/me/licensing`.
 </Callout>
 
 ### Catalogue summary
 
-Every sellable add-on at a glance. The `Grants` column is shown here for
-reference only; it is not part of the public catalogue payload.
+Every sellable product at a glance. The `Grants` column is shown here for
+reference only; it is not part of the public catalogue payload. For the details,
+see the [Entitlement Matrix](/en/reference/plan-matrix).
 
-| Code | Kind | Billing | Price | Grants | Dependency |
-| --- | --- | --- | --- | --- | --- |
-| `kds_extra_screen` | capacity | recurring | ₺99.00 (`9900`) | `limit.kdsScreens` +1 | — |
-| `kds_extra_station` | capacity | recurring | ₺149.00 (`14900`) | `limit.kdsStations` +1 | — |
-| `extra_tablet` | capacity | recurring | ₺79.00 (`7900`) | `limit.tablets` +1 | — |
-| `extra_branch` | capacity | recurring | ₺399.00 (`39900`) | `limit.branches` +1, `feature.multiLocation` | — |
-| `fiscal_efatura` | integration | recurring | ₺199.00 (`19900`) | `integration.fiscal` += `efatura` | — |
-| `fiscal_hugin` | integration | recurring | ₺299.00 (`29900`) | `integration.fiscal` += `hugin` | **`plan:PRO`** |
-| `delivery_yemeksepeti` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `yemeksepeti` | — |
-| `delivery_getir` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `getir` | — |
-| `delivery_trendyol_yemek` | integration | recurring | ₺249.00 (`24900`) | `integration.delivery` += `trendyol_yemek` | — |
-| `caller_id_integration` | integration | recurring | ₺149.00 (`14900`) | `feature.callerIntegration` | — |
-| `advanced_reports` | software | recurring | ₺129.00 (`12900`) | `feature.advancedReports` | — |
-| `api_access` | software | recurring | ₺249.00 (`24900`) | `feature.apiAccess` | — |
-| `priority_support` | support | recurring | ₺199.00 (`19900`) | `feature.prioritySupport` | — |
-| `onsite_install_full` | support | **one-time** | ₺7,500.00 (`750000`) | — (`grants: {}`, service line) | — |
+| Code | Kind | Billing | Price | Grants | Licence | Dependency |
+| --- | --- | --- | --- | --- | --- | --- |
+| `license_annual` | license | annual | ₺2,990 (`299000`) | `feature.license` | — | — |
+| `advanced_reports` | module | annual | ₺1,290 (`129000`) | `feature.advancedReports` | ✅ | — |
+| `module_inventory` | module | annual | ₺1,490 (`149000`) | `feature.inventoryTracking` | ✅ | — |
+| `module_reservations` | module | annual | ₺990 (`99000`) | `feature.reservationSystem` | ✅ | — |
+| `module_personnel` | module | annual | ₺990 (`99000`) | `feature.personnelManagement` | ✅ | — |
+| `module_ai_studio` | module | annual | ₺1,990 (`199000`) | `feature.aiContentGeneration` | ✅ | — |
+| `api_access` | module | annual | ₺2,490 (`249000`) | `feature.apiAccess` | ✅ | — |
+| `module_external_display` | module | annual | ₺1,990 (`199000`) | `feature.externalDisplay` | ✅ | — |
+| `priority_support` | module | annual | ₺1,990 (`199000`) | `feature.prioritySupport` | ✅ | — |
+| `delivery_yemeksepeti` | integration | annual | ₺2,490 (`249000`) | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ | — |
+| `delivery_getir` | integration | annual | ₺2,490 (`249000`) | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ | — |
+| `delivery_trendyol_yemek` | integration | annual | ₺2,490 (`249000`) | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ | — |
+| `fiscal_efatura` | integration | annual | ₺1,990 (`199000`) | `integration.fiscal` += `efatura` | ✅ | — |
+| `fiscal_hugin` | integration | annual | ₺2,990 (`299000`) | `integration.fiscal` += `hugin` | ✅ | — |
+| `caller_id_integration` | integration | annual | ₺1,490 (`149000`) | `integration.caller` += `generic` | ✅ | — |
+| `sms_integration` | integration | annual | ₺990 (`99000`) | `integration.sms` += `*` | ✅ | — |
+| `extra_branch` | capacity | annual | ₺3,990 (`399000`) | `limit.maxBranches` +1, `feature.multiLocation` | ✅ | — |
+| `credit_ai_photo_100` | credit | **one-time** | ₺690 (`69000`) | — (100 `PHOTO` credits) | — | `module_ai_studio` |
+| `credit_ai_video_20` | credit | **one-time** | ₺890 (`89000`) | — (20 `VIDEO` credits) | — | `module_ai_studio` |
+| `credit_ai_3d_10` | credit | **one-time** | ₺790 (`79000`) | — (10 `MODEL3D` credits) | — | `module_ai_studio` |
+| `credit_sms_500` | credit | **one-time** | ₺490 (`49000`) | — (500 `SMS` credits) | — | `sms_integration` |
+| `onsite_install_full` | service | **one-time** | ₺7,500 (`750000`) | — (`grants: {}`, service line) | — | — |
 
 <Callout type="warning">
   `onsite_install_full` is a **service** line: it is paid and invoiced but grants
   no entitlement (`grants: {}`). It is one-time, not recurring, and gets no
-  period-end window (`currentPeriodEnd` is `null`).
+  period-end window (`currentPeriodEnd` is `null`). Credit packs carry no grants
+  either — they top up a balance and produce a `CreditLot` row, not a
+  `TenantAddOn`.
 </Callout>
 
 <Callout type="info">
   `extra_branch` carries both a **limit** (SUM) and a **feature** (OR) grant in a
-  single purchase: `{ "limit.branches": 1, "feature.multiLocation": true }`.
-  `caller_id_integration` has `kind: "integration"` but its grant is a **feature**
-  flag (`feature.callerIntegration`), not an `integration.*` list. All three
-  `delivery_*` add-ons write to `integration.delivery` and are union-ed.
+  single purchase: `{ "limit.maxBranches": 1, "feature.multiLocation": true }`.
+  The multi-branch UI is already free; what is paid for is the second branch
+  itself. All three `delivery_*` products write to `integration.delivery` and are
+  union-ed, and the `feature.deliveryIntegration` flag alongside them folds with
+  OR.
 </Callout>
 
-## Buy an add-on (checkout intent)
+Retired codes (`kds_extra_screen`, `kds_extra_station`, `extra_tablet`) are
+**archived, never deleted**: `MarketplaceAddOn.code` may not be reused and
+`TenantAddOn.addOnId` is `onDelete: Restrict`. All three granted
+`limit.kdsScreens` / `limit.kdsStations` / `limit.tablets` — keys no enforcement
+code has ever read — and the à-la-carte model drops device-capacity pricing
+entirely.
 
-The only way to buy an add-on is the checkout (PayTR) rail. A paid add-on is
-never provisioned without proof of payment (`paymentRef`).
+## Buy a product (checkout intent)
+
+The only way to buy is the checkout (PayTR) rail. A paid product is never
+provisioned without proof of payment (`paymentRef`).
 
 <Steps>
 
 ### Start a checkout intent
 
-Submit the selected add-ons (plus any plan / hardware / service lines) as a
-single **mixed cart** to `POST /v1/checkout/intent`. The server **re-prices** the
-cart (it never trusts client totals), mints a `paymentRef` of the form
-`CK-<uuid7>`, freezes the cart onto a `CheckoutIntent` row, and returns a PayTR
-iframe token + payment link.
+Submit the selected products (plus any hardware / service lines) as a single
+**mixed cart** to `POST /v1/checkout/intent`. The server **re-prices** the cart
+(it never trusts client totals), mints a `paymentRef` of the form `CK-<uuid7>`,
+freezes the cart onto a `CheckoutIntent` row, and returns a PayTR iframe token +
+payment link.
 
 <Tabs items={['curl', 'TypeScript (fetch)']}>
   <Tabs.Tab>
@@ -164,7 +201,7 @@ curl -X POST https://hummytummy.com/api/v1/checkout/intent \
   -d '{
     "cart": {
       "items": [
-        { "type": "addon", "code": "kds_extra_screen", "qty": 1 },
+        { "type": "addon", "code": "license_annual", "qty": 1 },
         { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
       ]
     },
@@ -174,7 +211,8 @@ curl -X POST https://hummytummy.com/api/v1/checkout/intent \
       "phone": "+905551112233",
       "address": "..."
     },
-    "returnUrl": "https://app.hummytummy.com/checkout/done"
+    "returnUrl": "https://app.hummytummy.com/checkout/done",
+    "acceptedDocumentIds": ["<KVKK>", "<DISTANCE_SALES>", "<REFUND>"]
   }'
 ```
   </Tabs.Tab>
@@ -189,7 +227,7 @@ const res = await fetch("https://hummytummy.com/api/v1/checkout/intent", {
   body: JSON.stringify({
     cart: {
       items: [
-        { type: "addon", code: "kds_extra_screen", qty: 1 },
+        { type: "addon", code: "license_annual", qty: 1 },
         { type: "addon", code: "fiscal_efatura", qty: 1 },
       ],
     },
@@ -200,6 +238,7 @@ const res = await fetch("https://hummytummy.com/api/v1/checkout/intent", {
       address: "...",
     },
     returnUrl: "https://app.hummytummy.com/checkout/done",
+    acceptedDocumentIds: [kvkkId, distanceSalesId, refundId],
   }),
 });
 const { paymentRef, iframeToken, paymentLink } = await res.json();
@@ -210,7 +249,7 @@ const { paymentRef, iframeToken, paymentLink } = await res.json();
 ### Pay via PayTR
 
 The buyer pays on the PayTR hosted iframe. Each cart line is shown to the buyer
-as a separate basket entry (e.g. *"Extra KDS screen (monthly)"*).
+as a separate basket entry (e.g. *"e-Fatura (Nilvera) (yıllık)"*).
 
 ### Settlement via webhook
 
@@ -221,39 +260,50 @@ There the `CheckoutIntent` is found, the frozen cart is read, and
 
 ### Grants are provisioned
 
-For each add-on line, `confirmAndProvision` calls
+For each catalog line, `confirmAndProvision` calls
 `TenantMarketplaceService.purchase()` **with the settled `paymentRef`** inside
-the checkout transaction. That creates a `TenantAddOn` row and appends an
-`AddOnPurchased` event to the outbox. The entitlement projector consumes
-`AddOnPurchased` and folds the add-on's `grants` map into the tenant's
-entitlement set; guards and the UI then see the new limit/feature/integration.
+the checkout transaction. That creates a `TenantAddOn` row (or reactivates a
+lapsed one in place) and appends an `AddOnPurchased` event to the outbox. The
+entitlement projector consumes `AddOnPurchased` and folds the product's `grants`
+map into the tenant's entitlement set; guards and the UI then see the new
+limit/feature/integration.
 
 </Steps>
 
-### Dependencies (`deps`)
+### Purchasability and dependencies (`deps`)
 
-Some add-ons require something else to already be in place. Every entry in the
-`deps` array must currently **apply** to the tenant at purchase time:
+Every `addon` line passes the purchasability gate **before any charge**. A
+rejected line returns `409` and stops the whole cart:
 
-- `plan:PRO` → the tenant's active plan name must be `PRO`
-  (`Tenant.currentPlan.name`).
-- An add-on code (e.g. `caller_id_integration`) → that add-on must be **active**
-  on the tenant.
+| `code` | Meaning |
+| --- | --- |
+| `LICENSE_REQUIRED` | The product needs a licence and the cart has none either |
+| `ADDON_ALREADY_OWNED` | This product (or the licence) is already active |
+| `ADDON_ALREADY_GRANTED` | Everything the product grants is already in the entitlement set |
+| `ADDON_REQUIRES_DEPENDENCY` | Its dependency is neither owned nor in the cart |
+| `ADDON_LIMIT_REDUNDANT` | The capacity it adds is already unlimited |
+| `ADDON_MAX_QUANTITY` | The catalog ceiling would be exceeded (100 for `extra_branch`) |
 
-Today the only add-on in the catalogue with `deps` is **`fiscal_hugin`**
-(`["plan:PRO"]`). If the tenant is not on PRO, the purchase is rejected with:
+Every entry in `deps` is **a catalog product code** and must be satisfied at
+purchase time by an active ownership row **or by a sibling line in the same
+cart**. Today the products carrying `deps` are the four credit packs
+(`credit_ai_*` → `module_ai_studio`, `credit_sms_500` → `sms_integration`).
 
-```
-Add-on requires: plan:PRO. Upgrade your plan or purchase the required add-ons first.
-```
+<Callout type="warning">
+  The legacy `plan:<NAME>` form (e.g. `fiscal_hugin`'s `plan:PRO`) is **gone**
+  along with plans. Catalog validation now rejects any `plan:`-prefixed dep at
+  write time: `Tenant.currentPlanId` is `NULL` for every tenant, so such a dep
+  could never be satisfied and would block **every** sale of that product.
+</Callout>
 
 ### Duplicate-purchase guard
 
-Buying the same capacity add-on twice to double a limit is blocked: if an active
-row already exists for the same `(tenantId, addOnId, branchId)`, the second
-purchase is rejected. Two concurrent purchases are caught by a **Serializable**
-transaction; the loser gets a retryable **`409`** (the card is not charged
-twice).
+Buying the same product twice and gaining nothing is blocked: if an active row
+already exists for the same `(tenantId, addOnId, branchId)`, the second purchase
+is rejected with `ADDON_ALREADY_OWNED`. Capacity products are bought by the unit,
+so their ceiling is `maxQuantity` instead. Credit packs are consumable and are
+never blocked. Two concurrent purchases are caught by a **Serializable**
+transaction; the loser gets a retryable **`409`** (the card is not charged twice).
 
 ### Idempotency
 
@@ -273,9 +323,9 @@ For the same `paymentRef` it returns the existing `TenantAddOn` row without
 re-emitting an `AddOnPurchased` event.
 </Steps>
 
-## My current add-ons
+## My current products
 
-Lists the add-ons the tenant currently holds.
+Lists the rows the tenant currently holds.
 
 <Tabs items={['curl', 'TypeScript (fetch)']}>
   <Tabs.Tab>
@@ -295,7 +345,7 @@ const mine = await res.json();
   </Tabs.Tab>
 </Tabs>
 
-Each row carries the add-on catalogue (`addOn`) plus its status/period fields:
+Each row carries the product catalogue (`addOn`) plus its status/period fields:
 
 ```json
 [
@@ -304,25 +354,37 @@ Each row carries the add-on catalogue (`addOn`) plus its status/period fields:
     "tenantId": "t_01J...",
     "addOnId": "ao_01J...",
     "branchId": null,
-    "quantity": 1,
+    "quantity": 2,
+    "pendingQuantity": null,
     "status": "active",
-    "activatedAt": "2026-06-22T10:00:00.000Z",
-    "currentPeriodStart": "2026-06-22T10:00:00.000Z",
-    "currentPeriodEnd": "2026-07-22T10:00:00.000Z",
+    "activatedAt": "2026-08-13T10:00:00.000Z",
+    "currentPeriodStart": "2026-08-13T00:00:00.000Z",
+    "currentPeriodEnd": "2027-03-10T00:00:00.000Z",
+    "cancelAtPeriodEnd": false,
     "paymentRef": "CK-018f...",
-    "addOn": { "code": "kds_extra_screen", "name": "Extra KDS screen", "...": "..." }
+    "chargedCents": 434300,
+    "currency": "TRY",
+    "origin": "purchase",
+    "addOn": { "code": "extra_branch", "name": "Ek Şube", "...": "..." }
   }
 ]
 ```
 
+| Field | Meaning |
+| --- | --- |
+| `status` | `active` · `past_due` (grace window, entitlement **still live**) · `cancelled` · `expired` |
+| `quantity` / `pendingQuantity` | Current units / units to apply at the next anniversary (capacity downgrades are renewal-time) |
+| `chargedCents` | What was **actually** charged (prorated) for this period; 0 for comps |
+| `origin` | `purchase` · `comp` · `migration` |
+
 <Callout type="info">
-  Recurring add-ons get a 30-day `currentPeriodEnd` window (so the cancellation
-  flow has a meaningful period end). The real billing cycle aligns to the parent
-  Subscription cycle. One-time items (`onsite_install_full`) carry
+  Annual products run to the account's **anniversary**, not to a rolling window —
+  `currentPeriodEnd` is the same date on every row, so the whole account renews
+  on one date with one invoice. One-time items (`onsite_install_full`) carry
   `currentPeriodEnd: null`.
 </Callout>
 
-## Cancel an add-on
+## Cancel a product
 
 Cancellation is **ADMIN-only** (it is a billing decision). By default the row is
 cancelled **at period end**; pass `?immediate=true` to revoke right away.
@@ -337,7 +399,7 @@ curl -X DELETE \
 
 The row is set to `cancelAtPeriodEnd: true` and **stays active**. The
 limit/feature/integration entitlements it grants keep living until the nightly
-sweeper / billing-cycle close transitions the row to `cancelled`.
+sweeper / renewal-cycle close transitions the row to `cancelled`.
   </Tabs.Tab>
   <Tabs.Tab>
 ```bash
@@ -353,18 +415,27 @@ the cancellation rolls back (no half-revoked entitlement is left behind).
   </Tabs.Tab>
 </Tabs>
 
+Only `active` and `past_due` rows can be cancelled; anything else returns `400`.
+For a `past_due` row the cancellation is **always immediate** — its paid period
+has already ended, so deferring to period end would only keep the grace grant
+alive with no way to revoke it.
+
 <Callout type="warning">
-  Two concurrent cancel calls converge on a single transition (a
-  `status = 'active'`-scoped `updateMany`). The loser gets
+  Two concurrent cancel calls converge on a single transition (a `status`-scoped
+  `updateMany`). The loser gets
   `Cancel raced with another request — refresh and retry`; the `AddOnCancelled`
   event is **not** emitted twice.
 </Callout>
 
 ## Related
 
+- [Entitlement Matrix](/en/reference/plan-matrix) — the free core, product
+  grants, licence suppression, and the `ENTITLEMENT_REQUIRED` envelope.
+- [Licensing & Billing API](/en/developer/billing-api) — the checkout rail,
+  proration, the anniversary, invoices, and renewals.
 - [API Fundamentals](/en/developer/api-fundamentals) — base URL, auth realms,
   error envelope, rate-limit tiers.
-- [Webhooks](/en/developer/webhooks) — receive `subscription.*` /
-  `payment.*` events (the `api_access` add-on grants `feature.apiAccess`).
-- Operator experience (browsing, buying, and tracking add-ons in the panel):
+- [Webhooks](/en/developer/webhooks) — receive outbound events (the `api_access`
+  module grants `feature.apiAccess`).
+- Operator experience (browsing, buying, and tracking products in the panel):
   [Marketplace help](https://help.hummytummy.com/en/marketplace).

@@ -8,7 +8,7 @@ import { Callout, Steps } from 'nextra/components'
 # Users & Roles
 
 **Menu path:** Back Office → Users &nbsp;•&nbsp; **URL:** `/admin/users`
-**Access:** ADMIN, MANAGER  •  **Plan:** All plans
+**Access:** ADMIN, MANAGER  •  **Requires:** Included in the free core (user count is **unlimited**)
 
 ## Purpose
 
@@ -16,8 +16,8 @@ This screen manages the **system accounts of the staff** who work in your restau
 
 <Callout type="info">
   This screen is available to **ADMIN** and **MANAGER** roles (changing a user's
-  **role** is restricted to **ADMIN**). There's no plan restriction; however, if your
-  plan's **user limit** is full, you can't add new accounts (see below).
+  **role** is restricted to **ADMIN**). Team and role management is part of the free
+  core: the **user count is unlimited** and there is no per-person fee.
 </Callout>
 
 ## How the screen is laid out
@@ -61,18 +61,17 @@ A user's **status** takes one of four values, and the actions on a row change wi
   the account permanently.
 </Callout>
 
-## User limit
+## User count
 
-Your plan may have a **maximum number of users**. The info banner at the top shows the `current / limit` ratio. When the limit is reached, the **"Add User"** button is locked, **reactivating** an inactive user is also blocked, and an upgrade card appears.
+The **number of users is unlimited** — you can open an account for your whole team. The info banner at the top shows the `current / limit` ratio, and because it's unlimited you'll see **∞** on the limit side; the **"Add User"** button never locks against a quota, and reactivating an inactive user is never blocked either.
 
-<Callout type="warning">
-  The limit check is shown in the interface, but the actual limit is enforced by the
-  **server**. To raise the limit you need to upgrade your plan — details:
-  **[Subscription](/en/plans)**.
+<Callout type="info">
+  Team and role management is part of the free core: no per-person charge, no seat fee
+  and no user quota — details: **[Plans](/en/plans)**.
 </Callout>
 
 ## Related pages
 
-- **[Personnel](/en/admin-guide/personnel)** — shifts, leave, and HR records (separate from this screen).
+- **[Personnel](/en/admin-guide/personnel)** — shifts, leave, and HR records (separate from this screen; needs the Staff Management module).
 - **[Branches](/en/admin-guide/branches)** — the branches users work at.
-- **[Subscription](/en/plans)** — plan and user limit.
+- **[Plans](/en/plans)** — the free core and the paid modules.

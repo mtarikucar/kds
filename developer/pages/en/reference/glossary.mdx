@@ -1,6 +1,6 @@
 ---
 title: Glossary
-description: Definitions of the core terms used across HummyTummy — Tenant, Branch, Role, KDS, POS, QR menu, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Add-on.
+description: Definitions of the core terms used across HummyTummy — Tenant, Branch, Role, KDS, POS, QR menu, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Catalog product, Licence, Credit, Anniversary.
 ---
 
 # Glossary
@@ -10,8 +10,8 @@ docs.
 
 ### Tenant
 The top-level account that represents a restaurant business (customer account).
-It owns the subscription, the plan, and all data. Tenant resolution is done via
-the `tenantId` in the JWT, not by host name.
+It owns the licence, the purchased catalog products, and all data. Tenant
+resolution is done via the `tenantId` in the JWT, not by host name.
 
 ### Branch
 A physical location/branch belonging to a tenant. Tables, orders, stock, and
@@ -64,11 +64,33 @@ database change and then reliably published afterwards. It keeps side effects
 delivery.
 
 ### Entitlement
-The effective set of features and limits derived from a tenant's active plan
-(and its add-ons). It is recomputed (re-projected) when the plan changes, and
-feature gates (`PlanFeatureGuard`) consult it.
+The effective set of features, limits, and integrations derived from a tenant's
+**free core** plus the catalog products it has bought. `feature.*` folds with
+OR, `limit.*` with SUM, `integration.*` with UNION; the set is recomputed
+(re-projected) whenever a product is bought, cancelled, or lapses. Gates consult
+it through `@RequireEntitlement` and return `403 ENTITLEMENT_REQUIRED` when it
+is missing. See the [Entitlement Matrix](/en/reference/plan-matrix).
 
-### Add-on
-An extra feature or capacity added to a plan and purchased separately. It is
-bought through the marketplace via the PayTR payment rail and added to the
-entitlement once the payment is confirmed.
+### Catalog product (add-on)
+A module, integration, capacity unit, credit pack, or service bought
+individually on top of the free core. It is defined in the marketplace catalog,
+bought through the PayTR checkout rail, and its `grants` map joins the
+entitlement set once payment is confirmed. The ownership row is `TenantAddOn`.
+
+### Licence
+The annual product (`license_annual`) that is the prerequisite for every paid
+capability. It is required both to buy and to **use**: while it is not live, the
+grants of every `requiresLicense` product are suppressed — ownership rows and
+business data are untouched, and paying the licence re-lights everything.
+
+### Credit
+A prepaid consumption balance (`PHOTO`, `VIDEO`, `MODEL3D`, `SMS`). It is **not**
+an entitlement: it is bought as a one-time pack, never expires, and is valid
+until consumed. The balance is read live at spend time; when it is insufficient
+the call returns `402 QUOTA_EXCEEDED`.
+
+### Anniversary
+The tenant-local calendar day the licence was bought — the account's immutable
+renewal date. Every annual item bought later is prorated to the days remaining
+until it, so the whole account renews on one date with one invoice. Renewal is
+**manual**: there is no card vault and no auto-charge.

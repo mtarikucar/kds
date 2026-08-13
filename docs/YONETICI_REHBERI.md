@@ -210,7 +210,7 @@ Sistem otomatik komisyon **hesaplar** ama otomatik **ödeme** yapmaz. Senin onay
 ### Akış
 
 ```
-SIGNUP / RENEWAL / UPSELL ödemesi olur
+Gerçekleşen bir ödeme (SIGNUP / UPSELL / RENEWAL)
    ↓
 Sistem otomatik commission yazar (PENDING)
    ↓ ← sen burada APPROVE / REJECT karar verirsin
@@ -219,18 +219,27 @@ APPROVED (kazanç onaylı, muhasebeye gider)
 PAID (bitti, panelde "ödendi" görünür)
 ```
 
+### Hesaplama Nasıl Çalışıyor?
+
+Komisyon, **ödenen sepetin toplam tutarı** ile sepetteki **en yüksek tutarlı kalemin** komisyon oranı çarpılarak yazılır. Varsayılan oran %10; superadmin katalogda ürün bazında değiştirebilir.
+
+Bilmen gereken iki tuzak:
+
+- **Orantılı fiyat**: yıl içinde eklenen yıllık bir kalem, hesabın yıl dönümüne kalan gün kadar fiyatlanır. Bu yüzden aynı modülün komisyonu iki müşteride farklı çıkabilir — hata değil, orantıdır.
+- **Yenileme manueldir**: müşteri yıl dönümünde ödemeyi kendisi yapar. Ödeme olmazsa komisyon da yazılmaz. Pazarlamacın "yenileme komisyonum gelmedi" diyorsa önce müşterinin ödeme yapıp yapmadığına bak.
+
 ### Commissions Sayfasında Ne Yapıyorsun?
 
 1. **Liste filtrele:** PENDING'leri gör.
-2. **Her satırda detay modal:** Hesaplama (`Ödenen × Oran`), bağlı lead, plan, dönem, tutar.
+2. **Her satırda detay modal:** Hesaplama (`Ödenen sepet toplamı × Oran`), bağlı lead, ürün, dönem, tutar.
 3. **Şüpheli bir şey yoksa APPROVE.** Şüpheliyse (örn. iade alınmış müşteri) REJECT — pazarlamacıya komisyon yazılmaz.
 4. **Ay sonu (veya belirlediğin sıklık):** APPROVED'ları toplu seçip MARK PAID — pazarlamacının panelinde de "ödendi" olur.
 
 ### Şüpheli İşlem Örnekleri
 
-- Aynı müşteri trial'da iptal etmiş, sonra başka bir kart ile tekrar gelmiş → çift commission yazılmış olabilir. Detay'da `convertedTenantId` kontrol et.
-- PayTR refund'ı sonrası RENEWAL komisyonu yazılmış → REJECT, refund ile geri al.
-- UPSELL ama plan aslında downgrade — sistem nadir yanlış işaretler; manuel düzelt.
+- Aynı müşteri hesabını kapatıp yeniden açmış → iki ayrı tenant, çift commission yazılmış olabilir. Detay'da `convertedTenantId` kontrol et.
+- PayTR refund'ı sonrası komisyon yazılmış → REJECT, refund ile geri al.
+- Tutar beklenenden düşük → büyük ihtimalle orantılı fiyatlanmış bir kalemdir; faturayla karşılaştır, doğruysa APPROVE.
 
 ### Audit Log
 
@@ -285,10 +294,12 @@ Leads sayfasındaki filtreler URL'e yansır. Bunları **kalıcı link** olarak S
 Bir lead WON olduğunda **müşteriye dönüştürme** aksiyonu sende:
 
 1. Lead Detail → **"Müşteriye Dönüştür"** butonu.
-2. Form: tenant adı (slug), abone olacağı plan, başlangıç planı (trial mi, direkt ödeme mi).
+2. Form: tenant adı (slug) ve yetkili kullanıcı bilgileri. Seçilecek bir paket/plan yoktur — hesap **ücretsiz çekirdekle** açılır.
 3. Onayla → arka planda yeni `Tenant` + `User` oluşur, müşteriye davet maili gider.
 4. `Lead.convertedTenantId` set edilir — aynı lead'den ikinci bir tenant açılamaz (unique constraint).
-5. Pazarlamacının komisyonu ilk ödeme yapıldığında otomatik yazılır.
+5. Müşteri ücretli bir kalemi mağazadan satın alıp ödeme gerçekleştiğinde pazarlamacının komisyonu otomatik yazılır.
+
+**Dönüştürme ≠ satış.** Ücretsiz çekirdek satılmaz, kurulur. Dönüştürdüğün hesabın gerçek satış anı, müşterinin mağazadan ilk ücretli kalemi almasıdır. Pazarlamacına bunu ayrı bir aşama olarak takip ettir.
 
 **Hatalı dönüştürme yaptıysan:** Tenant'ı superadmin panelinden silmen + lead'in `convertedTenantId`'sini temizlemen gerekir. Dikkatli ol — kolay geri alınmaz.
 
@@ -312,7 +323,8 @@ Bir lead WON olduğunda **müşteriye dönüştürme** aksiyonu sende:
 
 - [ ] **APPROVED komisyonları MARK PAID** (havale günü öncesi).
 - [ ] Otomatik dağıtım stratejisini gözden geçir — sayılar göre değişmesi gerekiyor mu?
-- [ ] Pazarlamacı performans karşılaştırması: kim BUSINESS satıyor, kim sadece BASIC?
+- [ ] Pazarlamacı performans karşılaştırması: kim sadece ücretsiz kurulum yapıyor, kim ücretli modül satıyor?
+- [ ] Yaklaşan **yıl dönümleri**: önümüzdeki ay yenilemesi gelen müşterileri pazarlamacılarına hatırlat. Yenileme manuel — hatırlatılmayan müşteri ödemeyi atlar.
 - [ ] LOST reason raporu: en sık reddediliyor olan neden ne, satış argümanı güncellemeli miyim?
 
 ---
@@ -331,8 +343,8 @@ C: `Lead.assignedToId` tek bir kişiyi tutar. Yeniden atama yapıldığında esk
 **S: Bir pazarlamacı iptal etmek istediği bir komisyon var diyor. Ne yapayım?**
 C: Commissions sayfasında o satırı bul, REJECT. Audit log'a kim ne zaman reddetti düşer. Pazarlamacının panelinde de durum "REJECTED" görünür.
 
-**S: Müşteri abonelikten çıktı (cancel), commission ne olur?**
-C: O ana kadar ödenen RENEWAL'lar geçerlidir (zaten ödenmişti). Sonraki ay RENEWAL **otomatik yazılmaz** çünkü ödeme olmuyor. Cancel sebebini lead'in `lostReason` (varsa) ya da tenant notuna düş.
+**S: Müşteri yenilemeyi yapmadı, commission ne olur?**
+C: O ana kadar ödenmiş komisyonlar geçerlidir (zaten ödenmişti). Yeni bir yenileme ödemesi olmadığı için yeni komisyon **yazılmaz**. Müşterinin hesabı silinmez: yalnızca ücretli kalemlerin erişimi kapanır, ücretsiz çekirdek çalışmaya devam eder ve müşteri sonradan ödeme yaparsa her şey aynen geri açılır — yani bu kayıp değil, ertelenmiş satıştır. Nedeni tenant notuna düş ve pazarlamacıya takip görevi aç.
 
 **S: 200'den fazla lead'i toplu atamam lazım. Ne yapayım?**
 C: Filtre + sayfa-ı sayfalı ata. Veya checkbox ile partilere böl (ilk 200 → ata, sonra sonraki 200 → ata). API limiti güvenlik için; tek partide çok büyük transaction performansı bozar.
@@ -361,4 +373,4 @@ C: Bazı raporlar (top performers, lead distribution by region) sadece müdüre 
 
 ---
 
-*Bu rehber canlı bir dökümandır. Yeni dağıtım stratejisi, komisyon kuralı veya UI değişikliği geldiğinde güncellenir. Son güncelleme: 2026-05-22.*
+*Bu rehber canlı bir dökümandır. Yeni dağıtım stratejisi, komisyon kuralı veya UI değişikliği geldiğinde güncellenir. Son güncelleme: 2026-08-14.*

@@ -1,443 +1,391 @@
 ---
-title: Abonelik & Ödeme API
-description: Plan kataloğu, plan değiştirme (proration ile yükseltme / planlı düşürme), ödeme intent'leri (PayTR & havale), faturalar, iptal/yeniden etkinleştirme, yetkili özellikler ve TRIAL_ENDED kilit zarfı.
+title: Lisans & Ödeme API
+description: Katalog fiyat listesi, lisans durumu, checkout rayı (quote → intent → PayTR → yerleşim), yıl dönümüne orantılı fiyatlama, faturalar ve manuel yenileme.
 ---
 
-import { Callout, Tabs, Steps } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
-# Abonelik & Ödeme API
+# Lisans & Ödeme API
 
-Bu sayfa, abonelik ve para ile ilgili her şeyin entegratör referansıdır: plan
-kataloğunu okuma, proration ile yükseltme, düşürmeyi planlama, PayTR veya havale
-ödemesi oluşturma, faturaları okuma, iptal/yeniden etkinleştirme ve tenant'ın
-yetkili özelliklerini sorgulama. [API Temelleri](/tr/developer/api-fundamentals)
-sayfasındaki ortak kuralların (taban URL, auth realm'leri, şube kapsamı, hata
-zarfı, idempotency, rate-limit'ler) üzerine kurulur.
+Bu sayfa, para ile ilgili her şeyin entegratör referansıdır: katalog fiyatlarını
+okuma, işletmenin lisans ve ürün durumunu sorgulama, checkout rayından ödeme
+alma, faturaları okuma ve yenileme döngüsünü izleme.
+[API Temelleri](/tr/developer/api-fundamentals) sayfasındaki ortak kuralların
+(taban URL, auth realm'leri, şube kapsamı, hata zarfı, idempotency,
+rate-limit'ler) üzerine kurulur.
 
 <Callout type="info">
-  Tüm tutarlar **TRY** ve **KDV dahildir**. Self-servis kart ödemesi yalnızca
-  TR/TRY destekleyen PayTR üzerinden yürür. Para birimi değiştiren plan geçişi
-  yoktur — sistem TRY-only çalışır.
+  **Model:** çekirdek ürün süresiz ücretsizdir. Ücretli yetenekler yıllık
+  **lisans** (`license_annual`) ön koşuluyla, katalogdan tek tek satın alınır.
+  Tüm tutarlar **TRY** ve **KDV dahildir**; tahsilat yalnızca PayTR üzerinden,
+  yalnızca TRY olarak yapılır. Plan, tier, paket, deneme süresi ve otomatik
+  yenileme **yoktur**.
 </Callout>
 
 ## Kimlik & roller
 
 Bu uçlar **Personel JWT** realm'ini kullanır (`Authorization: Bearer <jwt>` —
-bkz. [API Temelleri](/tr/developer/api-fundamentals)). Rol gereksinimleri uca göre
-değişir:
+bkz. [API Temelleri](/tr/developer/api-fundamentals)). Rol gereksinimleri uca
+göre değişir:
 
 | Yetenek | Gerekli rol |
 | --- | --- |
-| Plan kataloğunu okuma | Public (`@Public`, kimliksiz) |
-| Ödeme intent'i / checkout oluşturma | ADMIN, MANAGER |
-| Fatura / planlı düşürme okuma | ADMIN, MANAGER |
-| Plan değiştirme (yazma), iptal, yeniden etkinleştirme, planlı düşürmeyi iptal | **Yalnız ADMIN** |
+| Katalog fiyat listesini okuma | Public (`@Public`, kimliksiz) |
+| Lisans durumunu / faturaları okuma | Kimliği doğrulanmış herhangi bir kullanıcı |
+| Sepeti fiyatlandırma (`/checkout/quote`) | Kimliği doğrulanmış herhangi bir kullanıcı |
+| Checkout intent / confirm | ADMIN, MANAGER |
+| Ürün iptali | **Yalnız ADMIN** |
 
 <Callout type="warning">
-  Plan değiştirme *teklif* çağrısı (`POST /subscriptions/:id/change-plan`) da
-  yalnız ADMIN'edir. Durum değiştirmez — sadece tutarı hesaplar — ancak başarılı
-  ödeme sonrası uygulama adımı yazma yaptığı için rotanın tamamı ADMIN'e
-  kısıtlıdır.
+  `POST /v1/checkout/quote` hiçbir yazma yapmaz — hipotetik bir sepeti
+  fiyatlandırır — bu yüzden rol kapısı yoktur. Durum yaratan ilk adım
+  `/checkout/start`, para hareketi yaratan ilk adım `/checkout/intent`'tir;
+  ikisi de ADMIN/MANAGER ister.
 </Callout>
 
 ## Uç özeti
 
 | Yöntem | Yol | Realm / rol | Amaç |
 | --- | --- | --- | --- |
-| `GET` | `/api/subscriptions/plans` | Public | Satılabilir paketleri listele |
-| `POST` | `/api/subscriptions/:id/change-plan` | ADMIN | Yükseltme teklifi / düşürme planlama |
-| `GET` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN, MANAGER | Planlanmış düşürmeyi oku |
-| `DELETE` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN | Planlanmış düşürmeyi iptal et |
-| `POST` | `/api/payments/create-intent` | ADMIN, MANAGER | PayTR (kart) abonelik ödemesi başlat |
-| `GET` | `/api/payments/bank-transfer/details` | ADMIN, MANAGER | Platform banka (IBAN) bilgisini oku |
-| `POST` | `/api/payments/bank-transfer/intent` | ADMIN, MANAGER | Havale ödemesi rezervasyonu oluştur |
-| `GET` | `/api/subscriptions/tenant/invoices` | ADMIN, MANAGER | Tüm tenant faturalarını listele (sayfalı) |
-| `GET` | `/api/subscriptions/:id/invoices` | ADMIN, MANAGER | Bir aboneliğin faturalarını listele (sayfalı) |
-| `POST` | `/api/subscriptions/:id/cancel` | ADMIN | Aboneliği iptal et |
-| `POST` | `/api/subscriptions/:id/reactivate` | ADMIN | İptal edilmiş aboneliği yeniden etkinleştir |
-| `GET` | `/api/subscriptions/effective-features` | ADMIN, MANAGER | Tenant'ın yetkili özellik/limitlerini oku |
+| `GET` | `/api/v1/catalog/pricing` | Public | Yayınlanmış katalog + fiyatlar (`?locale=tr`) |
+| `GET` | `/api/v1/me/licensing` | Personel JWT | Lisans durumu, sahip olunanlar, kontörler, yenileme, teklifler, satın alınabilirlik |
+| `GET` | `/api/v1/me/invoices` | Personel JWT | Bu tenant'ın kalem kalem à-la-carte faturaları |
+| `GET` | `/api/v1/entitlements/me` | Personel JWT | Katlanmış yetki seti |
+| `POST` | `/api/v1/checkout/quote` | Personel JWT | Karma sepeti fiyatlandır (yazma yok) |
+| `POST` | `/api/v1/checkout/start` | ADMIN, MANAGER | Yönlendirme öncesi teklifi sabitle (yeniden fiyatlandırma) |
+| `POST` | `/api/v1/checkout/intent` | ADMIN, MANAGER | PayTR iframe token'ı + `paymentRef` üret |
+| `POST` | `/api/v1/checkout/confirm` | ADMIN, MANAGER | Yerleşmiş bir intent'i provizyona çevir (idempotent) |
+| `POST` | `/api/webhooks/paytr` | PayTR (HMAC + IP allowlist) | Ödeme sonucu geri-çağrısı |
+| `DELETE` | `/api/v1/marketplace/addons/:id` | ADMIN | Sahip olunan bir ürünü iptal et |
+| `GET` | `/api/subscriptions/plans` | Public | **Kalıcı olarak boş dizi** (aşağıya bakın) |
+| `GET` | `/api/subscriptions/tenant/invoices` | ADMIN, MANAGER | Eski abonelik faturaları arşivi (sayfalı) |
+| `GET` | `/api/invoices/:invoiceNumber` | ADMIN, MANAGER | Tek eski fatura (`/download` ile PDF) |
 
-## Satılabilir paketleri listeleme
+<Callout type="warning">
+  `GET /api/subscriptions/plans` hâlâ `@Public` olarak yönlendirmede duruyor ama
+  **kalıcı olarak `[]` döner**: uç yalnızca `isActive && isPublic` paketleri
+  listeler ve v3.3.0 migrasyonu (`20260811120000_free_core`) her
+  `subscription_plans` satırını `isActive=false, isPublic=false` yaptı. Satırlar
+  yalnızca `subscriptions.planId` Restrict FK'sı ve VUK'un saklamayı zorunlu
+  kıldığı eski faturalar için duruyor. Fiyat listesi için
+  `GET /v1/catalog/pricing` kullanın.
+</Callout>
 
-Plan kataloğu herkese açıktır (`@Public`) ve yalnızca **etkin + herkese açık**
-paketleri döndürür — yani Başlangıç / Profesyonel / Kurumsal. Deneme
-(`isPublic=false`) ve kaldırılan Ücretsiz (`isActive=false`) paketleri listede
-yer almaz.
+## Fiyat listesini okuma
 
-<Tabs items={['curl', 'Yanıt (alanlar)']}>
-<Tabs.Tab>
+Katalog herkese açıktır; pazarlama sayfaları da bunu okur, böylece süperadmin
+panelinden yapılan bir fiyat değişikliği sitede eski fiyatın kalmasına yol
+açamaz.
 
 ```bash
-curl https://app.hummytummy.com/api/subscriptions/plans
+curl "https://app.hummytummy.com/api/v1/catalog/pricing?locale=tr"
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-Her paket için yanıt şunları içerir:
+Her ürün için dönen alanlar:
 
 | Alan | Açıklama |
 | --- | --- |
-| `id` | Paket kimliği |
-| `name` / `displayName` | İç ad / görünen etiket |
-| `monthlyPrice` / `yearlyPrice` | TRY, KDV dahil |
+| `code` | Değişmez ürün kodu (ör. `module_inventory`) |
+| `name` / `description` | `locale` için yerelleştirilmiş metin (yoksa TR fallback) |
+| `kind` | `license` \| `module` \| `integration` \| `capacity` \| `credit` \| `service` |
+| `billing` | `annual` \| `oneTime` |
+| `priceCents` | KDV dahil kuruş — tam yıllık liste fiyatı |
 | `currency` | Her zaman `TRY` |
-| `trialDays` | Deneme süresi (bilgi amaçlı) |
-| `limits` | `maxUsers`, `maxTables`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
-| `features` | Özellik-bayrağı haritası (`posAccess`, `multiLocation`, …) |
-| `discount` | Varsa aktif indirim |
+| `creditKind` / `creditUnits` | Yalnızca kontör paketlerinde |
+| `requiresLicense` | Kullanmak için canlı lisans gerekip gerekmediği |
+| `sortOrder` | Vitrin sıralaması |
 
-</Tabs.Tab>
-</Tabs>
+Ürün kodlarının verdiği yetkiler için
+[Yetki Matrisi](/tr/reference/plan-matrix)'ne bakın.
+
+## Lisans durumu ve sahip olunanlar
+
+`GET /v1/me/licensing`, SPA'nın lisans ekranını tek istekte çizmesini sağlar:
+
+```bash
+curl https://app.hummytummy.com/api/v1/me/licensing \
+  -H "Authorization: Bearer $JWT"
+```
+
+| Alan | İçerik |
+| --- | --- |
+| `entitlements` | `features`, `limits`, `integrations`, `computedAt` |
+| `license` | `status`, `anchorAt`, `anniversaryAt`, `daysRemaining` |
+| `credits` | Kontör türü → kalan bakiye |
+| `owned` | Sahip olunan her satır: `code`, `kind`, `quantity`, `pendingQuantity`, `status`, `periodEnd`, `chargedCents`, `renewalCents`, `origin` |
+| `renewal` | Açık yenileme döngüsü: `cycleId`, `anniversaryAt`, `graceEndsAt`, `totalCents`, `daysLeft` |
+| `offers` | Her grant anahtarı → onu açan **en ucuz** ürün, bu tenant için **bugün** fiyatlanmış hâliyle |
+| `purchasability` | Ürün kodu → `{ ok }` veya `{ ok: false, reason, message }` |
+
+`license.status` dört değerden biridir:
+
+| Değer | Anlamı |
+| --- | --- |
+| `none` | Hiç lisans alınmamış |
+| `active` | Lisans canlı |
+| `grace` | Lisans satırı `past_due` — ödemesiz dönem sürüyor |
+| `expired` | Yıl dönümü geçmiş, ödenmemiş |
 
 <Callout type="info">
-  İlan edilen indirimli fiyat, ücretlendirme raylarının kullandığı **aynı**
-  `resolvePlanAmount` ile hesaplanır; yani gösterilen fiyat tahsil edilecek
-  fiyata eşittir.
+  `offers` ve `purchasability`, checkout'un kullandığı **aynı** fonksiyonlardan
+  üretilir (`LicensingService.price`, `evaluatePurchasability`). Bu yüzden
+  vitrinde gördüğünüz fiyat ile tahsil edilen fiyat, ve "Satın al" butonu ile
+  checkout'un kabulü birbirinden ayrışamaz.
 </Callout>
 
-## Doğru akışı seçme
+## Yıl dönümü ve orantılı fiyatlama
 
-İstemci, işletmenin mevcut abonelik durumuna göre change-plan rayı ile taze
-checkout arasında karar verir. Operatöre dönük ekranlar
-([Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/choosing-and-upgrading))
-şöyle dallanır:
+Lisansın alındığı gün, hesabın **değişmez yıl dönümü** olur (tenant yerel
+takvim tarihi; varsayılan `Europe/Istanbul`). Sonradan alınan her **yıllık**
+kalem, yıl dönümüne kalan gün kadar orantılanır — böylece tüm hesap tek tarihte,
+tek kalemli faturayla yenilenir.
+
+| Mod | Ne zaman | Fiyat |
+| --- | --- | --- |
+| `full` | Kalan gün = döngü günü (ilk alım veya tam yıl dönümünde alım) | Tam liste fiyatı |
+| `prorated` | Yıl dönümüne 14 günden fazla var | `liste × kalanGün / döngüGünü` |
+| `rollForward` | Yıl dönümüne **≤ 14 gün** kaldı | Kalan gün + bir sonraki tam döngü |
+
+- Yuvarlama **birim başına** yapılır, sonra adetle çarpılır:
+  `unitCents × qty === subtotalCents` daima birebir tutar.
+- Hiçbir ücretli satır **₺1'in altına** inmez (`MIN_LINE_CENTS = 100`); gerçekten
+  ücretsiz bir kalem ise 0 kalır.
+- Döngü uzunluğu 365 veya 366 olarak **hesaplanır**, sabit değildir; 29 Şubat
+  yıl dönümü artık olmayan yıllarda 28 Şubat'a sıkıştırılır.
+
+<Callout type="info">
+  14 günlük eşik bilinçli: yıl dönümüne 2 gün kala alınan ₺990'lık bir modül
+  ₺5,42 tutar, 48 saat sonra yenileme sepetine düşer ve PayTR'ın minimum tahsilat
+  eşiğinin altında kalırdı — satış değil, destek talebi üretirdi.
+</Callout>
+
+## KDV dahil fiyatlandırma içi
+
+Katalogdaki tüm fiyatlar **brüt** (KDV dahil) tutarlardır ve müşteriden tam
+olarak bu tutar tahsil edilir. Quote, KDV'yi brütün **içinden** çıkarır; asla
+üzerine eklemez:
+
+```text
+netCents = round(brütSatırToplamı / (1 + oran))
+taxCents = brütSatırToplamı - netCents
+```
+
+TRY sepetlerde oran **%20**'dir. Quote yanıtında `subtotalCents` **net**,
+`taxCents` içerideki KDV, `totalCents` ise tahsil edilecek brüt tutardır
+(donanım varsa kargo dahil).
+
+## Checkout rayı
+
+Bir ürünü satın almanın tek yolu checkout (PayTR) rayıdır. Ücretli hiçbir kalem
+ödeme kanıtı (`paymentRef`) olmadan provizyonlanmaz.
 
 <Steps>
 
-### Canlı abonelik (ACTIVE / TRIALING), farklı paket
-**change-plan** rayına yönlendirin. Yükseltme/düşürme proration mantığı yalnızca
-canlı bir faturalama döneminde anlamlıdır.
-
-```text
-/subscription/change-plan?newPlanId=<PLAN_ID>&billingCycle=MONTHLY
-```
-
-### Canlı abonelik, aynı paket
-İşlem yapılmaz (no-op).
-
-### PAST_DUE / EXPIRED / CANCELLED / abonelik yok
-Taze **checkout** rayını kullanın. Biten bir dönem üzerinde proration negatif
-tutar üreteceği için, bu durumlarda yeni tam dönemli bir abonelik başlatılır.
-
-```text
-/subscription/checkout?planId=<PLAN_ID>&billingCycle=MONTHLY
-```
-
-### Deneme hakkı olan işletme
-Backend, `POST /payments/create-intent` içinde TRIAL yanıtına kısa-devre yapar;
-checkout ekranı bunu özel olarak ele alır.
-
-</Steps>
-
-## Yükseltme (proration ile)
-
-Canlı bir abonelikte daha pahalı bir pakete geçiş **yükseltme** sayılır.
-`POST /subscriptions/:id/change-plan`, dönemin kalan günlerine göre **oransal
-(proration) bir teklif** döndürür — bu çağrı bir mutasyon yazmaz, sadece tahsil
-edilecek tutarı hesaplar. Teklif sonrası ödeme PayTR (veya havale) rayından
-toplanır ve onayla birlikte yükseltme uygulanır.
-
-<Tabs items={['curl', 'İstek gövdesi', 'Yanıt']}>
-<Tabs.Tab>
+### Sepeti fiyatlandırın
 
 ```bash
-curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/change-plan \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+curl -X POST https://app.hummytummy.com/api/v1/checkout/quote \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{
-    "newPlanId": "<YENI_PLAN_ID>",
-    "billingCycle": "MONTHLY"
+    "items": [
+      { "type": "addon", "code": "license_annual", "qty": 1 },
+      { "type": "addon", "code": "module_inventory", "qty": 1 },
+      { "type": "addon", "code": "extra_branch", "qty": 2 }
+    ]
   }'
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
+Sepet kalemi tipleri: `addon` (katalog ürünü — `code`), `hardware` (`sku`),
+`service` (`code`). Eski `plan` tipi DTO'da hâlâ kabul ediliyor ama fiyatlayıcı
+onun için **hiçbir satır üretmez**. Sepette en fazla 50 kalem, kalem başına en
+fazla 999 adet olabilir.
 
-| Alan | Tip | Not |
-| --- | --- | --- |
-| `newPlanId` | string | Hedef paket kimliği |
-| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Hedef faturalama döngüsü |
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```json
-{
-  "type": "upgrade",
-  "requiresPayment": true,
-  "paymentInfo": {
-    "subscriptionId": "sub_...",
-    "newPlanId": "plan_...",
-    "billingCycle": "MONTHLY",
-    "prorationAmount": 533.42,
-    "newAmount": 1299,
-    "currency": "TRY"
-  }
-}
-```
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="info">
-  Proration; `currentPeriodEnd`'e kalan gün sayısı ile toplam dönem günü oranı
-  üzerinden hesaplanır. `prorationAmount` 0'dan büyükse `requiresPayment: true`
-  döner ve yükseltme ancak ödeme alındıktan sonra uygulanır.
-</Callout>
-
-## Düşürme (dönem sonunda planlanır)
-
-Daha ucuz bir pakete geçiş **düşürme** sayılır ve **anında uygulanmaz** —
-`POST /subscriptions/:id/change-plan` mevcut faturalama döneminin sonuna
-**planlar**. Aynı çağrı şu davranışları sergiler:
-
-- Önce mevcut kullanım, hedef paketin limitlerine karşı doğrulanır
-  (`assertDowngradeAllowed`). Örneğin 4 şubeniz varsa 1 şubelik Başlangıç'a
-  düşemezsiniz.
-- Geçiş, `scheduledDowngradePlanId` olarak işaretlenir; yarış koşullarına karşı
-  bileşik `WHERE ... scheduledDowngradePlanId IS NULL` ile atomik olarak yazılır.
-- Yanıt `type: "downgrade"`, `requiresPayment: false` ve `scheduledFor` (dönem
-  sonu tarihi) içerir.
-
-### Planlanmış düşürmeyi okuma ve iptal etme
-
-<Tabs items={['Sorgu (GET)', 'İptal (DELETE)']}>
-<Tabs.Tab>
+### Ödeme niyeti (intent) oluşturun
 
 ```bash
-curl https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-# Yalnız ADMIN
-curl -X DELETE https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
-```
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="warning">
-  Zaten planlanmış bir plan değişikliği varken yeni bir değişiklik denerseniz
-  istek reddedilir ("önce mevcut değişikliği iptal edin"). Para birimi değiştiren
-  plan geçişleri de desteklenmez (sistem TRY-only çalışır).
-</Callout>
-
-## Ödeme rayları
-
-Yeni bir abonelik veya yükseltme ödemesi iki raydan toplanabilir: **PayTR
-(kart)** veya **havale (havale/EFT, manuel)**.
-
-### PayTR (kart) — varsayılan
-
-`POST /payments/create-intent` bir PENDING ödeme oluşturur; PayTR webhook'u ile
-onaylanınca abonelik aktifleşir.
-
-<Tabs items={['curl', 'İstek gövdesi']}>
-<Tabs.Tab>
-
-```bash
-curl -X POST https://app.hummytummy.com/api/payments/create-intent \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+curl -X POST https://app.hummytummy.com/api/v1/checkout/intent \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -H "Content-Type: application/json" \
-  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
+  -d '{
+    "cart": { "items": [ { "type": "addon", "code": "license_annual", "qty": 1 } ] },
+    "buyer": {
+      "email": "owner@restoran.com",
+      "name": "Ali Veli",
+      "phone": "+905551112233",
+      "address": "..."
+    },
+    "returnUrl": "https://app.hummytummy.com/checkout/done",
+    "acceptedDocumentIds": ["<KVKK>", "<MESAFELI_SATIS>", "<IADE>"]
+  }'
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-| Alan | Tip | Not |
+| Alan | Zorunlu | Not |
 | --- | --- | --- |
-| `planId` | string | Hedef paket kimliği |
-| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Faturalama döngüsü |
+| `cart` | Evet | En az 1 kalem |
+| `buyer` | Evet | PayTR'ın gördüğü ve fraud skorlamasına giren bilgiler; telefon E.164'e normalize edilir |
+| `acceptedDocumentIds` | Evet | **Tam 3 adet**: KVKK, Mesafeli Satış, İade Politikası. `/legal/documents/:kind/current` ucundan alınır |
+| `returnUrl` | Hayır | Mutlak `http(s)` URL olmalı (açık yönlendirme koruması) |
+| `branchId` | Hayır | Donanım gönderimi için tenant'a ait aktif şube |
+| `referralCode` | Hayır | Intent anında çözülüp dondurulur |
 
-</Tabs.Tab>
-</Tabs>
+Yanıt: `{ paymentRef, iframeToken, paymentLink }`. `paymentRef`
+`CK-<uuid7>` biçimindedir.
 
-<Callout type="warning">
-  Bu uç dakikada en fazla **5 deneme** ile sınırlıdır (`@Throttle`) —
-  [API Temelleri](/tr/developer/api-fundamentals#rate-limit-katmanlar%C4%B1)
-  içindeki global katmanların üstüne. Aşıldığında standart bir `429` döner
-  (`errorCode` eklenmez); `Retry-After` başlığına saygı gösterin.
-</Callout>
+Sunucu bu adımda sırasıyla: demo tenant'ı bloklar, rıza kayıtlarını yazar, her
+`addon` satırını satın alınabilirlik kapısından geçirir, fiyatlama anını
+(`pricedAt`) dondurup sepeti **yeniden fiyatlandırır** (istemci toplamına asla
+güvenmez), donanım stoklarını ürün bazında toplayıp kontrol eder ve sepeti bir
+`CheckoutIntent` satırına dondurur.
 
-<Callout type="info">
-  Deneme hakkı olan bir işletme için `create-intent`, tahsilat oluşturmak yerine
-  TRIAL yanıtına kısa-devre yapar.
-</Callout>
+### PayTR'da ödeyin
 
-### Havale / EFT (manuel banka transferi) — alternatif
+Buyer, PayTR hosted iframe'inde öder. Sepetin her satırı ayrı bir kalem olarak
+gösterilir (ör. *"Stok & Maliyet Yönetimi (yıllık)"*).
 
-Havale ödemesini **superadmin onayı aktifleştirir** (webhook değil). Superadmin
-IBAN tanımlamadıysa havale seçeneği kapalı gelir.
+### Webhook ile yerleşim (settlement)
 
-<Tabs items={['Detaylar (GET)', 'Intent (POST)']}>
-<Tabs.Tab>
+PayTR geri-çağrısı yalnızca `merchant_oid` + `total_amount` taşır. Dispatcher
+`CK-` önekini görüp çağrıyı `CheckoutSettlementService`'e yönlendirir; orada
+`CheckoutIntent` bulunur, dondurulmuş sepet ve `pricedAt` okunur ve
+`CheckoutService.confirmAndProvision` çalışır.
 
-```bash
-# Platform banka (IBAN) bilgilerini döndürür
-curl https://app.hummytummy.com/api/payments/bank-transfer/details \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
+### Provizyon
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-# Bir havale ödemesi rezerve eder; sonradan superadmin onayıyla aktifleşir
-curl -X POST https://app.hummytummy.com/api/payments/bank-transfer/intent \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
-```
-
-</Tabs.Tab>
-</Tabs>
-
-### Marketplace eklentileri checkout rayını paylaşır
-
-Marketplace eklenti satın alımları **aynı PayTR checkout rayını** kullanır:
-`POST /api/v1/checkout/intent` → `CK-` önekli webhook → `confirmAndProvision`.
-Eklentiler ancak ödeme onaylandıktan sonra etkinleşir.
-
-## Faturalar
-
-Faturalarınızı API'den okuyabilirsiniz. İki uç da sayfalıdır (`page`,
-`pageSize`).
-
-<Tabs items={['Tüm tenant faturaları', 'Tek abonelik']}>
-<Tabs.Tab>
-
-```bash
-curl "https://app.hummytummy.com/api/subscriptions/tenant/invoices?page=1&pageSize=20" \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-curl "https://app.hummytummy.com/api/subscriptions/<SUB_ID>/invoices?page=1&pageSize=20" \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-</Tabs>
-
-### KDV dahil fiyatlandırma içi
-
-İlan edilen tüm paket fiyatları **brüt** (KDV dahil) tutarlardır ve müşteriden
-tam olarak bu tutar tahsil edilir. Fatura kesilirken `BillingService`, brüt
-tutardan KDV'yi **geriye doğru** ayrıştırır:
-
-- Varsayılan KDV oranı **%20** (`DEFAULT_KDV_RATE = 0.2`). `KDV_RATE` ortam
-  değişkeniyle (ör. `0.10`) override edilebilir.
-- Ayrıştırma yalnızca TRY faturalar için yapılır; net ve vergi şöyle türetilir:
-
-```text
-subtotal = total / (1 + oran)
-tax      = total - subtotal
-```
-
-Çıkarma yöntemi, yuvarlamadan bağımsız olarak `subtotal + tax == total`
-eşitliğini **kuruşuna kadar** garanti eder.
-
-**Örnek — Profesyonel aylık ₺1.299 (KDV %20):**
-
-| Kalem | Tutar |
-| --- | --- |
-| Ara toplam (net) | ₺1.082,50 |
-| KDV (%20) | ₺216,50 |
-| **Toplam (tahsil edilen)** | **₺1.299,00** |
-
-<Callout type="info">
-  Faturada işletmenin vergi numarası (`taxId`) **fatura kesim anındaki haliyle**
-  anlık kaydedilir (snapshot). Sonradan değiştirilse bile geçmiş faturalar
-  etkilenmez.
-</Callout>
-
-## İptal ve yeniden etkinleştirme
-
-| Yöntem | Yol | Not |
-| --- | --- | --- |
-| `POST` | `/api/subscriptions/:id/cancel` | Yalnız ADMIN. Gövde: `immediate` (anında mı, dönem sonunda mı) ve en fazla 500 karakterlik `reason`. |
-| `POST` | `/api/subscriptions/:id/reactivate` | Yalnız ADMIN. İptal edilmiş bir aboneliği yeniden etkinleştirir. |
-
-```bash
-curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/cancel \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{ "immediate": false, "reason": "Sezon sonu kapanış" }'
-```
-
-## Yetkili özelliklerin sorgulanması
-
-Bir işletmenin o an aktif (etkin) özelliklerini ve limitlerini okuyun. Bu uç;
-paket özelliklerini, varsa marketplace eklenti yükseltmelerini ve superadmin
-override'larını birleştirir — işletmenin *gerçek* erişimini `feature.*` ve
-`limit.*` projeksiyonlarına göre döndürür, sadece paket varsayılanını değil.
-
-```bash
-curl https://app.hummytummy.com/api/subscriptions/effective-features \
-  -H "Authorization: Bearer <ADMIN_VEYA_MANAGER_TOKEN>"
-```
-
-## TRIAL_ENDED kilidi
-
-Her yeni işletme, kayıt anında ayrı bir **Deneme** onboarding paketinde başlar
-(7 gün, Kurumsal'ın tüm özellikleri, tüm limitler `-1`). Deneme, ücretli bir
-paket seçilmeden dolarsa işletme `TRIAL_ENDED` durumuna geçer ve **kilitlenir** —
-entegratörün ele alması gereken bir davranıştır.
-
-<Steps>
-
-### Backend (varsayılan-reddet)
-Global `SubscriptionStatusGuard`, canlı bir abonelik (`ACTIVE` / `TRIALING` /
-`PAST_DUE`) olmayan her işletmenin **tenant kapsamlı tüm rotalarını** `403` ile
-reddeder. Zarf:
-
-```json
-{
-  "statusCode": 403,
-  "error": "Plan Selection Required",
-  "errorCode": "PLAN_SELECTION_REQUIRED",
-  "message": "Deneme süreniz sona erdi. Devam etmek için bir plan seçin."
-}
-```
-
-Yerelleştirilen `message` yerine `errorCode: PLAN_SELECTION_REQUIRED` üzerinden
-dallanın.
-
-### Kurtarma için izinli yollar
-Kilitli bir işletme yine de şu önekleri çağırabilir: `/auth`, `/me`,
-`/users/me`, `/profile`, `/subscriptions`, `/payments`, `/checkout`, `/legal`,
-`/entitlements`, `/webhooks`, `/health`. Yani plan kataloğunu okuyabilir ve
-ödeme yapabilir — başka hiçbir şey yapamaz.
-
-### Frontend yönlendirmesi
-SPA tarafındaki `SubscriptionGate`, `PLAN_SELECTION_REQUIRED` koduna karşılık
-kullanıcıyı plan seçim ekranına (`/choose-plan`) yönlendirir.
+Her katalog satırı için `TenantMarketplaceService.purchase()` **yerleşmiş
+`paymentRef` ile** ve checkout'un transaction'ı içinde çağrılır: `TenantAddOn`
+satırı oluşur (ya da lapsed bir satır yerinde yeniden etkinleşir), outbox'a
+`AddOnPurchased` yazılır, kontör paketleri `CreditLot` mint eder. Entitlement
+projektörü olayı tüketip ürünün `grants` haritasını tenant'ın hak setine katar.
 
 </Steps>
 
 <Callout type="warning">
-  Kilit yalnızca `TRIAL_ENDED` için değildir: `EXPIRED` ve `CANCELLED` işletmeler
-  de "canlı değil" sayılır ve aynı şekilde kilitlenir. `PAST_DUE` durumundaki bir
-  abonelik 7 günlük ödemesiz dönem (grace) boyunca canlı kabul edilir.
+  Yerleşimde sepet `pricedAt` ile **yeniden fiyatlandırılır** ve toplam
+  1 kuruştan fazla kaydıysa provizyon reddedilir. Bu yüzden gece yarısını
+  geçen bir intent bir gün ucuza yeniden fiyatlanıp müşteriyi ortada
+  bırakmaz; tolerans yalnızca gerçek katalog fiyat değişikliklerini yakalar.
 </Callout>
+
+### Satın alınabilirlik kapısı (tahsilat öncesi)
+
+Her `addon` satırı, ödeme alınmadan **önce** kontrol edilir. Reddedilen satır
+`409` ile döner ve sepetin tamamı durur — hiçbir intent satırı yazılmaz, PayTR
+çağrılmaz. Zarf `{ code, message, addOnCode }` taşır:
+
+| `code` | Anlamı |
+| --- | --- |
+| `LICENSE_REQUIRED` | Ürün lisans ister; sepette de lisans yok |
+| `ADDON_ALREADY_OWNED` | Bu ürün (ya da lisans) zaten aktif |
+| `ADDON_ALREADY_GRANTED` | Ürünün verdiği her şey zaten yetki setinde var |
+| `ADDON_REQUIRES_DEPENDENCY` | Bağımlı olduğu ürün ne sahiplikte ne sepette |
+| `ADDON_LIMIT_REDUNDANT` | Eklediği kapasite zaten sınırsız |
+| `ADDON_MAX_QUANTITY` | Katalog tavanı aşılıyor (ör. `extra_branch` için 100) |
+
+<Callout type="info">
+  Kapı **sepet farkındadır**: bir ön koşul, sahip olunan bir üründen değil aynı
+  sepetteki kardeş satırdan da karşılanabilir. İlk sepet zaten zorunlu olarak
+  hem lisansı hem ilk modülü içerir; aksi hâlde ilk alışveriş asla geçemezdi.
+  Üretilmiş bir **yenileme** sepetinde ise sahiplik kontrolleri kapatılır —
+  yenileme, zaten sahip olunanı yeniden ödemektir.
+</Callout>
+
+Diğer tahsilat öncesi retler:
+
+- `409` `HARDWARE_OUT_OF_STOCK` — donanım satırında yeterli gerçek stok yok
+  (aynı ürünün birden çok satırı toplanarak kontrol edilir).
+- `400` — sepet toplamı `0`; PayTR sıfır tutarlı sepeti reddeder, ücretsiz
+  provizyon süperadmin comp yolundan yapılır.
+
+### İdempotensi
+
+PayTR retry'leri agresiftir (gövde "OK"/"FAIL" değilse 200 alsa bile tekrar
+dener). Çift provizyona karşı üç katman vardır:
+
+<Steps>
+### `CheckoutIntent.status` kontrolü
+Intent zaten `provisioned`/`failed` ise hiçbir şeye dokunulmaz.
+
+### `confirmAndProvision` bağımsız idempotenttir
+`(tenantId, paymentRef)` üzerinde idempotenttir ve provizyondan önce o çift için
+**yerleşmiş bir `CheckoutIntent`** arar; uydurma bir `paymentRef` ile
+`/checkout/confirm` çağırmak hiçbir şey provizyonlamaz.
+
+### `purchase()` mevcut satırı döner
+Aynı `paymentRef` için mevcut `TenantAddOn` satırını, `AddOnPurchased` olayını
+yeniden yazmadan döner.
+</Steps>
+
+## Faturalar
+
+| Yöntem | Yol | Not |
+| --- | --- | --- |
+| `GET` | `/api/v1/me/invoices` | À-la-carte `tenant_invoices` kayıtları — bugün kesilen faturalar |
+| `GET` | `/api/subscriptions/tenant/invoices` | Eski abonelik faturaları arşivi (sayfalı: `page`, `pageSize`) |
+| `GET` | `/api/subscriptions/:id/invoices` | Tek bir eski aboneliğin faturaları |
+| `GET` | `/api/invoices/:invoiceNumber` | Tek eski fatura; `/download` PDF döner |
+
+<Callout type="info">
+  İki tablo bilerek bir arada yaşıyor: eski `invoices` tablosu, VUK'un yıllarca
+  saklanmasını zorunlu kıldığı vergi kayıtlarını tutuyor ve `NOT NULL`
+  `subscriptionId` taşıyor. Yeni `tenant_invoices` yazıcısı **aynı numara
+  sayacını** kullanır (`invoice_counters`) — iki bağımsız sayaç tek numara
+  formatı üzerinde er ya da geç çakışırdı, üstelik kart çekildikten sonra.
+</Callout>
+
+## Yenileme (manuel)
+
+Kayıtlı kart ve otomatik tahsilat **yoktur**. Yenileme, aynı checkout rayından
+elle ödenir.
+
+| Adım | Zamanlama | Ne olur |
+| --- | --- | --- |
+| Döngü üretimi | Yıl dönümünden **30 gün** önce, günlük 06:00 cron | Sahip olunan her satır için bir kalem taşıyan `RenewalCycle` dondurulur; fiyatlar üretim anında katalogdan **canlı** okunup sabitlenir |
+| Hatırlatmalar | Günlük 09:00 cron | Kalan **30 / 7 / 1** günde bir kez; gönderim `remindersSent` dizisine yazılır, aynı hatırlatma iki kez gitmez |
+| Ödemesiz dönem (grace) | Yıl dönümü + **7 gün** | Ödenmemiş satırlar `past_due` olur ama **grant vermeye devam eder** |
+| Süre dolumu | Günlük 00:30 cron | Grace bitince ödenmeyen satırlar `expired` olur; erişim kararır, **veri silinmez** |
+
+Yenileme sepeti tam liste fiyatındandır: yıl dönümü anına quote edildiği için
+kalan gün = döngü günü olur ve orantılama tam fiyatı döndürür. Ödenince aynı
+`TenantAddOn` satırı yerinde yeniden etkinleşir — yeni satır açılmaz, sahiplik
+kimliği ve varsa planlanmış kapasite düşüşü (`pendingQuantity`) korunur.
+
+<Callout type="warning">
+  Lisans satırı ödenmezse yalnızca o ürün değil, `requiresLicense: true` olan
+  **her ürünün** grant'ları karartılır. Sahiplik satırları ve iş verisi yerinde
+  kalır; lisans ödenince bir sonraki projeksiyonda hepsi geri yanar. Bkz.
+  [Yetki Matrisi](/tr/reference/plan-matrix).
+</Callout>
+
+## İptal
+
+Ürün iptali marketplace rayındadır ve **yalnız ADMIN**'e açıktır:
+`DELETE /api/v1/marketplace/addons/:id` (varsayılan dönem sonu,
+`?immediate=true` ile anında). Ayrıntılar için
+[Marketplace API](/tr/developer/marketplace-api).
+
+## Kaldırılan raylar
+
+Aşağıdaki uçlar v3.3.0'da kaldırıldı; eski entegrasyonlar bunları çağırıyorsa
+`404` alır:
+
+| Kaldırılan | Yerine |
+| --- | --- |
+| `POST /api/subscriptions/:id/change-plan` | Yok — geçilecek tier yok; ürün tek tek alınır/bırakılır |
+| `POST /api/payments/create-intent` | `POST /api/v1/checkout/intent` |
+| `GET/POST /api/payments/bank-transfer/*` | Yok — tahsilat PayTR rayındadır |
+| `POST /api/v1/marketplace/addons/purchase` | `POST /api/v1/checkout/intent` (comp'lar yalnız süperadmin yüzeyinde) |
+| `GET /api/subscriptions/usage/snapshot` | `GET /api/v1/me/licensing` |
+| `GET /api/subscriptions/effective-features` (hâlâ mount'lu ama plan tablosuna bağlı: `currentPlan` yoksa `404`) | `GET /api/v1/entitlements/me` |
+| `TRIAL_ENDED` kilidi / `PLAN_SELECTION_REQUIRED` zarfı | Yok — çekirdek ücretsiz olduğu için global abonelik durumu kapısı kaldırıldı; kapılar rota bazında `ENTITLEMENT_REQUIRED` döner |
 
 ## İlgili
 
+- [Yetki Matrisi](/tr/reference/plan-matrix) — ücretsiz taban, ürün grant'ları,
+  katlama kuralları ve `ENTITLEMENT_REQUIRED` zarfı.
+- [Marketplace API](/tr/developer/marketplace-api) — katalog listeleme, sahip
+  olunanlar ve iptal.
 - [API Temelleri](/tr/developer/api-fundamentals) — taban URL, auth realm'leri,
   şube kapsamı, hata zarfı, rate-limit katmanları.
 - [Webhook'lar](/tr/developer/webhooks) — bu raylar onaylandığında tetiklenen
-  `subscription.activated.v1` ve ödeme olayları.
-- Help'teki operatör kılavuzları:
-  [Plan seçimi ve yükseltme](https://help.hummytummy.com/tr/plans/choosing-and-upgrading),
-  [Deneme ve faturalama](https://help.hummytummy.com/tr/plans/trial-and-billing),
-  [Özellik matrisi](https://help.hummytummy.com/tr/plans/feature-matrix).
+  ödeme ve checkout olayları.

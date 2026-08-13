@@ -9,15 +9,16 @@ import { Callout } from 'nextra/components'
 
 **Menü yolu:** Operasyon → Stok &nbsp;•&nbsp; **URL:** `/admin/stock`
 **Erişim:** ADMIN, MANAGER
-**Plan:** `inventoryTracking` — **Başlangıç (BASIC)** ve üzeri
+**Gereksinim:** `inventoryTracking` — **Stok & Maliyet Yönetimi** modülü (1.490 ₺/yıl, lisans ön koşuluyla)
 
 ## Amacı
 
 Stok modülü, tedarikten mutfağa kadar tüm döngüyü tek ekranda toplar: ne alınmalı ve nereden (Tedarik Rehberi), malzeme envanteri, satın alma siparişleri, tedarikçi ilişkileri, reçete/maliyet ve günlük operasyon (hareket, fire, sayım, şube transferi). Reçeteler sayesinde bir ürün satıldığında içindeki malzemeler stoktan otomatik düşülebilir.
 
 <Callout type="info">
-  Stok takibi **Başlangıç (BASIC)** ve üzeri planlarda açıktır. Planınızda yoksa sol
-  menüde Stok görünmez ve `/admin/stock` adresi yükseltme kartı gösterir.
+  Stok takibi, **Stok & Maliyet Yönetimi** modülüyle (1.490 ₺/yıl; HummyTummy Lisansı
+  2.990 ₺/yıl ön koşuldur) açılır. Modül sizde yoksa sol menüde Stok görünmez ve
+  `/admin/stock` adresi satın alma kartı gösterir.
 </Callout>
 
 ## Sekmeler
@@ -60,7 +61,7 @@ Rehber sekmesi iki bölümden oluşur:
 
 - **Kritik eşik belirleyin:** Her malzemeye kritik seviye girin; Rehber ve Malzemeler sekmeleri düşük stokları öne çıkarır, sipariş zamanını kaçırmazsınız.
 - **Reçeteler otomatik düşüşün anahtarı:** Reçete tanımlamazsanız satış stoğu otomatik düşmez — manuel hareket girmeniz gerekir. Çok satan ürünler için reçeteyi mutlaka tanımlayın.
-- **Menü mühendisliği gelişmiş rapor gerektirir:** Reçete & Maliyet sekmesindeki menü mühendisliği bloğu `ADVANCED_REPORTS` ile kapılıdır; plana dahil değilse yükseltme mesajı görürsünüz (bu, Stok'un kendi `inventoryTracking` kapısından ayrı bir plan bayrağıdır).
+- **Menü mühendisliği ayrı bir modül ister:** Reçete & Maliyet sekmesindeki menü mühendisliği bloğu `advancedReports` ile kapılıdır; **Gelişmiş Rapor & Analitik** modülü (1.290 ₺/yıl) sizde yoksa satın alma mesajı görürsünüz — bu, Stok'un kendi `inventoryTracking` kapısından ayrı bir kalemdir.
 - **İptal stok iade eder:** Mutfakta `PENDING` bir sipariş iptal edilirse stok geri yazılır. Sayımda "neden eksik/fazla" sorusunu yanıtlarken iptalleri de göz önünde bulundurun.
 - **Derin bağlantı verin:** Belirli bir sekmeye doğrudan bağlantı vermek için `?tab=` parametresini kullanın (ör. `/admin/stock?tab=suppliers`); parametresiz adres her zaman Tedarik Rehberi'ni açar.
 

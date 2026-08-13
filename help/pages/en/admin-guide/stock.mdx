@@ -9,16 +9,16 @@ import { Callout } from 'nextra/components'
 
 **Menu path:** Back Office → Stock &nbsp;•&nbsp; **URL:** `/admin/stock`
 **Access:** ADMIN, MANAGER
-**Plan:** `inventoryTracking` — **Starter (BASIC)** and above
+**Requires:** `inventoryTracking` — the **Inventory & Cost Management** module (₺1,490/year, with the licence as a prerequisite)
 
 ## Purpose
 
 The stock module brings the whole supply-to-kitchen loop into one screen: what to buy and where (Procurement Guide), the ingredient catalog, purchase orders, supplier relationships, recipe/costing, and day-to-day operations (movements, waste, counts, branch transfers). Thanks to recipes, when a product is sold its ingredients can be deducted from stock automatically.
 
 <Callout type="info">
-  Inventory tracking is unlocked on **Starter (BASIC)** and higher plans. If your plan
-  doesn't include it, Stock is hidden from the sidebar and `/admin/stock` shows an
-  upgrade card.
+  Inventory tracking is unlocked by the **Inventory & Cost Management** module
+  (₺1,490/year; the HummyTummy Licence at ₺2,990/year is a prerequisite). Without the
+  module, Stock is hidden from the sidebar and `/admin/stock` shows a purchase card.
 </Callout>
 
 ## Tabs
@@ -61,7 +61,7 @@ The Guide tab has two sections:
 
 - **Set critical thresholds:** give each ingredient a critical level; the Guide and Ingredients tabs surface low stock so you don't miss reorder time.
 - **Recipes are the key to auto-drawdown:** without a recipe, a sale won't reduce stock automatically — you'd have to enter a manual movement. Always define recipes for your best-sellers.
-- **Menu engineering needs the advanced-reports flag:** the menu-engineering block on the Recipe & Costing tab is gated on `ADVANCED_REPORTS`; if your plan doesn't include it you'll see an upgrade message (a separate plan flag from Stock's own `inventoryTracking` gate).
+- **Menu engineering needs a separate module:** the menu-engineering block on the Recipe & Costing tab is gated on `advancedReports`; without the **Advanced Reports & Analytics** module (₺1,290/year) you'll see a purchase message — a separate item from Stock's own `inventoryTracking` gate.
 - **Cancellation returns stock:** if a `PENDING` order is cancelled in the kitchen, stock is restored. So when answering "why is this short/over" during a count, account for cancellations too.
 - **Deep-link a tab:** use the `?tab=` parameter to link directly to a tab (e.g. `/admin/stock?tab=suppliers`); the bare URL always opens the Procurement Guide.
 

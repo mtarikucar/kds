@@ -3,7 +3,9 @@ import { MODULES } from "../data/modules";
 import { INTEGRATION_GROUPS } from "../data/integrations";
 
 // Every figure is computed from (or pinned to) real product data — no invented
-// customer counts or uptime percentages (honesty guardrails, spec §7).
+// customer counts or uptime percentages (honesty guardrails, spec §7). The ₺0
+// figure is the free core itself, not a trial: see
+// backend/src/modules/entitlements/free-baseline.const.ts.
 const liveIntegrations = INTEGRATION_GROUPS.flatMap((g) => g.brands).filter(
   (b) => b.status === "entegre",
 ).length;
@@ -13,7 +15,7 @@ const STATS = [
   { v: "4", l: "teslimat platformu entegre" },
   { v: String(liveIntegrations), l: "canlı entegrasyon" },
   { v: "5", l: "dilde arayüz — panel + QR menü (RTL dahil)" },
-  { v: "7 gün", l: "ücretsiz, kartsız deneme" },
+  { v: "₺0", l: "çekirdek — süresiz ücretsiz, kartsız" },
 ];
 
 /** Full-bleed dark stat band with oversized Fraunces numerals. */

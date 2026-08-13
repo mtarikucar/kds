@@ -6,7 +6,7 @@ Bu döküman, KDS Restoran Yönetim Sistemi'nin tüm modüllerini ve yetenekleri
 
 1. [Genel Bakış](#1-genel-bakış)
 2. [Mimari ve Teknoloji](#2-mimari-ve-teknoloji)
-3. [Abonelik ve Planlar](#3-abonelik-ve-planlar)
+3. [Lisans ve Modüller](#3-lisans-ve-modüller)
 4. [POS — Kasa ve Sipariş](#4-pos--kasa-ve-sipariş)
 5. [Mutfak Ekranı (KDS)](#5-mutfak-ekranı-kds)
 6. [QR Menü ve Self-Pay](#6-qr-menü-ve-self-pay)
@@ -27,13 +27,13 @@ Bu döküman, KDS Restoran Yönetim Sistemi'nin tüm modüllerini ve yetenekleri
 
 ## 1. Genel Bakış
 
-KDS, kafe ve restoranlar için tek bir hesapta POS, mutfak ekranı, QR menü, rezervasyon, stok, personel, raporlar ve çok şube yönetimini birleştiren bir SaaS üründür. Müşteri 14 gün ücretsiz dener, PayTR üzerinden aylık veya yıllık aboneliğe geçer. Sistem Türkiye'ye özel olarak tasarlanmıştır: TR vergi kuralları, e-fatura entegrasyon hazırlığı, KVKK uyumlu veri saklama, Türkçe arayüz ve destek.
+KDS, kafe ve restoranlar için tek bir hesapta POS, mutfak ekranı, QR menü, rezervasyon, stok, personel, raporlar ve çok şube yönetimini birleştiren bir SaaS üründür. Ürünün çekirdeği (POS, KDS, menü, masa planı, QR menü, sipariş, kasa, temel raporlar, ekip, müşteriler, cihaz/şube paneli, özel marka) **süresiz ücretsizdir**; ek ihtiyaçlar tek tek, yıllık satın alınan modüllerle açılır. Sistem Türkiye'ye özel olarak tasarlanmıştır: TR vergi kuralları, e-fatura entegrasyonu, KVKK uyumlu veri saklama, Türkçe arayüz ve destek.
 
 **Detay**
 
 - Hedef segment: kafe, restoran, pastane, bar, fast-food (1-100+ masa)
 - Çok kiracılı (multi-tenant) yapı: her işletmenin verisi izole; admin sadece kendi tenant'ını görür
-- Tek hesapta tüm fonksiyon: ek modül satın alma yok, plan limit'leri her şeye uyarlanır
+- Paket/kademe yok: ücretsiz çekirdek her hesapta açıktır, ücretli kalemler à-la-carte satın alınır ve entitlement motoru tarafından açılır
 - Tarayıcı tabanlı; herhangi bir donanım veya kurulum gerekmez
 - Mobil-uyumlu UI (tablet/telefon dahil)
 - Offline-first POS: internet kesilse bile sipariş alınır, bağlantı gelince senkronize olur
@@ -54,8 +54,8 @@ Backend NestJS + PostgreSQL + Prisma, frontend React + Vite + TanStack Query + T
 - **UI**: Tailwind CSS, Headless UI, Lucide ikonları
 - **Gerçek zaman**: Socket.IO; sipariş/ödeme/masa durumu olayları anında yayımlanır
 - **Auth**: JWT erişim + refresh token rotation, üç ayrı realm (tenant kullanıcısı, SuperAdmin, Marketing personeli)
-- **Ödeme**: PayTR (Türk lirası, 3D secure, recurring token, kart-saklamadan otomatik yenileme)
-- **Arkaplan görevleri**: `@nestjs/schedule` cron — trial bitirme, abonelik yenileme, fatura çıkarma, teklif süresi dolması, bildirim temizleme
+- **Ödeme**: PayTR (yalnızca Türk lirası, 3D secure). Kart saklama / otomatik tahsilat kullanılmaz — yenileme manueldir
+- **Arkaplan görevleri**: `@nestjs/schedule` cron — yenileme cycle'ının önceden oluşturulması, 30/7/1 gün hatırlatmaları, ek süre sonunda erişim kapatma, fatura çıkarma, teklif süresi dolması, bildirim temizleme
 - **Sentry**: hata izleme, kritik aksiyonlarda manual capture
 - **Test**: Jest (birim), Playwright (e2e 460+ spec, sequential, fixture-driven, globalSetup'lı)
 - **i18n**: i18next + react-i18next, 5 dilde lokal JSON bundle
@@ -63,27 +63,51 @@ Backend NestJS + PostgreSQL + Prisma, frontend React + Vite + TanStack Query + T
 
 ---
 
-## 3. Abonelik ve Planlar
+## 3. Lisans ve Modüller
 
-Sistem dört planlı: **Ücretsiz**, **Başlangıç**, **Profesyonel**, **Kurumsal**. Müşteri kayıt olunca otomatik 14 günlük BUSINESS trial başlar, deneme bitince ücretli bir plana geçer veya FREE'ye düşer. Plan değişimi (upgrade/downgrade) PayTR üzerinden anında çalışır.
+Paket, kademe, plan ve deneme süresi yoktur. Çekirdek her hesapta **süresiz ücretsiz** açıktır; ücretli tarafta ise yıllık bir **lisans** ve tek tek satın alınan **modül / entegrasyon / kapasite** kalemleri vardır. Tüm fiyatlar TRY ve KDV dahildir; tahsilat PayTR üzerinden yapılır.
 
 **Detay**
 
-| Plan | Aylık | Yıllık | Hedef |
-|---|---:|---:|---|
-| Ücretsiz | ₺0 | ₺0 | Deneme sonrası fallback |
-| Başlangıç | ₺499 | ₺4 490 | 1–2 masalı kafe / büfe |
-| Profesyonel | ₺1 299 | ₺12 990 | Şehir merkezi restoran |
-| Kurumsal | ₺2 999 | ₺29 990 | Çok şubeli zincir |
+### Ücretsiz çekirdek (₺0, süresiz, kart istenmez, lisans gerekmez)
 
-- **14 günlük trial** — tüm ücretli planlarda, kart bilgisi istenmez
-- **Yıllık 2 ay bedava** — yıllık ödemede 10 ay fiyatına 12 ay
-- **Plan limit'leri**: maxUsers, maxTables, maxProducts, maxCategories, maxMonthlyOrders. Limit aşıldığında ilgili create endpoint'leri 403 döner
-- **Feature flag'lar**: rezervasyon, çok şube, gelişmiş raporlar, özel marka, API erişimi, öncelikli destek, stok takibi, personel, delivery
-- **Tenant-bazlı override**: SuperAdmin belirli müşteriye plan dışı özel limit/feature tanımlayabilir
-- **Lifecycle**: TRIALING → ACTIVE → PAST_DUE (7 gün grace) → EXPIRED. Cron her gün çalışır
-- **Otomatik yenileme**: PayTR recurring token ile, müşteri elle ödeme yapmaz; başarısızsa PAST_DUE
-- **Trial tek-seferlik**: tenant başına bir trial, kötüye kullanım engeli
+POS ve adisyon · Mutfak ekranı (KDS) · Menü yönetimi · Masa ve kat planı · QR menü · Sipariş yönetimi · Kasa ve nakit · Temel raporlar · Ekip ve rol yönetimi · Müşteriler · Cihaz ve şube paneli · Özel marka ve alan adı.
+
+Kullanıcı, masa, ürün, kategori ve **aylık sipariş sayısı sınırsızdır** (`-1` sentinel değeri, `limit.*` toplamına baskın gelir). **İlk şube ücretsizdir** (`limit.maxBranches = 1`); ücretli olan tek kapasite kalemi ikinci ve sonraki şubelerdir.
+
+### Ücretli katalog (TRY, KDV dahil)
+
+| Kalem | Tip | Fiyat |
+|---|---|---:|
+| Lisans | yıllık | ₺2.990 |
+| Gelişmiş Rapor & Analitik | modül / yıllık | ₺1.290 |
+| Stok & Maliyet Yönetimi | modül / yıllık | ₺1.490 |
+| Rezervasyon Sistemi | modül / yıllık | ₺990 |
+| Personel Yönetimi | modül / yıllık | ₺990 |
+| AI Menü Stüdyosu | modül / yıllık | ₺1.990 |
+| API & Webhook Erişimi | modül / yıllık | ₺2.490 |
+| Partner Ekran API | modül / yıllık | ₺1.990 |
+| Öncelikli Destek | modül / yıllık | ₺1.990 |
+| Yemeksepeti / Getir / Trendyol Yemek | entegrasyon / yıllık | her biri ₺2.490 |
+| e-Fatura (Nilvera) | entegrasyon / yıllık | ₺1.990 |
+| ÖKC / Yazarkasa (Hugin) | entegrasyon / yıllık | ₺2.990 |
+| Çağrı-ID | entegrasyon / yıllık | ₺1.490 |
+| SMS Bildirimleri | entegrasyon / yıllık | ₺990 |
+| Ek Şube | kapasite / yıllık / adet | ₺3.990 (en fazla 100 adet) |
+| 100 AI görsel · 20 AI video · 10 AI 3D model | kontör / tek seferlik | ₺690 · ₺890 · ₺790 |
+| 500 SMS | kontör / tek seferlik | ₺490 |
+| Yerinde Kurulum & Eğitim | hizmet / tek seferlik | ₺7.500 |
+
+- **Lisans ön koşuludur**: modül, entegrasyon ve kapasite kalemleri hem satın almak hem de kullanmak için aktif lisans ister (`requiresLicense`). Lisans karardığında bu kalemlerin hakları verilmez; ücretsiz çekirdek etkilenmez
+- **Kontör bağımlılığı**: AI kontörleri `module_ai_studio`, SMS kontörü `sms_integration` sahipliği ister. Kontörler süresizdir, tükenene kadar geçerlidir ve yenilemeye girmez
+- **Yıl dönümü**: lisansın alındığı tenant-yerel takvim günü hesabın değişmez yıl dönümüdür (`anchorAt`)
+- **Orantılı fiyat**: yıl içinde alınan yıllık kalem, yıl dönümüne kalan gün kadar fiyatlanır. Yıl dönümüne 14 günden az kalmışsa kalem sonraki tam döngüye taşınır. Hiçbir satır ₺1 altına inmez
+- **Tek fatura, tek yenileme tarihi**: sahip olunan tüm yıllık kalemler tek bir yenileme cycle'ında toplanır ve tek itemize faturayla ödenir
+- **Manuel yenileme**: kayıtlı kart ve otomatik çekim yoktur. Yıl dönümünden 30 / 7 / 1 gün önce hatırlatma gider, ardından 7 gün ek süre (grace) tanınır
+- **Ödenmezse**: ek süre sonunda yalnızca ilgili kalemlerin **erişimi** kapanır (`active → past_due → expired`, projeksiyon grant'ı düşürür). **Veri silinmez**; ödeme yapıldığında aynı satır yeniden aktifleşir
+- **Entitlement motoru**: `feature.*` anahtarları OR ile, `limit.*` anahtarları toplamla katlanır; ücretsiz çekirdek her tenant'a `free:baseline` kaynağından projekte edilir
+- **Tenant-bazlı override**: SuperAdmin belirli bir müşteriye katalog dışı özel grant tanımlayabilir (`override:admin`)
+- **Demo restoranı**: paylaşımlı, örnek menü/masa/sipariş ile dolu bir demo tenant'ı vardır; kullanıcı panelden tek tıkla geçer, kendi verisine dokunulmaz
 
 ---
 
@@ -138,7 +162,7 @@ Müşterinin masa QR'ı okuyup menüyü açtığı, sipariş verdiği, telefonun
 - **Sepete ekle → sipariş oluştur**: müşteri kendi sepetini yapar; sipariş garson sistemine PENDING olarak düşer
 - **Self-pay**: ayar açıkken, müşteri kendi siparişini PayTR ile öder. Webhook ile başarılı/başarısız akışı senkron
 - **Sadakat (loyalty)**: müşteri telefonunu doğrularsa loyalty puanı toplar, indirim/ücretsiz ürün kazanır
-- **Branding**: tenant logosu, ana rengi, banner görseli, açılış mesajı özelleştirilir (PRO/BUSINESS)
+- **Branding**: tenant logosu, ana rengi, banner görseli, açılış mesajı özelleştirilir (ücretsiz çekirdeğin parçası)
 - **Tenant ayarları**: fotoğraf gösterme aç/kapa, fiyat gösterme aç/kapa, alerji/içerik etiketleri
 - **WiFi paylaşımı**: tenant SSID + parolası QR menü altında gösterilebilir
 - **Sosyal**: Instagram/Facebook/Twitter/TikTok/WhatsApp ikonları menü altına eklenir
@@ -147,7 +171,7 @@ Müşterinin masa QR'ı okuyup menüyü açtığı, sipariş verdiği, telefonun
 
 ## 7. Rezervasyon Sistemi
 
-Müşterilerin halka açık bir sayfadan masa rezerve edebileceği, restoranın no-show ve kapasite yönetimini yapabileceği modül. PRO ve BUSINESS planlarında.
+Müşterilerin halka açık bir sayfadan masa rezerve edebileceği, restoranın no-show ve kapasite yönetimini yapabileceği modül. **Rezervasyon Sistemi** modülü gerekir (yıllık, lisans ön koşuluyla).
 
 **Detay**
 
@@ -168,7 +192,7 @@ Müşterilerin halka açık bir sayfadan masa rezerve edebileceği, restoranın 
 
 ## 8. Stok ve Reçete Yönetimi
 
-Hammadde stoğunu takip etmek, ürünleri reçeteye bağlamak ve satışla beraber stoğun otomatik düşmesini sağlamak için kapsamlı modül. BASIC ve üzeri planlarda.
+Hammadde stoğunu takip etmek, ürünleri reçeteye bağlamak ve satışla beraber stoğun otomatik düşmesini sağlamak için kapsamlı modül. **Stok & Maliyet Yönetimi** modülü gerekir (yıllık, lisans ön koşuluyla).
 
 **Detay**
 
@@ -186,7 +210,7 @@ Hammadde stoğunu takip etmek, ürünleri reçeteye bağlamak ve satışla berab
 
 ## 9. Personel Yönetimi
 
-Garson, kasiyer, mutfak personeli için vardiya, mola, mesai takibi. PRO ve BUSINESS planlarında.
+Garson, kasiyer, mutfak personeli için vardiya, mola, mesai takibi. **Personel Yönetimi** modülü gerekir (yıllık, lisans ön koşuluyla).
 
 **Detay**
 
@@ -221,12 +245,12 @@ Tenant'ın kendi müşteri veritabanı; geçmiş siparişler, harcama, sadakat p
 
 ## 11. Online Sipariş Entegrasyonları
 
-Yemeksepeti ve Trendyol Yemek gibi platformlardan gelen siparişleri tek panelden yönetme. PRO ve BUSINESS planlarında.
+Yemeksepeti, Getir ve Trendyol Yemek platformlarından gelen siparişleri tek panelden yönetme. Her platform **ayrı bir yıllık entegrasyon kalemidir** (lisans ön koşuluyla) ve birikir: birden fazla platform aynı anda açık olabilir, hepsi tek mutfak akışına düşer.
 
 **Detay**
 
 - **Yemeksepeti webhook**: yeni sipariş otomatik POS'a düşer (PENDING). Restoran kabul/red ederse durum platforma yazılır
-- **Trendyol Yemek webhook**: aynı akış
+- **Getir / Trendyol Yemek webhook**: aynı akış
 - **Sipariş eşleştirme**: platform ürün adı ↔ kendi menü ürün adı, manuel eşleştirme veya otomatik fuzzy match
 - **Fiyat senkronizasyonu** (manuel): platformdaki fiyat farklı olabilir; kendi sistem fiyatı bağımsızdır
 - **Sipariş hazır bildirimi**: kurye çağırma (Yemeksepeti API)
@@ -237,14 +261,14 @@ Yemeksepeti ve Trendyol Yemek gibi platformlardan gelen siparişleri tek panelde
 
 ## 12. Çok Şube ve Markalaşma
 
-PRO ve BUSINESS planlarında, aynı sahibe ait birden çok şubeyi tek panelden yönetme + her şubeye özel marka. Zincir restoranlar için.
+Aynı sahibe ait birden çok şubeyi tek panelden yönetme + her şubeye özel marka. Şube paneli ve özel marka **ücretsiz çekirdeğin parçasıdır**; ücretli olan tek şey ikinci ve sonraki şubelerdir (**Ek Şube** kalemi, yıllık, adet bazlı).
 
 **Detay**
 
-- **Multi-location**: PRO 5 şubeye kadar, BUSINESS sınırsız. Her şube ayrı bir Tenant değil, ana tenant altında bir lokasyon kaydı
+- **Multi-location**: ilk şube ücretsizdir; her **Ek Şube** kalemi kapasiteyi +1 artırır (en fazla 100 adet). Her şube ayrı bir Tenant değil, ana tenant altında bir lokasyon kaydı
 - **Lokasyon-bazlı menü override**: bir şubenin fiyatı farklı olabilir; ana menü temel, lokasyon override'lar üstüne biner
 - **Birleşik raporlar**: tüm şubelerin satışı, en iyi performans gösteren şube, lokasyon-kıyaslama
-- **Özel marka (custom branding)**: logo, ana renk, font, QR menü banner görseli — PRO/BUSINESS
+- **Özel marka (custom branding)**: logo, ana renk, font, QR menü banner görseli — ücretsiz
 - **Subdomain**: `restoranadi.kds.app` ile özel QR menü URL'i; tenant subdomain alanından set edilir
 - **WiFi paylaşımı**: lokasyon-bazlı SSID/parola
 - **Sosyal medya linkleri**: Instagram, Facebook, Twitter, TikTok, YouTube, WhatsApp — QR menü altında
@@ -264,7 +288,7 @@ Satış, ürün, kategori, saat, gün, çalışan, ödeme yöntemi ve müşteri 
 - **Ödeme yöntemi**: nakit/kart/havale/QR self-pay dağılımı
 - **Çalışan performansı**: garson başına satış, ortalama servis süresi
 - **İptal raporu**: hangi nedenle, hangi ürün, hangi saat
-- **Gelişmiş raporlar (advancedReports)**: PRO/BUSINESS — yıllık karşılaştırma, sezonsallık analizi, demografik müşteri segmentasyonu
+- **Gelişmiş raporlar (advancedReports)**: **Gelişmiş Rapor & Analitik** modülü gerekir (yıllık, lisans ön koşuluyla) — yıllık karşılaştırma, sezonsallık analizi, demografik müşteri segmentasyonu, muhasebe back-office
 - **Export**: PDF (yazdırma için), CSV (muhasebeye dış aktarım), JSON (entegrasyon)
 - **E-posta raporu**: tenant ayarından "günlük rapor" açılırsa belirtilen adreslere her gece otomatik gönderilir
 
@@ -289,18 +313,20 @@ Tenant'ın admin/manager rolündeki kullanıcıları kullanır. Mavi-beyaz tema,
 - Personnel Management: vardiya, mesai
 - Stock Management: stok kalemleri, reçete, alım/sayım
 - Invoices: ödeme + KDV split + PDF
-- Settings: POS toggle'ları, QR menü görünümü, branding, rezervasyon ayarları, SMS sağlayıcı, muhasebe entegrasyonu, abonelik yönetimi
+- Lisans & Erişim (`/admin/license`): lisans durumu, sahip olunan ürünler, kontör bakiyeleri, yenileme tarihi ve faturalar
+- Mağaza (`/admin/store`): katalogdan kalem seçme, anlık toplam, tek ödemeyle satın alma
+- Settings: POS toggle'ları, QR menü görünümü, branding, rezervasyon ayarları, SMS sağlayıcı, muhasebe entegrasyonu
 
 ### b. SuperAdmin Paneli (`/superadmin/*`) — Platform Operatörü
 
 Tüm tenant'ları üst seviyeden yöneten platform-sahibi paneli. Koyu zinc teması, 2FA zorunlu (TOTP).
 
-- Dashboard: platform geneli KPI (toplam tenant, aktif abonelik, MRR, churn)
-- Tenants: tüm restoranlar listesi, plan, durum, son giriş
+- Dashboard: platform geneli KPI (toplam tenant, aktif lisans, gelir, churn)
+- Tenants: tüm restoranlar listesi, sahip olunan ürünler, durum, son giriş; tenant-bazlı grant override
 - Users: tüm tenant kullanıcıları, email doğrulama override, kilit açma
-- Plans: plan CRUD, fiyat değişimi, komisyon oranı override
-- Subscriptions: tüm abonelikler — plan değiştir, iptal et, iade et, deneme bitir
+- Marketplace (`/superadmin/marketplace`): à-la-carte katalog yönetimi — ürün, fiyat ve komisyon oranı. Eski `/superadmin/plans` ve `/superadmin/subscriptions` yolları buraya yönlenir
 - Audit Logs: tüm platform aksiyonları (kim, ne zaman, hangi tenant, hangi alanı değiştirdi)
+- Outbox: olay kuyruğu izleme ve yeniden kuyruğa alma (requeue)
 - Legal Documents: KVKK / Mesafeli Satış / İade politikası versiyon yönetimi (audit history)
 - Settings: platform genelinde global ayarlar
 
@@ -322,7 +348,7 @@ Pazarlamacıların kendi lead'lerini takip ettiği CRM. Indigo teması, ayrı lo
 - Lead Detail: aktiviteler, teklifler, görevler, müşteriye dönüştür
 - Tasks: yapılacaklar, vade hatırlatması
 - Calendar: görevlerin aylık görünümü
-- Offers: lead'e özel fiyat/trial gün uzatma
+- Offers: lead'e özel teklif, geçerlilik tarihi (`validUntil`)
 - Commissions: kendi komisyonları, detay modal, audit timeline
 - Reports: kaynak dağılımı, bölgesel performans, conversion funnel (manager-only)
 - Users: ekip üyeleri (manager-only)
@@ -331,20 +357,21 @@ Pazarlamacıların kendi lead'lerini takip ettiği CRM. Indigo teması, ayrı lo
 
 ## 15. Pazarlama / Satış Modülü
 
-Pazarlamacıların yeni müşteri kazanırken referans kodu kullanması ve **ömür boyu komisyon** alması için kurulu satış modülü. Lead → Convert → Commission zinciri ile çalışır.
+Pazarlamacıların yeni müşteri kazanırken referans kodu kullanması ve **her gerçekleşen ödemeden komisyon** alması için kurulu satış modülü. Lead → Convert → Commission zinciri ile çalışır.
 
 **Detay**
 
 - **Referans kodu**: her pazarlamacının panelinde benzersiz kod (örn. `MRT9X3K`)
-- **URL paylaşımı**: `kds.app/?ref=MRT9X3K` — cookie 30 gün saklar, checkout'ta otomatik dolar
-- **Manuel giriş**: müşteri checkout'ta kodu elle de girebilir
+- **URL paylaşımı**: `kds.app/?ref=MRT9X3K`
+- **Ödemeye bağlanma**: kod checkout intent'i oluşturulurken referans dizininden çözülür ve `referralCode` + `referredByMarketingUserId` olarak kayda yazılır; geçersiz kod sessizce yok sayılır, ödeme bloklanmaz
 - **Komisyon tipleri**:
-  - **SIGNUP** — ilk ücretli abonelik
-  - **RENEWAL** — her yenileme
-  - **UPSELL** — plan yükseltme
-- **Lifetime model**: müşteri abonelik aldığı sürece her yenileme sana komisyon yazar
+  - **SIGNUP** — ödenen sepette lisans olan ödeme (ücretli tarafa ilk geçiş ve yıl dönümü yenilemesi; lisans da yenilenen bir kalemdir)
+  - **UPSELL** — lisansı aktif olan müşterinin yıl içinde yeni kalem eklemesi
+  - **RENEWAL** — komisyon defterinin yenileme tipi
+- **Hesaplama**: ödenen sepetin **toplam tutarı** × sepetteki **en yüksek tutarlı kalemin** komisyon oranı
 - **Onay akışı**: PENDING → APPROVED (manager onay) → PAID (ödeme yapıldı). Audit log her geçişi kayıt eder
-- **Per-plan oran**: her plana ayrı komisyon yüzdesi (default %10), SuperAdmin değiştirebilir
+- **Per-product oran**: her katalog ürününe ayrı komisyon yüzdesi (`MarketplaceAddOn.commissionRate`, default %10), SuperAdmin değiştirebilir
+- **Referans donması**: referans kodu ödeme anında çözülür ve kayda donar — pazarlamacı kodunu sonradan yenilese bile geçmiş satış yeniden atanmaz
 - **Otomatik Lead**: ref kodla gelen müşteriye otomatik Lead yaratılır (status=WON, source=REFERRAL)
 - **Manager öncelikli**: SuperAdmin/manager elle convert ettiyse kod yarışı bırakılır
 - **Bildirimler**: pazarlamacıya komisyon kaydı düştüğünde in-app bildirim
@@ -360,7 +387,7 @@ Türkiye'deki yasal gereksinimler (KVKK, mesafeli satış, e-fatura) ve uluslara
 **Detay**
 
 - **KVKK uyumu**: müşteri verisi kayıt sırasında açık rıza (consent) ile alınır, audit'lenir
-- **Mesafeli satış sözleşmesi**: abonelik checkout'unda zorunlu onay; sözleşme metni LegalDocument modelinde versiyonlu saklanır
+- **Mesafeli satış sözleşmesi**: mağaza checkout'unda zorunlu onay; sözleşme metni LegalDocument modelinde versiyonlu saklanır
 - **İade ve cayma politikası**: aynı şekilde versiyonlu onay
 - **Consent versiyonlama**: doküman güncellenirse müşteri checkout'ta yeni versiyonu onaylar; eski onayları audit'te kalır
 - **Şifre güvenliği**: bcrypt cost 12, min 8 karakter, büyük/küçük + rakam zorunlu
@@ -368,10 +395,10 @@ Türkiye'deki yasal gereksinimler (KVKK, mesafeli satış, e-fatura) ve uluslara
 - **Refresh token rotation**: her refresh'te token yenilenir, eski token revoked olur
 - **Rate limiting (throttler)**: payment-intent 5/dk, login 10/dk, global 100/dk
 - **2FA (SuperAdmin)**: TOTP zorunlu; replay guard (60 sn aynı kod kullanılamaz)
-- **Audit log**: kritik aksiyonlar (plan değişimi, kullanıcı silme, komisyon onay) audit_logs tablosuna yazılır
+- **Audit log**: kritik aksiyonlar (katalog/fiyat değişimi, kullanıcı silme, komisyon onay) audit_logs tablosuna yazılır
 - **IP allowlist**: PayTR webhook'u IP-allowlist guard ile (defence in depth, HMAC ana güvenlik)
 - **HMAC doğrulama**: PayTR webhook'unda merchant key + salt ile hash kontrol
-- **Veritabanı şifreleme**: PayTR recurring token at-rest şifreli; Tenant.paytrRecurringToken plaintext değil
+- **Veritabanı şifreleme**: entegrasyon kimlik bilgileri ve webhook secret'ları AES-256-GCM ile at-rest şifreli saklanır (`common/helpers/encryption.helper.ts`). Kart bilgisi hiç saklanmaz — tahsilat PayTR tarafında yapılır, kayıtlı kart / otomatik çekim kullanılmaz
 - **Soft-delete**: tenant ve kullanıcı silme INACTIVE statüsü ile (veri korunur, erişim kapatılır)
 - **CORS**: prod domain whitelist
 - **CSP & headers**: helmet middleware ile default secure headers
@@ -388,10 +415,9 @@ Sistem içinde e-posta, in-app bildirimler ve WebSocket olayları ile kullanıc�
   - Hoşgeldin e-postası (kayıt)
   - Email doğrulama kodu
   - Şifre sıfırlama
-  - Abonelik aktive (trial başladı)
-  - Abonelik yenilendi
-  - Ödeme başarısız (PAST_DUE uyarısı)
-  - Trial bitti (FREE'ye düştü)
+  - Yenileme hatırlatması (yıl dönümüne 30 / 7 / 1 gün kala, tutar ve kalem listesiyle)
+  - Ödeme başarılı / fatura hazır
+  - Ek süreye düşen kalem uyarısı (past due)
   - Rezervasyon onayı / hatırlatma
   - Z-Raporu (günlük)
 - **WebSocket olayları**:
@@ -402,7 +428,7 @@ Sistem içinde e-posta, in-app bildirimler ve WebSocket olayları ile kullanıc�
   - `kitchen:ready` → garson uyarısı
 - **In-app bildirimler**:
   - Marketing: yeni komisyon, takip görevi, teklif yanıtı
-  - Admin: düşük stok, vadesi geçen ödeme, yeni rezervasyon
+  - Admin: düşük stok, yaklaşan/geçen yenileme, yeni rezervasyon
 - **SMS** (ayar): rezervasyon onay/hatırlatma SMS, sadakat puanı SMS
 - **Push** (gelecek): mobil uygulama bildirimi için altyapı hazır
 
@@ -414,23 +440,21 @@ Sistemi yöneten ekip için izleme, müdahale ve destek araçları.
 
 **Detay**
 
-- **Sentry**: kritik hata yakalama (duplicate-active-subscription, payment failures, webhook bad-hash, marketing commission credit failures)
+- **Sentry**: kritik hata yakalama (ödeme hataları, webhook bad-hash, provisioning hataları, komisyon kredilendirme hataları)
 - **Logging**: NestJS Logger her servis için, request middleware ile tüm HTTP istek logları
 - **Health endpoint**: `/api/health` — Docker liveness/readiness probe
-- **Cron izleme**: her cron job log mesajı atar, `subscription-scheduler.log` arşivlenir
-- **Manuel-tetik endpoint'leri** (SuperAdmin): expire-trials, run-renewals, cancel-orphans, expire-offers
+- **Cron izleme**: her cron job log mesajı atar; yenileme işleri advisory lock ile korunur, çok replikada tek kez çalışır
+- **Yenileme cron'ları**: 06:00 yenileme cycle'ının oluşturulması, 09:00 hatırlatmalar, 00:30 ek süresi biten cycle'ların kapatılması, 03:00 add-on sweeper
+- **Manuel müdahale** (SuperAdmin): outbox kuyruğundan olay yeniden kuyruğa alma (requeue)
 - **Backup**: PostgreSQL günlük snapshot (deploy dışında ayrı süreç)
 - **Migration**: `prisma migrate deploy` ile prod; downtime sıfır (forward-only)
-- **Seed**: `seed.ts` (plan + base data), `seed-platform-users.ts` (e2e users), `seed-demo.ts` (Sultanahmet demo tenant)
-- **Destek seviyeleri**:
-  - Standart (BASIC/PRO): e-posta, iş günü saatlerinde
-  - Öncelikli (PRO): garantili 4 saat yanıt
-  - Kurumsal (BUSINESS): 7/24, telefon, atanmış destek müdürü
-- **API erişimi (BUSINESS)**: müşteri kendi entegrasyonu için API key (apiKeyHash ile saklanır)
+- **Seed**: `seed.ts` (temel veri), `seeds/seed-marketplace.ts` (à-la-carte katalog), `seed-platform-users.ts` (e2e users), `seed-demo.ts` (Sultanahmet demo tenant)
+- **Destek**: standart destek e-posta ile, iş günü saatlerinde ve ücretsiz çekirdek dahil herkese açıktır. **Öncelikli Destek** modülü (yıllık, lisans ön koşuluyla) alındığında talepler öncelikli sıraya girer ve garantili yanıt süresi uygulanır
+- **API erişimi**: **API & Webhook Erişimi** modülü gerekir (yıllık, lisans ön koşuluyla) — müşteri kendi entegrasyonu için API key alır (apiKeyHash ile saklanır)
 - **Deployment**: Docker Compose (db + backend + frontend + redis); CI build → image registry → docker swarm / k8s deploy
 - **CI/CD**: GitHub Actions; PR → typecheck + unit tests + e2e suite + lint
 - **Monitoring**: Grafana + Prometheus (deploy ortamında)
 
 ---
 
-*Bu döküman canlı bir referanstır — modüller eklendikçe veya plan/fiyat değişiklikleri olursa güncellenir. Pazarlama, satış, ürün ve destek ekipleri sahaya çıkmadan önce buradan bir bakış geçirebilir.*
+*Bu döküman canlı bir referanstır — modüller eklendikçe veya katalog/fiyat değişiklikleri olursa güncellenir. Pazarlama, satış, ürün ve destek ekipleri sahaya çıkmadan önce buradan bir bakış geçirebilir.*

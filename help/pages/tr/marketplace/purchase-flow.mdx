@@ -1,6 +1,6 @@
 ---
 title: Satın Alma Akışı
-description: Add-on'u sepete ekleme, PayTR ile ödeme, hakların etkinleşmesi, iptal ve dönem-sonu davranışı.
+description: Kalemi sepete ekleme, PayTR ile ödeme, hakların etkinleşmesi, orantılı fiyatlama, manuel yenileme ve iptal davranışı.
 ---
 
 import { Callout, Steps } from 'nextra/components'
@@ -8,11 +8,12 @@ import { Callout, Steps } from 'nextra/components'
 # Satın Alma Akışı
 
 **Menü yolu:** Sol menü → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
-**Erişim:** ADMIN, MANAGER (ödeme onayı ve iptal yalnızca ADMIN) • **Plan:** Tüm planlar
+**Erişim:** ADMIN, MANAGER (ödeme onayı ve iptal yalnızca ADMIN) • **Gerekli modül:** Yok — Marketplace ücretsiz çekirdekte açıktır
 
-Bir add-on satın almanın tek yolu Marketplace'ten sepete ekleyip **PayTR ile
+Bir kalem satın almanın tek yolu Marketplace'ten sepete ekleyip **PayTR ile
 ödeme** yapmaktır. Ödeme tamamlanmadan hiçbir hak (limit veya özellik)
-hesabınıza eklenmez; bedavaya açma yolu yoktur.
+hesabınıza eklenmez; bedavaya açma yolu yoktur. Ücretsiz çekirdek için ise
+hiçbir şey satın almanız gerekmez — o zaten süresiz açıktır.
 
 <Callout type="info">
   Operatör bedavaları (comp) yalnızca HummyTummy ekibi/süperadmin tarafından
@@ -23,24 +24,26 @@ hesabınıza eklenmez; bedavaya açma yolu yoktur.
 
 <Steps>
 
-### Add-on'u seç
+### Kalemi seç
 
-Marketplace ekranında satın almak istediğiniz add-on'u bulun. Kart üzerinde
-add-on'un ne işe yaradığını, fiyatını (₺) ve tekrarlayan mı yoksa tek seferlik
-bir hizmet mi olduğunu görürsünüz.
+Marketplace ekranında satın almak istediğiniz kalemi bulun. Kart üzerinde
+kalemin ne işe yaradığını, fiyatını (₺) ve yıllık mı yoksa tek seferlik mi
+olduğunu görürsünüz.
 
 ### Sepete ekle
 
-Add-on'u sepete ekleyin. Aynı sepete birden çok add-on (ve gerekiyorsa plan veya
-donanım kalemleri) koyabilirsiniz; ekran toplam tutarı **KDV dahil** olarak
-gösterir. Toplam her zaman sunucu tarafında yeniden hesaplanır, böylece
-ödeyeceğiniz tutar güvenilirdir.
+Kalemi sepete ekleyin. Aynı sepete birden çok kalem koyabilirsiniz; ilk
+alışverişinizde **HummyTummy Lisansı + modül(ler) + kontör** aynı sepette
+sorunsuz ilerler, çünkü sunucu bağımlılık sırasına göre işler. Ekran toplam
+tutarı **KDV dahil** gösterir ve toplam her zaman sunucu tarafında yeniden
+hesaplanır, böylece ödeyeceğiniz tutar güvenilirdir.
 
 ### Ödemeye geç
 
 **Öde / Devam et** düğmesiyle ödeme adımına geçin. Ekran sizi **PayTR**
 güvenli ödeme sayfasına yönlendirir; sepetinizdeki her kalem burada ayrı bir
-satır olarak görünür (ör. *"Ekstra KDS ekranı (aylık)"*).
+satır olarak görünür (ör. *"Stok & Maliyet Yönetimi (yıllık)"*). Tahsilat
+yalnızca **TRY** ile yapılır.
 
 ### Ödemeyi tamamla
 
@@ -49,9 +52,10 @@ dönersiniz.
 
 ### Hakların etkinleşmesi
 
-Ödeme onaylandığı anda add-on'un verdiği hak hesabınıza **otomatik eklenir**.
-Örneğin bir ekstra KDS ekranı aldıysanız, KDS ekranı limitiniz panelde anında
-bir artar; bir entegrasyon aldıysanız ilgili ayar/özellik açılır.
+Ödeme onaylandığı anda kalemin verdiği hak hesabınıza **otomatik eklenir**.
+Örneğin bir Ek Şube aldıysanız şube limitiniz panelde anında bir artar; bir
+modül veya entegrasyon aldıysanız ilgili ekran/ayar açılır; kontör aldıysanız
+bakiyeniz yüklenir.
 
 </Steps>
 
@@ -62,44 +66,65 @@ bir artar; bir entegrasyon aldıysanız ilgili ayar/özellik açılır.
 
 ## Haklar nasıl birikir
 
-Add-on'lar planınızın üzerine eklenir; aynı türden birden çok kaynak şu şekilde
-birleşir:
+Satın aldıklarınız ücretsiz çekirdeğin üzerine eklenir; aynı türden birden çok
+kaynak şu şekilde birleşir:
 
-- **Limitler** (KDS ekranı, istasyon, tablet, şube) → **toplanır.** Örneğin
-  planınız 2 KDS ekranı veriyorsa ve 1 "Ekstra KDS ekranı" aldıysanız, toplam
-  **3** olur.
-- **Özellikler** (gelişmiş raporlar, öncelikli destek, çoklu-lokasyon vb.) →
+- **Limitler** (şube) → **toplanır.** Çekirdek 1 şube verir; 2 adet "Ek Şube"
+  aldıysanız toplam **3** olur.
+- **Özellikler** (gelişmiş raporlar, öncelikli destek, rezervasyon vb.) →
   herhangi bir kaynak açıyorsa **açık** sayılır.
 - **Entegrasyonlar** (e-Fatura, Yemeksepeti, Getir, Trendyol) → hepsi yan yana
   birikir; aynı anda birden çok teslimat entegrasyonu kullanabilirsiniz.
+- **Kontörler** → tükenene kadar birikir; ikinci paket birincinin kalanına
+  eklenir.
 
-Aynı kapasite add-on'unu iki kez alıp limiti çift saymaya çalışmak engellenir:
-bir add-on'a zaten sahipseniz, ikinci kez aynı kalemi satın almaya çalıştığınızda
-işlem reddedilir ve kartınız ikinci kez çekilmez.
+Aynı modül veya entegrasyonu ikinci kez alıp para harcamanız engellenir: zaten
+aktifse işlem reddedilir (`ADDON_ALREADY_GRANTED` / `ADDON_ALREADY_OWNED`) ve
+kartınız ikinci kez çekilmez. **Ek Şube** bunun istisnasıdır: adet bazlıdır,
+hesap başına en fazla 100 şubeye kadar tekrar alınabilir.
 
 ## Bağımlılıklar
 
-Bazı add-on'lar başka bir şeyin önceden mevcut olmasını ister. Şu an kataloğda
-bu durumdaki tek add-on **Hugin yazarkasa**'dır: **PRO planı** gerektirir. PRO
-planında değilseniz satın alma engellenir ve önce planınızı yükseltmeniz
-gerektiği bildirilir.
+- **HummyTummy Lisansı** ücretli modül, entegrasyon ve kapasite kalemlerinin ön
+  koşuludur. Lisansınız yoksa satın alma engellenir (`LICENSE_REQUIRED`) —
+  ancak lisansı **aynı sepete** koyduysanız kalem geçer.
+- **Kontörler** bağlı oldukları kalemi ister: AI kontörleri **AI Menü
+  Stüdyosu**'nu, SMS kontörü **SMS Bildirimleri**'ni. Bunlar da aynı sepette
+  karşılanabilir.
+- Kontör paketleri ve **Yerinde Kurulum & Eğitim** lisans gerektirmez.
 
-## İptal ve dönem-sonu davranışı
+## Yenileme
 
-Bir add-on'u iptal etme yetkisi yalnızca **ADMIN**'dedir (faturalandırma
+Faturalama yıl dönümünüz üzerinden yürür: lisansı aldığınız gün hesabınızın
+**değişmez yıl dönümü** olur, tüm yıllık kalemler **tek fatura** ve **tek
+yenileme tarihi** ile toplanır. Yıl içinde aldığınız bir kalem yıl dönümüne
+kalan gün kadar orantılı fiyatlanır; yıl dönümüne 14 günden az kalmışsa kalan
+gün ile birlikte bir sonraki tam döngü faturalanır. Hiçbir satır 1 TL'nin
+altına inmez.
+
+<Callout type="warning">
+  **Yenileme manueldir.** Otomatik kart çekimi yoktur, kayıtlı kart tutulmaz.
+  Yenileme tarihinden **30, 7 ve 1 gün** önce hatırlatma alırsınız; tarih
+  geçerse **7 günlük ek süre** işler. Ödeme yapılmazsa yalnızca ücretli
+  kalemlerin **erişimi kararır** — **veri silinmez** ve ödeme yapıldığı anda her
+  şey aynen geri açılır. Ücretsiz çekirdek bundan hiç etkilenmez.
+</Callout>
+
+## İptal davranışı
+
+Bir kalemi iptal etme yetkisi yalnızca **ADMIN**'dedir (faturalandırma
 kararıdır). İki seçeneğiniz vardır:
 
-- **Dönem sonunda iptal (varsayılan):** add-on **dönem sonuna kadar aktif kalır**
+- **Dönem sonunda iptal (varsayılan):** kalem **dönem sonuna kadar aktif kalır**
   ve verdiği haklar o tarihe kadar çalışmaya devam eder. Dönem dolduğunda
   otomatik olarak kapanır ve ilgili limit/özellik geri alınır.
-- **Hemen iptal:** add-on anında kapanır ve verdiği haklar **derhal geri
+- **Hemen iptal:** kalem anında kapanır ve verdiği haklar **derhal geri
   alınır**.
 
 <Callout type="info">
-  Tekrarlayan add-on'lar 30 günlük bir dönem penceresinde çalışır; gerçek
-  faturalama döngünüz ana aboneliğinizin döngüsüyle hizalanır. Tek seferlik
-  hizmet kalemleri (ör. yerinde kurulum) tekrarlanmaz ve iptal edilecek bir
-  dönemleri yoktur.
+  Yıllık kalemlerin dönemi lisans yıl dönümünüzle hizalıdır. Tek seferlik
+  kalemlerin (kontör paketleri, yerinde kurulum) iptal edilecek bir dönemi
+  yoktur; kontörler tükenene kadar sizde kalır.
 </Callout>
 
 ---

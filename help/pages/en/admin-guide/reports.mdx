@@ -10,7 +10,7 @@ import { Callout } from 'nextra/components'
 **Menu path:** Back Office → Reports / Analytics
 **URL:** `/admin/reports` and `/admin/analytics`
 **Access:** ADMIN, MANAGER
-**Plan:** `advancedReports` — **Professional (PRO)** and above (or the `advanced_reports` add-on)
+**Requires:** `advancedReports` — the **Advanced Reports & Analytics** module (₺1,290/year, with the licence as a prerequisite)
 
 ## Purpose
 
@@ -20,10 +20,11 @@ Both screens turn your business data into something readable:
 - **Analytics** — table utilization, traffic/congestion analysis, customer behavior and **AI-powered insights**.
 
 <Callout type="info">
-  Both screens are tied to the `advancedReports` feature (**PRO and above**). To unlock
-  them without moving up to PRO, you can buy the **`advanced_reports`** marketplace
-  add-on. If your plan doesn't include it, both menu items are hidden and the direct URL
-  shows an upgrade card.
+  Both screens are tied to the `advancedReports` feature: the **Advanced Reports &
+  Analytics** module (₺1,290/year; the HummyTummy Licence at ₺2,990/year is a
+  prerequisite). Without the module both menu items are hidden and the direct URL shows
+  a purchase card. The cash-and-till screen (Finance) stays in the free core — you can
+  run your till without buying anything.
 </Callout>
 
 ## Reports screen
@@ -35,14 +36,14 @@ There are tabs at the top, plus a **date-range filter** (start–end) and, for m
 | **Sales** | Total revenue, order count, average ticket, total discount; payment-method breakdown; daily sales; top-selling products | Always |
 | **Hourly** | Order distribution by hour of day | Always |
 | **Customers** | Customer analytics (per period) | Always |
-| **Inventory** | Stock report | Only if `inventoryTracking` is granted |
-| **Staff** | Staff performance | Only if `personnelManagement` is granted |
+| **Inventory** | Stock report | Only with the **Inventory & Cost Management** module |
+| **Staff** | Staff performance | Only with the **Staff Management** module |
 | **Z-Reports** | End-of-day fiscal summaries (Z-reports) | Always |
 
 <Callout type="info">
-  The Inventory and Staff tabs depend on extra features — without them the **tab is
+  The Inventory and Staff tabs depend on separate modules — without them the **tab is
   hidden** (it used to 403 on click). Sales/Hourly/Customers/Z-Report come with the
-  `advancedReports` that unlocks the page itself.
+  **Advanced Reports & Analytics** module that unlocks the page itself.
 </Callout>
 
 ## Analytics screen

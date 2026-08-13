@@ -1,47 +1,146 @@
 ---
-title: Plans
-description: HummyTummy subscription plans — pricing, scope, and which plan is right for you.
+title: Licence & modules
+description: The free core, the annual HummyTummy licence, and the modules you buy one at a time — scope and current price list.
 ---
 
 import { Callout, Cards } from 'nextra/components'
 
-# Plans
+# Licence & modules
 
-HummyTummy offers three sellable plans: **Basic (BASIC)**, **Pro (PRO)**, and **Business (BUSINESS)**. Every new business starts on a **7-day full-featured Trial (TRIAL)** at sign-up; when the trial ends you must choose a paid plan to keep going.
+The HummyTummy core is **free and stays open indefinitely**. There are no plans,
+no tiers, no packages and no trial period. You buy the paid modules you need
+**one at a time**, annually — and you never pay for anything you don't use.
 
-All prices are in **Turkish Lira (TRY)** and are **VAT-inclusive**.
+All prices are in **Turkish Lira (TRY)** and are **VAT-inclusive**; the amount
+you see on screen is the amount you'll be charged.
 
-## Plans and pricing
+## The free core
 
-| Plan | Monthly | Yearly | Best for |
-| --- | --- | --- | --- |
-| **Basic** (BASIC) | **₺499/mo** | **₺4,490/yr** | Cafés and small restaurants needing core POS + inventory |
-| **Pro** (PRO) | **₺1,299/mo** | **₺12,990/yr** | City-center restaurants needing reservations + delivery + staff management |
-| **Business** (BUSINESS) | **₺2,999/mo** | **₺29,990/yr** | Multi-branch chains — unlimited + API access + priority support |
+The following is open on every business **indefinitely**, with **no credit card**
+and **no licence required**:
+
+- **POS and tabs** — order taking and the sales screen
+- **Kitchen display (KDS)**
+- **Menu management**
+- **Tables and floor plan**
+- **QR menu**
+- **Order management**
+- **Cash drawer and cash handling**
+- **Basic reports**
+- **Team and role management**
+- **Customers**
+- **Device and branch panel**
+- **Custom branding and subdomain**
+
+Usage limits are part of the core too:
+
+- **Users, tables, products, categories and monthly orders are unlimited.**
+- **Your first branch is free.** The branch panel itself is free as well; the
+  only priced capacity item is **the second and every further branch**.
 
 <Callout type="info">
-  Paying yearly saves you ~17%: you pay the yearly amount instead of 12 monthly charges (e.g. on Basic, ₺4,490 instead of 12 × ₺499 = ₺5,988).
+  You don't have to enter payment details to start using the core, and there is
+  no trial clock to run out. If you want to look around before setting anything
+  up with your own data, you can switch into the **shared demo restaurant** from
+  the panel and browse it with real data.
 </Callout>
 
-## What's in every plan?
+## What the licence is for
 
-All three plans include the core modules you need to run a restaurant:
+| Product | Yearly |
+| --- | --- |
+| **HummyTummy Licence** | **₺2,990** |
 
-- **POS access** (`posAccess`) — order taking and sales screen
-- **KDS integration** (`kdsIntegration`) — kitchen display
-- **Inventory tracking** (`inventoryTracking`) — product and ingredient stock
+The licence is the prerequisite for **both buying and using** any paid module.
+If you don't hold one when you pick a module, the store adds the licence to your
+bill automatically.
 
-As you move up the tiers, capabilities like advanced reports, multi-location, reservations, staff management, delivery integration, custom branding, and API access unlock, and your usage limits (users, tables, branches, products, orders) increase.
+The day you buy the licence becomes your account's **immutable anniversary**:
+every annual item you add later is priced pro rata up to that date, so your
+account renews on one date with one invoice. Details:
+[Billing & renewal](/en/plans/trial-and-billing).
 
 <Callout type="warning">
-  **The Free (FREE) plan has been retired.** Its enum value is kept only for backward compatibility with legacy tenants; it is not sellable and no new business ever lands on it. Businesses whose trial ends move to `TRIAL_ENDED` status and the app is locked until a plan is chosen — see [Trial & billing](/en/plans/trial-and-billing).
+  If the licence goes dark (isn't renewed), **your paid modules go dark with
+  it** — licence-gated products grant nothing while the licence is inactive.
+  Your data is not deleted; paying re-lights everything exactly as it was.
 </Callout>
+
+## Modules
+
+Each is annual, and each requires the licence.
+
+| Module | Yearly | What it unlocks |
+| --- | --- | --- |
+| Advanced Reports & Analytics | **₺1,290** | Detailed sales, product, staff and customer analytics; the accounting back-office and e-document settings |
+| Inventory & Cost Management | **₺1,490** | Recipes, stock counts, purchase orders, waste tracking, suppliers, inter-branch transfers |
+| Reservation System | **₺990** | Booking calendar, availability engine, public online reservation page |
+| Staff Management | **₺990** | Attendance, shift planning, shift swaps, performance tracking |
+| AI Menu Studio | **₺1,990** | AI-generated product images, video and 3D models, OCR menu import (generations consume credits) |
+| API & Webhook Access | **₺2,490** | REST API keys and outbound webhooks |
+| Partner Display API | **₺1,990** | Per-screen API access so third-party displays can show your menu |
+| Priority Support | **₺1,990** | Front-of-queue support with a guaranteed response time |
+
+## Integrations
+
+| Integration | Yearly | What it unlocks |
+| --- | --- | --- |
+| Yemeksepeti | **₺2,490** | Yemeksepeti orders flow automatically into the POS and the kitchen |
+| Getir | **₺2,490** | Getir orders flow automatically into the POS and the kitchen |
+| Trendyol Yemek | **₺2,490** | Trendyol Yemek orders flow automatically into the POS and the kitchen |
+| e-Invoice (Nilvera) | **₺1,990** | Sales invoices filed as e-Fatura / e-Arşiv through Nilvera |
+| Fiscal printer (Hugin) | **₺2,990** | Integrated receipt printing and fiscal report sync with a Hugin device |
+| Caller-ID | **₺1,490** | Recognise the customer on an incoming call, open an order in one click |
+| SMS Notifications | **₺990** | Order, reservation and campaign SMS (each send consumes credits) |
+
+<Callout type="info">
+  Delivery integrations stack: you can run several platforms at once and they
+  all land in the same kitchen flow.
+</Callout>
+
+## Capacity
+
+| Item | Yearly | Note |
+| --- | --- | --- |
+| Extra Branch | **₺3,990 / unit** | The first branch is free. Bought by the unit; up to 100 per account |
+
+## Credits (one-time)
+
+Credits are bought **once**, **never expire** and are **valid until consumed**.
+They are not part of the annual renewal.
+
+| Credit pack | Price | Prerequisite |
+| --- | --- | --- |
+| 100 AI images | **₺690** | AI Menu Studio |
+| 20 AI videos | **₺890** | AI Menu Studio |
+| 10 AI 3D models | **₺790** | AI Menu Studio |
+| 500 SMS | **₺490** | SMS Notifications |
+
+## Service (one-time)
+
+| Service | Price | What's included |
+| --- | --- | --- |
+| On-site Installation & Training | **₺7,500** | A full day of on-site installation, device commissioning and staff training |
+
+<Callout type="warning">
+  On-site installation is a **service** line: it is paid for and invoiced, but it
+  adds no feature or limit to your account and does not recur.
+</Callout>
+
+## Where this lives in the panel
+
+- **Licence & Access** (`/admin/license`, sidebar *Settings & Access → Plan &
+  Access*) — your licence status, the products you own, your credit balances,
+  your renewal date and your invoices.
+- **Store** (`/admin/store`, the store icon in the top bar) — tick the items you
+  want from the catalogue, watch the total update, and buy them all in one
+  payment.
 
 ## Continue
 
 <Cards>
   <Cards.Card title="Feature matrix" href="/en/plans/feature-matrix" />
-  <Cards.Card title="Choosing & upgrading" href="/en/plans/choosing-and-upgrading" />
-  <Cards.Card title="Trial & billing" href="/en/plans/trial-and-billing" />
-  <Cards.Card title="Marketplace add-ons" href="/en/marketplace" />
+  <Cards.Card title="Which modules fit you" href="/en/plans/choosing-and-upgrading" />
+  <Cards.Card title="Billing & renewal" href="/en/plans/trial-and-billing" />
+  <Cards.Card title="Marketplace" href="/en/marketplace" />
 </Cards>

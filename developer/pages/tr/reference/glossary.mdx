@@ -1,6 +1,6 @@
 ---
 title: Sözlük
-description: HummyTummy sisteminde geçen temel terimlerin tanımları — Tenant, Branch, Rol, KDS, POS, QR menü, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Add-on.
+description: HummyTummy sisteminde geçen temel terimlerin tanımları — Tenant, Branch, Rol, KDS, POS, QR menü, Self-pay, Scope, Screen token, Webhook, Outbox, Entitlement, Katalog ürünü, Lisans, Kontör, Yıl dönümü.
 ---
 
 # Sözlük
@@ -9,8 +9,8 @@ HummyTummy API'sinde ve dokümantasyonda sık geçen terimlerin kısa tanımlar�
 
 ### Tenant
 Bir restoran işletmesini (müşteri hesabı) temsil eden en üst düzey kiracı.
-Aboneliğin, planın ve tüm verinin sahibidir. Tenant çözümlemesi host adına
-göre değil, JWT içindeki `tenantId` üzerinden yapılır.
+Lisansın, satın alınan katalog ürünlerinin ve tüm verinin sahibidir. Tenant
+çözümlemesi host adına göre değil, JWT içindeki `tenantId` üzerinden yapılır.
 
 ### Branch (Şube)
 Bir tenant'a ait fiziksel konum/şube. Masalar, siparişler, stok ve çoğu
@@ -62,11 +62,34 @@ biçimde yayımlanan olay kaydı deseni. Yan etkilerin (olay yayını) ana veriy
 atomik olmasını ve "en az bir kez" teslimi sağlar.
 
 ### Entitlement (Hak)
-Bir tenant'ın aktif planından (ve add-on'larından) türetilen efektif özellik
-ve limit kümesi. Plan değiştiğinde yeniden hesaplanır (re-projeksiyon) ve
-özellik kapıları (`PlanFeatureGuard`) bu hesaba bakar.
+Bir tenant'ın **ücretsiz çekirdeğinden** ve satın aldığı katalog ürünlerinden
+türetilen efektif özellik, limit ve entegrasyon kümesi. `feature.*` OR,
+`limit.*` SUM, `integration.*` UNION ile katlanır; bir ürün alındığında,
+iptal edildiğinde veya süresi dolduğunda yeniden hesaplanır (re-projeksiyon).
+Kapılar `@RequireEntitlement` üzerinden bu kümeye bakar; eksikse
+`403 ENTITLEMENT_REQUIRED` döner. Bkz.
+[Yetki Matrisi](/tr/reference/plan-matrix).
 
-### Add-on (Eklenti)
-Plana eklenen, ayrı satın alınan ek özellik veya kapasite. Marketplace
-üzerinden PayTR ödeme rayı ile satın alınır ve ödeme onaylandıktan sonra
-entitlement'a eklenir.
+### Katalog ürünü (Add-on)
+Ücretsiz çekirdeğin üzerine ayrı satın alınan modül, entegrasyon, kapasite,
+kontör paketi veya hizmet. Marketplace kataloğunda tanımlıdır, PayTR checkout
+rayı ile satın alınır ve ödeme onaylandıktan sonra `grants` haritası
+entitlement'a katılır. Veritabanı tarafındaki sahiplik satırı `TenantAddOn`'dur.
+
+### Lisans
+Ücretli her yeteneğin ön koşulu olan yıllık ürün (`license_annual`). Hem satın
+almak hem **kullanmak** için gerekir: lisans canlı değilken `requiresLicense`
+taşıyan her ürünün grant'ları karartılır — sahiplik satırları ve iş verisi
+silinmez, lisans ödenince aynen geri açılır.
+
+### Kontör (Credit)
+Ön ödemeli tüketim bakiyesi (`PHOTO`, `VIDEO`, `MODEL3D`, `SMS`). Entitlement
+**değildir**: tek seferlik paketlerle alınır, süresi yoktur ve tükenene kadar
+geçerlidir. Bakiye, harcama anında canlı okunur; yetersizse
+`402 QUOTA_EXCEEDED` döner.
+
+### Yıl dönümü (Anniversary)
+Lisansın alındığı tenant-yerel takvim günü; hesabın değişmez yenileme tarihi.
+Sonradan alınan her yıllık kalem bu tarihe kalan gün kadar orantılı fiyatlanır,
+böylece tüm hesap tek tarihte tek faturayla yenilenir. Yenileme **manueldir**;
+kayıtlı kart ve otomatik tahsilat yoktur.

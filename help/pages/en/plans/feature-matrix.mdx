@@ -1,63 +1,110 @@
 ---
 title: Feature matrix
-description: Full feature and limit comparison across the Basic, Pro, and Business plans.
+description: Which capabilities are in the free core, which paid module unlocks each of the rest, and how the limits work.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Feature matrix
 
-The tables below compare what each of the three sellable plans (**Basic / Pro / Business**) includes and their usage limits. Use this page to decide which plan fits you best.
+There are no plans to compare. There is only one question: **is this capability
+in the free core, or which paid module unlocks it?** The tables below give the
+full list.
 
-## Features
+## The free core
 
-| Feature | Basic | Pro | Business |
-| --- | :---: | :---: | :---: |
-| POS (sales screen) access | ✓ | ✓ | ✓ |
-| KDS (kitchen display) integration | ✓ | ✓ | ✓ |
-| Inventory tracking | ✓ | ✓ | ✓ |
-| Advanced reports | ✗ | ✓ | ✓ |
-| Multi-location | ✗ | ✓ | ✓ |
-| Custom branding | ✗ | ✓ | ✓ |
-| Priority support | ✗ | ✓ | ✓ |
-| Reservation system | ✗ | ✓ | ✓ |
-| Personnel management | ✗ | ✓ | ✓ |
-| Delivery integration | ✗ | ✓ | ✓ |
-| API access | ✗ | ✗ | ✓ |
-| External display (Partner Display) | ✗ | ✗ | ✓ |
+These are open on every business — no licence needed, no time limit.
+
+| Capability | Status |
+| --- | :---: |
+| POS (sales screen) and tabs | Free |
+| Kitchen display (KDS) | Free |
+| Menu management | Free |
+| Tables and floor plan | Free |
+| QR menu | Free |
+| Order management | Free |
+| Cash drawer and cash handling | Free |
+| Basic reports | Free |
+| Team and role management | Free |
+| Customers | Free |
+| Device and branch panel (multi-location UI) | Free |
+| Custom branding and subdomain | Free |
+
+## Paid capabilities and the products that unlock them
+
+Each capability below opens when you buy the product next to it. All are annual
+and all require the **licence (₺2,990/yr)**.
+
+| Capability | Unlocked by | Yearly |
+| --- | --- | ---: |
+| Advanced reports and analytics, accounting back-office | Advanced Reports & Analytics | ₺1,290 |
+| Stock, recipes, costing, purchasing, waste, suppliers | Inventory & Cost Management | ₺1,490 |
+| Reservation system and public booking page | Reservation System | ₺990 |
+| Staff management (attendance, shifts, performance) | Staff Management | ₺990 |
+| AI content generation and OCR menu import | AI Menu Studio | ₺1,990 |
+| API access and outbound webhooks | API & Webhook Access | ₺2,490 |
+| External / partner display API | Partner Display API | ₺1,990 |
+| Priority support | Priority Support | ₺1,990 |
+| Delivery integration | Yemeksepeti · Getir · Trendyol Yemek | ₺2,490 (each) |
+| e-Documents (e-Fatura / e-Arşiv) | e-Invoice (Nilvera) | ₺1,990 |
+| Fiscal printer integration | Fiscal printer (Hugin) | ₺2,990 |
+| Caller-ID customer recognition | Caller-ID Integration | ₺1,490 |
+| SMS sending | SMS Notifications | ₺990 |
 
 <Callout type="info">
-  **API access** and **external display (Partner Display)** are exclusive to the Business plan. These two capabilities cover third-party integrations and remote/desktop screen sessions.
+  Buying **any one** delivery integration opens the delivery surface; adding a
+  second platform makes both run side by side. e-Invoice and the fiscal printer
+  are separate products — neither one includes the other.
 </Callout>
 
 ## Limits
 
 The infinity sign (**∞**) means that limit is **unlimited**.
 
-| Limit | Basic | Pro | Business |
-| --- | :---: | :---: | :---: |
-| Max users | 5 | 15 | ∞ |
-| Max tables | 20 | 50 | ∞ |
-| Max branches | 1 | 3 | ∞ |
-| Max products | 100 | 500 | ∞ |
-| Max categories | 20 | 50 | ∞ |
-| Max monthly orders | 500 | 2,000 | ∞ |
+| Limit | Free core | How it grows |
+| --- | :---: | --- |
+| Users | ∞ | — |
+| Tables | ∞ | — |
+| Products | ∞ | — |
+| Categories | ∞ | — |
+| Monthly orders | ∞ | — |
+| Branches | 1 | Each **Extra Branch** (₺3,990/yr per unit) raises your branch allowance by one; up to 100 per account |
 
-## The Trial plan
+Branches are the only priced capacity item. The branch panel and the branch
+switcher themselves are free — what you pay for is **the second and every
+further branch**.
 
-The **Trial** plan that every new business starts on has **all of Business's features and unlimited limits** for 7 days. Because it isn't a plan you buy, it isn't listed on the plan-selection screen and is excluded from the pricing comparison. For details, see [Trial & billing](/en/plans/trial-and-billing).
+## Capabilities that run on credits
 
-## Which features do I have right now?
+Two capabilities consume **credits** per use once they are open:
 
-You can see your business's currently active features in the panel. The access you see is your **actual access**, combined from your plan's features, any add-ons you've added from the Marketplace, and any capabilities granted specifically to you — it reflects what you can actually use, not just the plan's default list.
+- **AI Menu Studio** — image, video and 3D model generations draw down credits.
+  Packs: 100 images ₺690 · 20 videos ₺890 · 10 3D models ₺790.
+- **SMS Notifications** — every send draws down credits. 500 SMS ₺490.
 
-<Callout type="info">
-  If you see a feature is off on your plan, you can unlock it by **upgrading your plan** or with a **Marketplace add-on**. See [Choosing & upgrading](/en/plans/choosing-and-upgrading) and [Marketplace](/en/marketplace).
+Credits are one-time, never expire and are valid until consumed; they are not
+part of the annual renewal. To buy credits you must own the module or
+integration they belong to.
+
+## Which capabilities do I have right now?
+
+The **Licence & Access** page (`/admin/license`) lists the products you own, the
+end date of each and what it will cost at renewal; your credit balances are on
+the same page.
+
+What you see in the panel is your **actual access**: it is computed by combining
+the products you bought, any capabilities granted to you specifically
+(complimentary), and the free core.
+
+<Callout type="warning">
+  While your licence is inactive, licence-gated products grant nothing — the
+  product row stays in your list but the capability reads as off. Renewing the
+  licence re-lights all of them exactly as they were.
 </Callout>
 
 ## Related pages
 
-- Choosing a plan, upgrading, and payment flows: **[Choosing & upgrading](/en/plans/choosing-and-upgrading)**
-- The trial and billing details: **[Trial & billing](/en/plans/trial-and-billing)**
+- Deciding what you need: **[Which modules fit you](/en/plans/choosing-and-upgrading)**
+- Proration, the anniversary and renewal: **[Billing & renewal](/en/plans/trial-and-billing)**
 
 Developer/integration details (including querying entitled features via the API): [Subscription & Billing API](https://developer.hummytummy.com/en/developer/billing-api)

@@ -393,7 +393,7 @@
       },
       "payment": {
         "title": "Ödeme Şartları",
-        "content": "Ücretli planlar aylık veya yıllık olarak peşin faturalandırılır. Bu şartlarda açıkça belirtilenler dışında tüm ücretler iade edilmez. 30 gün önceden bildirimde bulunarak fiyatlarımızı değiştirme hakkını saklı tutarız."
+        "content": "Çekirdek özellikler süresiz ücretsizdir ve kredi kartı gerektirmez; ödeme yalnızca satın aldığınız yıllık lisans, modül, entegrasyon ve kapasite kalemleri ile tek seferlik kontör ve hizmetler için alınır. Yıllık kalemler peşin faturalandırılır ve hesabınızın yıl dönümüne kalan gün sayısına göre orantılanır; tüm kalemler tek faturada toplanır ve tek tarihte yenilenir. Yenileme manueldir: kayıtlı kartla otomatik tahsilat yapmayız. Ödeme yapılmazsa 7 günlük ek sürenin ardından yalnızca ilgili ücretli özelliklere erişim durur, verileriniz silinmez. Tahsilat PayTR üzerinden yalnızca Türk Lirası ile yapılır. Bu şartlarda açıkça belirtilenler dışında tüm ücretler iade edilmez. 30 gün önceden bildirimde bulunarak fiyatlarımızı değiştirme hakkını saklı tutarız."
       },
       "intellectual": {
         "title": "Fikri Mülkiyet",
@@ -442,7 +442,6 @@
     "viewSource": "Üretici sayfası",
     "from": "{currency}{amount}",
     "warrantyMonths": "{months} ay garanti",
-    "rentalFrom": "veya {currency}{amount}/ay kira",
     "gibCertified": "GİB onaylı YN ÖKC",
     "outOfStock": "Stokta yok",
     "discontinued": "Üretimi durduruldu",

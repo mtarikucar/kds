@@ -1,23 +1,25 @@
 ---
-title: Subscription & Billing API
-description: Plan catalog, change-plan (proration upgrade / scheduled downgrade), payment intents (PayTR & bank transfer), invoices, cancellation/reactivation, entitlements, and the TRIAL_ENDED lock envelope.
+title: Licensing & Billing API
+description: The catalog price list, licence state, the checkout rail (quote → intent → PayTR → settlement), anniversary proration, invoices, and manual renewal.
 ---
 
-import { Callout, Tabs, Steps } from 'nextra/components'
+import { Callout, Steps } from 'nextra/components'
 
-# Subscription & Billing API
+# Licensing & Billing API
 
-This page is the integrator reference for everything around subscriptions and
-money: reading the plan catalog, upgrading with proration, scheduling a
-downgrade, creating a PayTR or bank-transfer payment, reading invoices,
-cancelling/reactivating, and querying the tenant's effective features. It builds
-on the conventions in [API Fundamentals](/en/developer/api-fundamentals) (base
-URL, auth realms, branch scope, the error envelope, idempotency, rate limits).
+This page is the integrator reference for everything around money: reading
+catalog prices, querying a business's licence and owned products, taking payment
+through the checkout rail, reading invoices, and following the renewal cycle. It
+builds on the conventions in [API Fundamentals](/en/developer/api-fundamentals)
+(base URL, auth realms, branch scope, the error envelope, idempotency, rate
+limits).
 
 <Callout type="info">
-  All amounts are **TRY** and **VAT-inclusive**. Self-service card payment runs
-  through PayTR, which only supports TR/TRY. There is no cross-currency plan
-  change — the system is TRY-only.
+  **The model:** the core product is free forever. Paid capabilities are bought
+  individually from the catalog, with the annual **licence**
+  (`license_annual`) as the prerequisite. All amounts are **TRY** and
+  **VAT-inclusive**; collection runs through PayTR, TRY only. There are **no**
+  plans, tiers, bundles, trials, or auto-renewals.
 </Callout>
 
 ## Auth & roles
@@ -28,415 +30,368 @@ endpoint:
 
 | Capability | Required role |
 | --- | --- |
-| Read plan catalog | Public (`@Public`, no auth) |
-| Create payment intent / checkout | ADMIN, MANAGER |
-| Read invoices / scheduled downgrade | ADMIN, MANAGER |
-| Change plan (write), cancel, reactivate, cancel scheduled downgrade | **ADMIN only** |
+| Read the catalog price list | Public (`@Public`, no auth) |
+| Read licence state / invoices | Any authenticated user |
+| Price a cart (`/checkout/quote`) | Any authenticated user |
+| Checkout intent / confirm | ADMIN, MANAGER |
+| Cancel a product | **ADMIN only** |
 
 <Callout type="warning">
-  The plan-change *quote* call (`POST /subscriptions/:id/change-plan`) is itself
-  ADMIN-only. It does not mutate state — it only computes the amount — but the
-  apply step that follows a successful payment does write, so the whole route is
-  ADMIN-gated.
+  `POST /v1/checkout/quote` writes nothing — it prices a hypothetical cart — so
+  it carries no role gate. The first step that creates state is
+  `/checkout/start`; the first step that moves money is `/checkout/intent`. Both
+  require ADMIN/MANAGER.
 </Callout>
 
 ## Endpoint summary
 
 | Method | Path | Realm / role | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/api/subscriptions/plans` | Public | List sellable plans |
-| `POST` | `/api/subscriptions/:id/change-plan` | ADMIN | Quote an upgrade / schedule a downgrade |
-| `GET` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN, MANAGER | Read a scheduled downgrade |
-| `DELETE` | `/api/subscriptions/:id/scheduled-downgrade` | ADMIN | Cancel a scheduled downgrade |
-| `POST` | `/api/payments/create-intent` | ADMIN, MANAGER | Start a PayTR (card) subscription payment |
-| `GET` | `/api/payments/bank-transfer/details` | ADMIN, MANAGER | Read platform bank (IBAN) details |
-| `POST` | `/api/payments/bank-transfer/intent` | ADMIN, MANAGER | Reserve a bank-transfer payment |
-| `GET` | `/api/subscriptions/tenant/invoices` | ADMIN, MANAGER | List all tenant invoices (paginated) |
-| `GET` | `/api/subscriptions/:id/invoices` | ADMIN, MANAGER | List a subscription's invoices (paginated) |
-| `POST` | `/api/subscriptions/:id/cancel` | ADMIN | Cancel a subscription |
-| `POST` | `/api/subscriptions/:id/reactivate` | ADMIN | Reactivate a cancelled subscription |
-| `GET` | `/api/subscriptions/effective-features` | ADMIN, MANAGER | Read the tenant's effective features/limits |
+| `GET` | `/api/v1/catalog/pricing` | Public | Published catalog + prices (`?locale=en`) |
+| `GET` | `/api/v1/me/licensing` | Staff JWT | Licence state, owned products, credits, renewal, offers, purchasability |
+| `GET` | `/api/v1/me/invoices` | Staff JWT | This tenant's itemized à-la-carte invoices |
+| `GET` | `/api/v1/entitlements/me` | Staff JWT | The folded entitlement set |
+| `POST` | `/api/v1/checkout/quote` | Staff JWT | Price a mixed cart (no writes) |
+| `POST` | `/api/v1/checkout/start` | ADMIN, MANAGER | Lock in a quote before redirecting (re-prices) |
+| `POST` | `/api/v1/checkout/intent` | ADMIN, MANAGER | Mint a PayTR iframe token + `paymentRef` |
+| `POST` | `/api/v1/checkout/confirm` | ADMIN, MANAGER | Turn a settled intent into provisioning (idempotent) |
+| `POST` | `/api/webhooks/paytr` | PayTR (HMAC + IP allowlist) | Payment-result callback |
+| `DELETE` | `/api/v1/marketplace/addons/:id` | ADMIN | Cancel an owned product |
+| `GET` | `/api/subscriptions/plans` | Public | **Permanently an empty array** (see below) |
+| `GET` | `/api/subscriptions/tenant/invoices` | ADMIN, MANAGER | Legacy subscription-invoice archive (paginated) |
+| `GET` | `/api/invoices/:invoiceNumber` | ADMIN, MANAGER | One legacy invoice (`/download` for the PDF) |
 
-## Listing sellable plans
+<Callout type="warning">
+  `GET /api/subscriptions/plans` is still mounted as `@Public`, but it now
+  **permanently returns `[]`**: the endpoint lists only `isActive && isPublic`
+  plans, and the v3.3.0 migration (`20260811120000_free_core`) set every
+  `subscription_plans` row to `isActive=false, isPublic=false`. The rows survive
+  only for the `subscriptions.planId` Restrict FK and the legacy tax invoices
+  Turkish law requires retaining. For the price list use
+  `GET /v1/catalog/pricing`.
+</Callout>
 
-The plan catalog is public (`@Public`) and returns only **active + public**
-plans — that is, Basic / Pro / Business. The Trial (`isPublic=false`) and the
-retired Free (`isActive=false`) plans never appear in the list.
+## Reading the price list
 
-<Tabs items={['curl', 'Response (fields)']}>
-<Tabs.Tab>
+The catalog is public — marketing pages read it too, so a price change made in
+the superadmin panel cannot leave the website advertising a stale amount.
 
 ```bash
-curl https://app.hummytummy.com/api/subscriptions/plans
+curl "https://app.hummytummy.com/api/v1/catalog/pricing?locale=en"
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-For each plan the response includes:
+Fields returned per product:
 
 | Field | Description |
 | --- | --- |
-| `id` | Plan id |
-| `name` / `displayName` | Internal name / display label |
-| `monthlyPrice` / `yearlyPrice` | TRY, VAT-inclusive |
+| `code` | Immutable product code (e.g. `module_inventory`) |
+| `name` / `description` | Localised for `locale` (falls back to the TR text) |
+| `kind` | `license` \| `module` \| `integration` \| `capacity` \| `credit` \| `service` |
+| `billing` | `annual` \| `oneTime` |
+| `priceCents` | VAT-inclusive cents — the full annual list price |
 | `currency` | Always `TRY` |
-| `trialDays` | Trial length (informational) |
-| `limits` | `maxUsers`, `maxTables`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` |
-| `features` | Feature-flag map (`posAccess`, `multiLocation`, …) |
-| `discount` | Active discount, if any |
+| `creditKind` / `creditUnits` | Credit packs only |
+| `requiresLicense` | Whether a live licence is needed to use it |
+| `sortOrder` | Storefront ordering |
 
-</Tabs.Tab>
-</Tabs>
+For what each product code grants, see the
+[Entitlement Matrix](/en/reference/plan-matrix).
+
+## Licence state and owned products
+
+`GET /v1/me/licensing` lets the SPA render the whole licence screen in one
+request:
+
+```bash
+curl https://app.hummytummy.com/api/v1/me/licensing \
+  -H "Authorization: Bearer $JWT"
+```
+
+| Field | Contents |
+| --- | --- |
+| `entitlements` | `features`, `limits`, `integrations`, `computedAt` |
+| `license` | `status`, `anchorAt`, `anniversaryAt`, `daysRemaining` |
+| `credits` | Credit kind → remaining balance |
+| `owned` | Per owned row: `code`, `kind`, `quantity`, `pendingQuantity`, `status`, `periodEnd`, `chargedCents`, `renewalCents`, `origin` |
+| `renewal` | The open renewal cycle: `cycleId`, `anniversaryAt`, `graceEndsAt`, `totalCents`, `daysLeft` |
+| `offers` | Every grant key → the **cheapest** product providing it, priced for **this tenant today** |
+| `purchasability` | Product code → `{ ok }` or `{ ok: false, reason, message }` |
+
+`license.status` is one of four values:
+
+| Value | Meaning |
+| --- | --- |
+| `none` | No licence has ever been bought |
+| `active` | The licence is live |
+| `grace` | The licence row is `past_due` — inside the grace window |
+| `expired` | The anniversary passed unpaid |
 
 <Callout type="info">
-  Any advertised discounted price is computed with the **same**
-  `resolvePlanAmount` the charge rails use, so the price shown equals the price
-  charged.
+  `offers` and `purchasability` are produced by the **same** functions checkout
+  uses (`LicensingService.price`, `evaluatePurchasability`). That is what keeps
+  the storefront price identical to the charged price, and the "Buy" button
+  identical to what checkout will accept.
 </Callout>
 
-## Choosing the right flow
+## The anniversary and proration
 
-A client decides between the change-plan rail and a fresh checkout based on the
-business's current subscription status. The operator-facing screens
-([Choosing & upgrading](https://help.hummytummy.com/en/plans/choosing-and-upgrading))
-branch as follows:
+The day the licence is bought becomes the account's **immutable anniversary**
+(the tenant-local calendar date; default `Europe/Istanbul`). Every **annual**
+item bought afterwards is prorated to the days remaining until that
+anniversary — so the whole account renews on ONE date with ONE itemized invoice.
+
+| Mode | When | Price |
+| --- | --- | --- |
+| `full` | Remaining days = cycle days (first purchase, or on the anniversary itself) | Full list price |
+| `prorated` | More than 14 days to the anniversary | `list × remainingDays / cycleDays` |
+| `rollForward` | **≤ 14 days** to the anniversary | The remainder plus one whole next cycle |
+
+- Rounding happens **per unit**, then multiplies:
+  `unitCents × qty === subtotalCents` holds exactly.
+- No priced line ever falls below **₺1** (`MIN_LINE_CENTS = 100`); a genuinely
+  free item stays at 0.
+- The cycle length is **computed** as 365 or 366, never hardcoded; a 29 Feb
+  anniversary clamps to 28 Feb in common years.
+
+<Callout type="info">
+  The 14-day threshold is deliberate: a ₺990 module bought 2 days before the
+  anniversary would cost ₺5.42, land on the renewal cart 48 hours later, and sit
+  under PayTR's minimum charge — a support ticket, not a sale.
+</Callout>
+
+## VAT-inclusive pricing internals
+
+Every catalog price is a **gross** (VAT-inclusive) amount, and the customer is
+charged exactly that. The quote engine derives the tax **out of** the gross; it
+never adds it on top:
+
+```text
+netCents = round(grossLineSum / (1 + rate))
+taxCents = grossLineSum - netCents
+```
+
+For TRY carts the rate is **20%**. In the quote response `subtotalCents` is the
+**net**, `taxCents` is the embedded VAT, and `totalCents` is the gross amount
+that will be charged (including shipping when the cart holds hardware).
+
+## The checkout rail
+
+The only way to buy a product is the checkout (PayTR) rail. No paid line is ever
+provisioned without proof of payment (`paymentRef`).
 
 <Steps>
 
-### Live subscription (ACTIVE / TRIALING), different plan
-Route to the **change-plan** rail. Upgrade/downgrade proration only makes sense
-within a live billing period.
-
-```text
-/subscription/change-plan?newPlanId=<PLAN_ID>&billingCycle=MONTHLY
-```
-
-### Live subscription, same plan
-No-op.
-
-### PAST_DUE / EXPIRED / CANCELLED / no subscription
-Use the fresh **checkout** rail. Because proration over a finished period would
-produce a negative amount, these cases start a new full-period subscription
-instead.
-
-```text
-/subscription/checkout?planId=<PLAN_ID>&billingCycle=MONTHLY
-```
-
-### Trial-eligible business
-The backend short-circuits to the TRIAL response inside
-`POST /payments/create-intent`; the checkout screen handles this case specially.
-
-</Steps>
-
-## Upgrade (with proration)
-
-Switching to a more expensive plan on a live subscription counts as an
-**upgrade**. `POST /subscriptions/:id/change-plan` returns a **prorated quote**
-based on the days remaining in the period — this call does not write a mutation;
-it only computes the amount to charge. After the quote, payment is collected via
-the PayTR (or bank-transfer) rail, and the upgrade is applied on confirmation.
-
-<Tabs items={['curl', 'Request body', 'Response']}>
-<Tabs.Tab>
+### Price the cart
 
 ```bash
-curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/change-plan \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+curl -X POST https://app.hummytummy.com/api/v1/checkout/quote \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{
-    "newPlanId": "<NEW_PLAN_ID>",
-    "billingCycle": "MONTHLY"
+    "items": [
+      { "type": "addon", "code": "license_annual", "qty": 1 },
+      { "type": "addon", "code": "module_inventory", "qty": 1 },
+      { "type": "addon", "code": "extra_branch", "qty": 2 }
+    ]
   }'
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
+Cart item types: `addon` (a catalog product — `code`), `hardware` (`sku`),
+`service` (`code`). The legacy `plan` type is still accepted by the DTO, but the
+pricer produces **no line** for it. A cart holds at most 50 items, each with a
+quantity of at most 999.
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `newPlanId` | string | Target plan id |
-| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Target billing cycle |
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```json
-{
-  "type": "upgrade",
-  "requiresPayment": true,
-  "paymentInfo": {
-    "subscriptionId": "sub_...",
-    "newPlanId": "plan_...",
-    "billingCycle": "MONTHLY",
-    "prorationAmount": 533.42,
-    "newAmount": 1299,
-    "currency": "TRY"
-  }
-}
-```
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="info">
-  Proration is computed from the ratio of days remaining until
-  `currentPeriodEnd` to the total days in the period. If `prorationAmount` is
-  greater than 0, `requiresPayment: true` is returned and the upgrade is applied
-  only after payment is collected.
-</Callout>
-
-## Downgrade (scheduled at period end)
-
-Switching to a cheaper plan counts as a **downgrade** and is **not applied
-immediately** — `POST /subscriptions/:id/change-plan` schedules it for the end of
-the current billing period. The same call behaves as follows:
-
-- Current usage is first validated against the target plan's limits
-  (`assertDowngradeAllowed`). For example, if you have 4 branches you cannot
-  downgrade to Basic's 1-branch limit.
-- The change is recorded as `scheduledDowngradePlanId`, written atomically with a
-  compound `WHERE ... scheduledDowngradePlanId IS NULL` to guard against races.
-- The response includes `type: "downgrade"`, `requiresPayment: false`, and
-  `scheduledFor` (the period-end date).
-
-### Reading and cancelling a scheduled downgrade
-
-<Tabs items={['Query (GET)', 'Cancel (DELETE)']}>
-<Tabs.Tab>
+### Create a payment intent
 
 ```bash
-curl https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-# ADMIN only
-curl -X DELETE https://app.hummytummy.com/api/subscriptions/<SUB_ID>/scheduled-downgrade \
-  -H "Authorization: Bearer <ADMIN_TOKEN>"
-```
-
-</Tabs.Tab>
-</Tabs>
-
-<Callout type="warning">
-  If you try to make a new change while one is already scheduled, the request is
-  rejected ("cancel the existing change first"). Cross-currency plan changes are
-  also unsupported (the system is TRY-only).
-</Callout>
-
-## Payment rails
-
-Payment for a new subscription or an upgrade can be collected via two rails:
-**PayTR (card)** or **bank transfer (havale/EFT, manual)**.
-
-### PayTR (card) — default
-
-`POST /payments/create-intent` creates a PENDING payment; once confirmed by the
-PayTR webhook, the subscription activates.
-
-<Tabs items={['curl', 'Request body']}>
-<Tabs.Tab>
-
-```bash
-curl -X POST https://app.hummytummy.com/api/payments/create-intent \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+curl -X POST https://app.hummytummy.com/api/v1/checkout/intent \
+  -H "Authorization: Bearer $ADMIN_JWT" \
   -H "Content-Type: application/json" \
-  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
+  -d '{
+    "cart": { "items": [ { "type": "addon", "code": "license_annual", "qty": 1 } ] },
+    "buyer": {
+      "email": "owner@restaurant.com",
+      "name": "Ali Veli",
+      "phone": "+905551112233",
+      "address": "..."
+    },
+    "returnUrl": "https://app.hummytummy.com/checkout/done",
+    "acceptedDocumentIds": ["<KVKK>", "<DISTANCE_SALES>", "<REFUND>"]
+  }'
 ```
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-| Field | Type | Notes |
+| Field | Required | Notes |
 | --- | --- | --- |
-| `planId` | string | Target plan id |
-| `billingCycle` | `"MONTHLY"` \| `"YEARLY"` | Billing cycle |
+| `cart` | Yes | At least 1 item |
+| `buyer` | Yes | What PayTR sees and fraud-scores; the phone is normalised to E.164 |
+| `acceptedDocumentIds` | Yes | **Exactly 3**: KVKK, distance-sales, refund policy. Ids come from `/legal/documents/:kind/current` |
+| `returnUrl` | No | Must be an absolute `http(s)` URL (open-redirect guard) |
+| `branchId` | No | A tenant-owned active branch, for hardware shipping |
+| `referralCode` | No | Resolved and frozen at intent time |
 
-</Tabs.Tab>
-</Tabs>
+Response: `{ paymentRef, iframeToken, paymentLink }`. The `paymentRef` has the
+form `CK-<uuid7>`.
 
-<Callout type="warning">
-  This endpoint is rate-limited to **5 attempts per minute** (`@Throttle`) — on
-  top of the global tiers in
-  [API Fundamentals](/en/developer/api-fundamentals#rate-limit-tiers). Exceeding
-  it returns a standard `429` (no `errorCode` attached); honor `Retry-After`.
-</Callout>
+In this step the server, in order: blocks the demo tenant, records the consent
+rows, runs every `addon` line through the purchasability gate, freezes the
+pricing instant (`pricedAt`) and **re-prices** the cart (it never trusts client
+totals), checks hardware stock summed per product, and freezes the cart onto a
+`CheckoutIntent` row.
 
-<Callout type="info">
-  For a trial-eligible business, `create-intent` short-circuits to the TRIAL
-  response instead of creating a charge.
-</Callout>
+### Pay via PayTR
 
-### Bank transfer (havale/EFT, manual) — alternative
+The buyer pays on the PayTR hosted iframe. Each cart line is shown as a separate
+basket entry (e.g. *"Inventory & Cost Management (yıllık)"*).
 
-A bank-transfer payment is **activated by superadmin confirmation** (not a
-webhook). If a superadmin has not set an IBAN, the bank-transfer option is
-disabled.
+### Settlement via webhook
 
-<Tabs items={['Details (GET)', 'Intent (POST)']}>
-<Tabs.Tab>
+The PayTR callback carries only `merchant_oid` + `total_amount`. The dispatcher
+sees the `CK-` prefix and routes it to `CheckoutSettlementService`, which finds
+the `CheckoutIntent`, reads the frozen cart and `pricedAt`, and runs
+`CheckoutService.confirmAndProvision`.
 
-```bash
-# Returns the platform bank (IBAN) details
-curl https://app.hummytummy.com/api/payments/bank-transfer/details \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
+### Provisioning
 
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-# Reserves a bank-transfer payment; activated later by superadmin confirmation
-curl -X POST https://app.hummytummy.com/api/payments/bank-transfer/intent \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{ "planId": "<PLAN_ID>", "billingCycle": "YEARLY" }'
-```
-
-</Tabs.Tab>
-</Tabs>
-
-### Marketplace add-ons share the checkout rail
-
-Marketplace add-on purchases use the **same PayTR checkout rail**:
-`POST /api/v1/checkout/intent` → a `CK-`-prefixed webhook → `confirmAndProvision`.
-Add-ons activate only after payment is confirmed.
-
-## Invoices
-
-Read invoices via the API. Both endpoints are paginated (`page`, `pageSize`).
-
-<Tabs items={['All tenant invoices', 'One subscription']}>
-<Tabs.Tab>
-
-```bash
-curl "https://app.hummytummy.com/api/subscriptions/tenant/invoices?page=1&pageSize=20" \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-<Tabs.Tab>
-
-```bash
-curl "https://app.hummytummy.com/api/subscriptions/<SUB_ID>/invoices?page=1&pageSize=20" \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
-
-</Tabs.Tab>
-</Tabs>
-
-### VAT-inclusive pricing internals
-
-All advertised plan prices are **gross** (VAT-inclusive) amounts, and the
-customer is charged exactly that amount. When an invoice is issued,
-`BillingService` reverse-engineers the VAT (KDV) out of the gross amount:
-
-- The default VAT rate is **20%** (`DEFAULT_KDV_RATE = 0.2`). It can be
-  overridden with the `KDV_RATE` environment variable (e.g. `0.10`).
-- The split is performed only for TRY invoices; net and tax are derived as:
-
-```text
-subtotal = total / (1 + rate)
-tax      = total - subtotal
-```
-
-Subtracting guarantees `subtotal + tax == total` **to the cent**, regardless of
-rounding choices.
-
-**Example — Pro monthly ₺1,299 (VAT 20%):**
-
-| Line | Amount |
-| --- | --- |
-| Subtotal (net) | ₺1,082.50 |
-| VAT (20%) | ₺216.50 |
-| **Total (charged)** | **₺1,299.00** |
-
-<Callout type="info">
-  The business's tax ID (`taxId`) is snapshotted on the invoice **as it was at
-  issuance time**. Even if it is changed later, past invoices are unaffected.
-</Callout>
-
-## Cancellation and reactivation
-
-| Method | Path | Notes |
-| --- | --- | --- |
-| `POST` | `/api/subscriptions/:id/cancel` | ADMIN only. Body: `immediate` (now vs. at period end) and a `reason` of up to 500 chars. |
-| `POST` | `/api/subscriptions/:id/reactivate` | ADMIN only. Reactivates a cancelled subscription. |
-
-```bash
-curl -X POST https://app.hummytummy.com/api/subscriptions/<SUB_ID>/cancel \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{ "immediate": false, "reason": "End-of-season closure" }'
-```
-
-## Querying effective features
-
-Read a business's currently effective features and limits. This endpoint merges
-plan features, any marketplace add-on upgrades, and superadmin overrides — it
-returns the business's *actual* access based on the `feature.*` and `limit.*`
-projections, not just the plan default.
-
-```bash
-curl https://app.hummytummy.com/api/subscriptions/effective-features \
-  -H "Authorization: Bearer <ADMIN_OR_MANAGER_TOKEN>"
-```
-
-## The TRIAL_ENDED lock
-
-Every new business starts on a dedicated **Trial** onboarding plan (7 days, all
-of Business's features, every limit `-1`). If the trial elapses without a paid
-plan being chosen, the business moves to `TRIAL_ENDED` and is **locked** —
-behavior an integrator must handle.
-
-<Steps>
-
-### Backend (default-deny)
-The global `SubscriptionStatusGuard` rejects **every tenant-scoped route** with a
-`403` for any business that lacks a live subscription (`ACTIVE` / `TRIALING` /
-`PAST_DUE`). The envelope:
-
-```json
-{
-  "statusCode": 403,
-  "error": "Plan Selection Required",
-  "errorCode": "PLAN_SELECTION_REQUIRED",
-  "message": "Deneme süreniz sona erdi. Devam etmek için bir plan seçin."
-}
-```
-
-Branch on `errorCode: PLAN_SELECTION_REQUIRED`, not on the localized `message`.
-
-### Allowlisted recovery paths
-A locked business can still call these prefixes: `/auth`, `/me`, `/users/me`,
-`/profile`, `/subscriptions`, `/payments`, `/checkout`, `/legal`,
-`/entitlements`, `/webhooks`, `/health`. In other words it can read the plan
-catalog and make a payment — nothing else.
-
-### Frontend redirect
-On the SPA side, `SubscriptionGate` redirects the user to the plan-selection
-screen (`/choose-plan`) in response to the `PLAN_SELECTION_REQUIRED` code.
+For each catalog line, `TenantMarketplaceService.purchase()` is called **with the
+settled `paymentRef`** inside the checkout transaction: a `TenantAddOn` row is
+created (or a lapsed row is reactivated in place), an `AddOnPurchased` event is
+appended to the outbox, and credit packs mint a `CreditLot`. The entitlement
+projector consumes the event and folds the product's `grants` map into the
+tenant's entitlement set.
 
 </Steps>
 
 <Callout type="warning">
-  The lock is not only for `TRIAL_ENDED`: `EXPIRED` and `CANCELLED` businesses
-  are also considered "not live" and are locked the same way. A subscription in
-  `PAST_DUE` is treated as live during its 7-day grace period.
+  At settlement the cart is **re-quoted** with `pricedAt`, and provisioning is
+  refused if the total moved by more than one cent. That is what stops an intent
+  created just before midnight from re-pricing a day cheaper and stranding a
+  cart the buyer already paid for; the tolerance is left doing its real job —
+  catching catalog price edits in flight.
 </Callout>
+
+### The purchasability gate (before any charge)
+
+Every `addon` line is checked **before** payment. A rejected line returns `409`
+and stops the whole cart — no intent row is written and PayTR is never called.
+The envelope carries `{ code, message, addOnCode }`:
+
+| `code` | Meaning |
+| --- | --- |
+| `LICENSE_REQUIRED` | The product needs a licence and the cart has none either |
+| `ADDON_ALREADY_OWNED` | This product (or the licence) is already active |
+| `ADDON_ALREADY_GRANTED` | Everything the product grants is already in the entitlement set |
+| `ADDON_REQUIRES_DEPENDENCY` | Its dependency is neither owned nor in the cart |
+| `ADDON_LIMIT_REDUNDANT` | The capacity it adds is already unlimited |
+| `ADDON_MAX_QUANTITY` | The catalog ceiling would be exceeded (e.g. 100 for `extra_branch`) |
+
+<Callout type="info">
+  The gate is **cart-aware**: a prerequisite can be satisfied by a sibling line
+  rather than by something already owned. An opening cart necessarily contains
+  both the licence and the first module it unlocks — without this, a first-time
+  buyer's only possible cart would be rejected. On a generated **renewal** cart
+  the ownership checks are switched off, because re-paying for what you already
+  hold is exactly what a renewal is.
+</Callout>
+
+Other pre-charge rejections:
+
+- `409` `HARDWARE_OUT_OF_STOCK` — not enough real stock for a hardware line
+  (quantities for the same product are summed across lines before checking).
+- `400` — the cart total is `0`; PayTR rejects zero-value baskets, and free
+  provisioning goes through the superadmin comp path.
+
+### Idempotency
+
+PayTR retries aggressively (it retries even after a `200 OK` if the body isn't
+`"OK"`/`"FAIL"`). Three layers guard against double provisioning:
+
+<Steps>
+### `CheckoutIntent.status` check
+If the intent is already `provisioned`/`failed`, nothing is touched.
+
+### `confirmAndProvision` is independently idempotent
+It is idempotent on `(tenantId, paymentRef)` and requires a **settled
+`CheckoutIntent`** for that pair before provisioning anything — calling
+`/checkout/confirm` with a forged `paymentRef` provisions nothing.
+
+### `purchase()` returns the existing row
+For the same `paymentRef` it returns the existing `TenantAddOn` row without
+re-emitting `AddOnPurchased`.
+</Steps>
+
+## Invoices
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/v1/me/invoices` | The à-la-carte `tenant_invoices` records — what is issued today |
+| `GET` | `/api/subscriptions/tenant/invoices` | Legacy subscription-invoice archive (paginated: `page`, `pageSize`) |
+| `GET` | `/api/subscriptions/:id/invoices` | Invoices of one legacy subscription |
+| `GET` | `/api/invoices/:invoiceNumber` | One legacy invoice; `/download` returns the PDF |
+
+<Callout type="info">
+  The two tables coexist deliberately: the legacy `invoices` table holds tax
+  records Turkish law requires retaining for years and carries a `NOT NULL`
+  `subscriptionId`. The new `tenant_invoices` writer draws from the **same
+  number sequence** (`invoice_counters`) — two independent counters over one
+  number format would eventually collide at settlement, after the card was
+  charged.
+</Callout>
+
+## Renewal (manual)
+
+There is **no** card vault and no auto-charge. A renewal is paid by hand through
+the same checkout rail.
+
+| Step | Timing | What happens |
+| --- | --- | --- |
+| Cycle generation | **30 days** before the anniversary, daily 06:00 cron | A `RenewalCycle` is frozen with one line per owned row; prices are read **live** from the catalog at generation time and then fixed |
+| Reminders | Daily 09:00 cron | Once each at **30 / 7 / 1** days left; each send is appended to `remindersSent`, so no reminder goes out twice |
+| Grace | Anniversary + **7 days** | Unpaid rows go `past_due` but **keep granting** |
+| Lapse | Daily 00:30 cron | When grace ends, unpaid rows go `expired`: access goes dark, **data is not deleted** |
+
+The renewal cart is at full list price: it is quoted as of the anniversary, so
+remaining days equal cycle days and proration returns the whole price. When it
+is paid, the same `TenantAddOn` row is reactivated in place — no duplicate row,
+the ownership identity survives, and any scheduled capacity reduction
+(`pendingQuantity`) is honoured.
+
+<Callout type="warning">
+  If the licence line goes unpaid, it is not only that product that goes dark:
+  the grants of **every** `requiresLicense: true` product are suppressed.
+  Ownership rows and business data stay put, and paying the licence re-lights
+  everything on the next projection. See the
+  [Entitlement Matrix](/en/reference/plan-matrix).
+</Callout>
+
+## Cancellation
+
+Product cancellation lives on the marketplace rail and is **ADMIN-only**:
+`DELETE /api/v1/marketplace/addons/:id` (at period end by default,
+`?immediate=true` to revoke right away). Details in the
+[Marketplace API](/en/developer/marketplace-api).
+
+## Retired rails
+
+The following endpoints were removed in v3.3.0; a legacy integration calling
+them gets a `404`:
+
+| Removed | Replacement |
+| --- | --- |
+| `POST /api/subscriptions/:id/change-plan` | None — there are no tiers to move between; products are bought and dropped individually |
+| `POST /api/payments/create-intent` | `POST /api/v1/checkout/intent` |
+| `GET/POST /api/payments/bank-transfer/*` | None — collection runs on the PayTR rail |
+| `POST /api/v1/marketplace/addons/purchase` | `POST /api/v1/checkout/intent` (comps live only on the superadmin surface) |
+| `GET /api/subscriptions/usage/snapshot` | `GET /api/v1/me/licensing` |
+| `GET /api/subscriptions/effective-features` (still mounted, but plan-table bound: `404` without a `currentPlan`) | `GET /api/v1/entitlements/me` |
+| The `TRIAL_ENDED` lock / `PLAN_SELECTION_REQUIRED` envelope | None — with a free core the global subscription-status guard is gone; gates are per-route and return `ENTITLEMENT_REQUIRED` |
 
 ## Related
 
+- [Entitlement Matrix](/en/reference/plan-matrix) — the free core, product
+  grants, fold rules, and the `ENTITLEMENT_REQUIRED` envelope.
+- [Marketplace API](/en/developer/marketplace-api) — catalog listing, owned
+  products, and cancellation.
 - [API Fundamentals](/en/developer/api-fundamentals) — base URL, auth realms,
   branch scope, error envelope, rate-limit tiers.
-- [Webhooks](/en/developer/webhooks) — the `subscription.activated.v1` and
-  payment events that fire when these rails confirm.
-- Operator guides on help:
-  [Choosing & upgrading](https://help.hummytummy.com/en/plans/choosing-and-upgrading),
-  [Trial & billing](https://help.hummytummy.com/en/plans/trial-and-billing),
-  [Feature matrix](https://help.hummytummy.com/en/plans/feature-matrix).
+- [Webhooks](/en/developer/webhooks) — the payment and checkout events that fire
+  when these rails confirm.

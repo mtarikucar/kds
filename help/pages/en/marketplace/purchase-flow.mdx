@@ -1,6 +1,6 @@
 ---
 title: Purchase Flow
-description: Add an add-on to the cart, pay via PayTR, watch the entitlements activate, plus cancellation and period-end behaviour.
+description: Add an item to the cart, pay via PayTR, watch the entitlements activate, plus pro-rata pricing, manual renewal and cancellation behaviour.
 ---
 
 import { Callout, Steps } from 'nextra/components'
@@ -8,11 +8,12 @@ import { Callout, Steps } from 'nextra/components'
 # Purchase Flow
 
 **Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
-**Access:** ADMIN, MANAGER (payment confirmation and cancellation are ADMIN-only) • **Plan:** All plans
+**Access:** ADMIN, MANAGER (payment confirmation and cancellation are ADMIN-only) • **Module required:** None — the Marketplace is part of the free core
 
-The only way to buy an add-on is to add it to the cart in the Marketplace and
+The only way to buy an item is to add it to the cart in the Marketplace and
 **pay via PayTR**. No entitlement (limit or feature) is added to your account
-until the payment completes; there is no way to activate an add-on for free.
+until the payment completes; there is no way to activate a paid item for free.
+The free core needs no purchase at all — it is already on, forever.
 
 <Callout type="info">
   Operator comps can only be issued by the HummyTummy team / superadmin. On your
@@ -23,23 +24,25 @@ until the payment completes; there is no way to activate an add-on for free.
 
 <Steps>
 
-### Pick an add-on
+### Pick an item
 
-Find the add-on you want to buy on the Marketplace screen. Each card shows what
-the add-on does, its price (₺), and whether it's recurring or a one-time service.
+Find the item you want to buy on the Marketplace screen. Each card shows what it
+does, its price (₺), and whether it is annual or one-time.
 
 ### Add to cart
 
-Add the add-on to the cart. You can put several add-ons (and, if needed, plan or
-hardware lines) in the same cart; the screen shows the total **KDV-inclusive**.
-The total is always recalculated on the server, so the amount you pay is
+Add the item to the cart. You can put several items in the same cart: an opening
+cart of **licence + module(s) + credit pack** settles cleanly, because the server
+provisions in dependency order. The screen shows the total **KDV-inclusive**, and
+the total is always recalculated on the server, so the amount you pay is
 trustworthy.
 
 ### Continue to payment
 
 Use the **Pay / Continue** button to move to the payment step. The screen
 redirects you to the **PayTR** secure payment page, where each item in your cart
-appears as its own line (e.g. *"Extra KDS screen (monthly)"*).
+appears as its own line (e.g. *"Inventory & Cost Management (annual)"*). Payment
+is collected in **TRY** only.
 
 ### Complete the payment
 
@@ -47,10 +50,11 @@ Pay on the PayTR page. Once the payment is confirmed, you are returned to the ap
 
 ### Entitlements activate
 
-The moment the payment is confirmed, the entitlement the add-on grants is **added
-to your account automatically**. For example, if you bought one extra KDS screen,
-your KDS-screen limit goes up by one in the panel right away; if you bought an
-integration, the related setting/feature is enabled.
+The moment the payment is confirmed, the entitlement the item grants is **added
+to your account automatically**. For example, if you bought one Extra Branch,
+your branch limit goes up by one in the panel right away; if you bought a module
+or an integration, the related screen/setting is enabled; if you bought a credit
+pack, your balance is topped up.
 
 </Steps>
 
@@ -62,44 +66,66 @@ integration, the related setting/feature is enabled.
 
 ## How entitlements stack
 
-Add-ons stack on top of your plan; multiple sources of the same kind combine like
-this:
+What you buy stacks on top of the free core; multiple sources of the same kind
+combine like this:
 
-- **Limits** (KDS screens, stations, tablets, branches) → **summed.** For
-  example, if your plan gives 2 KDS screens and you buy 1 "Extra KDS screen",
-  the total becomes **3**.
-- **Features** (advanced reports, priority support, multi-location, etc.) →
+- **Limits** (branches) → **summed.** The core gives 1 branch; buy 2 "Extra
+  Branch" units and the total becomes **3**.
+- **Features** (advanced reports, priority support, reservations, etc.) →
   **enabled** if any source enables it.
-- **Integrations** (e-Fatura, Yemeksepeti, Getir, Trendyol) → all accumulate
+- **Integrations** (e-Invoice, Yemeksepeti, Getir, Trendyol) → all accumulate
   side by side; you can use several delivery integrations at once.
+- **Credits** → accumulate until consumed; a second pack adds to what is left of
+  the first.
 
-Buying the same capacity add-on twice to double a limit is blocked: if you
-already own an add-on, trying to buy the same item a second time is rejected and
-your card is not charged again.
+Paying twice for the same module or integration is blocked: if it is already
+active, the purchase is rejected (`ADDON_ALREADY_GRANTED` / `ADDON_ALREADY_OWNED`)
+and your card is not charged again. **Extra Branch** is the exception — it is
+quantity-based and can be bought repeatedly, up to 100 branches per account.
 
 ## Dependencies
 
-Some add-ons require something else to already be in place. Today the only add-on
-like this in the catalogue is **Hugin yazarkasa**: it requires the **PRO plan**.
-If you are not on PRO, the purchase is blocked and you're told to upgrade your
-plan first.
+- The **HummyTummy Licence** is the prerequisite for every paid module,
+  integration and capacity item. Without one the purchase is blocked
+  (`LICENSE_REQUIRED`) — unless the licence is in **the same cart**, which
+  satisfies it.
+- **Credit packs** require the item they belong to: AI credits require **AI Menu
+  Studio**, SMS credits require **SMS Notifications**. A sibling cart line
+  satisfies this too.
+- Credit packs and **On-site Installation & Training** need no licence.
 
-## Cancellation and period-end behaviour
+## Renewal
 
-Only an **ADMIN** can cancel an add-on (it's a billing decision). You have two
+Billing runs off your anniversary: the day you buy the licence becomes your
+account's **fixed anniversary**, and every annual item is collected onto **one
+invoice with one renewal date**. An item bought mid-year is priced pro rata for
+the days left until that anniversary; if fewer than 14 days remain, the remainder
+is billed together with the next full cycle. No line is ever priced below ₺1.
+
+<Callout type="warning">
+  **Renewal is manual.** There is no automatic card charge and no card on file.
+  You get reminders **30, 7 and 1 day** before the renewal date, and a **7-day
+  grace period** after it. If it goes unpaid, only **access to the paid items
+  goes dark** — **no data is deleted**, and everything comes back exactly as it
+  was the moment you pay. The free core is never affected.
+</Callout>
+
+## Cancellation behaviour
+
+Only an **ADMIN** can cancel an item (it's a billing decision). You have two
 options:
 
-- **Cancel at period end (default):** the add-on **stays active until the end of
+- **Cancel at period end (default):** the item **stays active until the end of
   the period**, and the entitlements it grants keep working until that date. When
   the period ends it closes automatically and the related limit/feature is
   revoked.
-- **Cancel immediately:** the add-on closes at once and the entitlements it
-  grants are **revoked right away**.
+- **Cancel immediately:** the item closes at once and the entitlements it grants
+  are **revoked right away**.
 
 <Callout type="info">
-  Recurring add-ons run on a 30-day period window; your real billing cycle aligns
-  with your main subscription's cycle. One-time service lines (e.g. on-site setup)
-  don't recur and have no period to cancel.
+  Annual items run on a period aligned to your licence anniversary. One-time
+  lines (credit packs, on-site setup) have no period to cancel; credits stay with
+  you until consumed.
 </Callout>
 
 ---
