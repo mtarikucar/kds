@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { WEBCHAT_CSP_ORIGIN } from './src/lib/webchat';
 import createNextIntlPlugin from 'next-intl/plugin';
 import { withSentryConfig } from '@sentry/nextjs';
 
@@ -41,9 +42,14 @@ const nextConfig: NextConfig = {
     // 2. swap Sentry's CDN replay worker for self-hosted to drop the
     //    sentry.io entry from connect-src.
     const isProd = process.env.NODE_ENV === 'production';
+    // The web-chat loader is fetched from, and frames, the Jeeta host. Both
+    // directives are widened from the SAME constant the widget tag renders
+    // from, and the constant is empty when the widget is switched off, so a
+    // staging deploy keeps the tighter header.
+    const webchat = WEBCHAT_CSP_ORIGIN ? ` ${WEBCHAT_CSP_ORIGIN}` : '';
     const scriptSrc = isProd
-      ? "script-src 'self' 'unsafe-inline'"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+      ? `script-src 'self' 'unsafe-inline'${webchat}`
+      : `script-src 'self' 'unsafe-inline' 'unsafe-eval'${webchat}`;
     const csp = [
       "default-src 'self'",
       scriptSrc,
@@ -51,6 +57,9 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https://hummytummy.com https://staging.hummytummy.com https://*.hugin.com.tr https://www.beko.com.tr https://www.epson.com.tr https://www.sunmi.com https://shop.interpay.com.tr https://www.penetek.com https://sps.honeywell.com https://www.zebra.com https://images.samsung.com https://productimages.hepsiburada.net https://cdn.dsmcdn.com https://img.akakce.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.sentry.io https://hummytummy.com https://staging.hummytummy.com",
+      // Without this the loader's iframe falls back to default-src 'self'
+      // and the chat panel never opens.
+      `frame-src 'self'${webchat}`,
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
