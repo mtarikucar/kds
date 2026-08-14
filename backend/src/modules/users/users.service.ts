@@ -185,7 +185,7 @@ export class UsersService {
           });
           if (activeCount >= effectiveMax) {
             throw new ForbiddenException(
-              `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on.`,
+              `User limit reached (${effectiveMax}). Users are unlimited on the free core, so this account has a capacity override — please contact support.`,
             );
           }
         }
@@ -743,7 +743,7 @@ export class UsersService {
         });
         if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
-            `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on, or deactivate another user before approving.`,
+            `User limit reached (${effectiveMax}). Users are unlimited on the free core, so this account has a capacity override — deactivate another user before approving, or contact support.`,
           );
         }
       }
@@ -806,7 +806,7 @@ export class UsersService {
         });
         if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
-            `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on.`,
+            `User limit reached (${effectiveMax}). Users are unlimited on the free core, so this account has a capacity override — please contact support.`,
           );
         }
       }
