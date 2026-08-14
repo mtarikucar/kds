@@ -110,7 +110,7 @@
     "fiscalRecovery": "Chek tiklash",
     "callerFeed": "Qo'ng'iroqlar",
     "hardwareOrders": "Jihoz buyurtmalarim",
-    "planAndAccess": "Tarif va kirish",
+    "planAndAccess": "Litsenziya va kirish",
     "sections": {
       "business": "Operatsiyalar",
       "menuAndTables": "Menyu va stollar",
@@ -263,7 +263,7 @@
         "periodEnds": "Davr tugashi"
       },
       "cancelAtPeriodEnd": "davr oxirida bekor qilinadi",
-      "includedInPlan": "Tarifingizga kiritilgan",
+      "includedInPlan": "Hisobingizda allaqachon faol",
       "owned": "Sizda bor",
       "active": "Faol",
       "purchasing": "Sotib olinmoqda…",
@@ -455,7 +455,7 @@
           "priceCents": "Narx (tiyin)",
           "currency": "Valyuta",
           "status": "Holat",
-          "deps": "Bog'liqliklar (vergul bilan; plan:PRO yoki qo'shimcha kodi)",
+          "deps": "Bog'liqliklar (vergul bilan; litsenziya yoki modul kodi)",
           "description": "Tavsif",
           "grants": "Ruxsatlar (JSON)",
           "cancel": "Bekor qilish",
@@ -480,7 +480,7 @@
           "brand": "Brend",
           "model": "Model",
           "priceCents": "Narx (tiyin)",
-          "rental": "Oylik ijara (tiyin, ixtiyoriy)",
+          "rental": "Oylik ijara (bekor qilingan, bo'sh qoldiring)",
           "currency": "Valyuta",
           "warranty": "Kafolat (oy)",
           "status": "Holat",
@@ -625,9 +625,9 @@
     "qrSettingsUpdatedSuccessfully": "QR sozlamalari muvaffaqiyatli yangilandi",
     "subscriptionCreatedSuccessfully": "Obuna muvaffaqiyatli yaratildi",
     "subscriptionCancelledSuccessfully": "Obuna muvaffaqiyatli bekor qilindi",
-    "planChangedSuccessfully": "Tarif muvaffaqiyatli o'zgartirildi",
+    "planChangedSuccessfully": "Modullar muvaffaqiyatli yangilandi",
     "redirectingToPayment": "To'lovga yo'naltirilmoqda...",
-    "downgradeScheduled": "Tarifni pasaytirish {{date}} da rejalashtirildi",
+    "downgradeScheduled": "Modulni olib tashlash {{date}} da rejalashtirildi",
     "subscriptionReactivatedSuccessfully": "Obuna muvaffaqiyatli qayta faollashtirildi",
     "userCreatedSuccessfully": "Foydalanuvchi muvaffaqiyatli yaratildi",
     "userUpdatedSuccessfully": "Foydalanuvchi muvaffaqiyatli yangilandi",
@@ -643,7 +643,7 @@
     "operationFailed": "Operatsiya amalga oshmadi",
     "deleteFailed": "O'chirish xatosi",
     "saveFailed": "Saqlash xatosi",
-    "changePlanFailed": "Tarifni o'zgartirib bo'lmadi",
+    "changePlanFailed": "Modullarni o'zgartirib bo'lmadi",
     "cancelSubscriptionFailed": "Obunani bekor qilib bo'lmadi",
     "reactivateSubscriptionFailed": "Obunani qayta faollashtirib bo'lmadi",
     "qrSettingsResetSuccessfully": "QR sozlamalari standart holatga qaytarildi",
@@ -675,7 +675,7 @@
     "productModifiersUpdatedSuccessfully": "Mahsulot modifikatorlari muvaffaqiyatli yangilandi",
     "modifierGroupRemovedFromProduct": "Modifikator guruhi mahsulotdan olib tashlandi",
     "registrationPendingApproval": "Ro'yxatdan o'tish muvaffaqiyatli. Hisobingiz administrator tasdiqlashini kutmoqda.",
-    "scheduledDowngradeCancelled": "Rejalashtirilgan tarif pasaytirish bekor qilindi"
+    "scheduledDowngradeCancelled": "Rejalashtirilgan modul olib tashlash bekor qilindi"
   },
   "time": {
     "today": "Bugun",
@@ -765,7 +765,7 @@
     "manageStaff": "Restoran xodimlarini va ularning rollarini boshqarish",
     "addUser": "Foydalanuvchi qo'shish",
     "currentUsers": "Joriy foydalanuvchilar",
-    "subscriptionLimitInfo": "Tarif rejangiz maksimal foydalanuvchilar sonini belgilaydi. Obuna limitlarini tekshiring.",
+    "subscriptionLimitInfo": "Bepul yadroda foydalanuvchilar soni cheklanmagan — qanchasi kerak bo'lsa, qo'shavering.",
     "user": "Foydalanuvchi",
     "email": "Email",
     "role": "Rol",
@@ -831,7 +831,7 @@
     "deleteTable": "Stolni o'chirish",
     "deleteOccupiedWarning": "Bu stol hozir band. O'chirish faol seansga ta'sir qilishi mumkin.",
     "deleteReservationWarning": "Bu stolda yaqinlashib kelayotgan bron bor",
-    "tableLimitInfo": "Obuna rejangiz ega bo'lishingiz mumkin bo'lgan stollarning maksimal sonini belgilaydi. Limitga yetgach ko'proq stol qo'shish uchun rejangizni yangilang.",
+    "tableLimitInfo": "Bepul yadroda stollar soni cheklanmagan — qanchasi kerak bo'lsa, qo'shavering.",
     "tableZone": "Zona",
     "zoneUnplaced": "Joylashtirilmagan",
     "noZonesHint": "Hali zonalar yo'q — stol zal plani muharriridagi joylashtirilmagan stollar bo'limida ko'rinadi.",
@@ -1013,30 +1013,30 @@
   },
   "pricing": {
     "title": "Narxlar",
-    "description": "Restoraningiz uchun mukammal tarifni tanlang. Barcha tariflarga bepul sinov davri kiradi.",
+    "description": "Yadro doimo bepul. Faqat kerakli modul uchun yiliga to'laysiz.",
     "monthly": "Oylik",
     "yearly": "Yillik",
-    "save20": "20% tejash",
+    "save20": "Bitta hisob-faktura, bitta yangilanish sanasi",
     "getStarted": "Boshlash",
     "faq": "Ko'p so'raladigan savollar",
-    "faqQ1": "Bepul sinov davri qanday ishlaydi?",
-    "faqA1": "Barcha tariflar 14 kunlik bepul sinov davriga ega. Boshlash uchun karta talab qilinmaydi. Istalgan vaqtda bekor qilishingiz mumkin.",
-    "faqQ2": "Tarifni keyinroq o'zgartira olamanmi?",
-    "faqA2": "Ha! Tarifni istalgan vaqtda oshirishingiz yoki pasaytirishingiz mumkin. O'zgarishlar keyingi hisob-kitob davrida aks etadi.",
+    "faqQ1": "Bepul yadro qanday ishlaydi?",
+    "faqA1": "Sinov davri yo'q. POS, oshxona ekrani, menyu boshqaruvi, stollar va zal rejasi, QR menyu, buyurtma boshqaruvi, kassa, asosiy hisobotlar, jamoa boshqaruvi va mijozlar doimo bepul. Foydalanuvchi, stol, mahsulot va oylik buyurtma soni cheksiz; karta ham, litsenziya ham talab qilinmaydi.",
+    "faqQ2": "Keyinroq modul qo'sha olamanmi?",
+    "faqA2": "Ha! Modullarni istalgan vaqtda qo'shishingiz mumkin. Yil davomida qo'shilgani yillik sanangizgacha qolgan kunlarga mutanosib narxlanadi, shuning uchun bitta hisob-faktura va bitta yangilanish sanasi qoladi.",
     "faqQ3": "Qaysi to'lov usullarini qabul qilasiz?",
     "faqA3": "Biz barcha asosiy kredit va debet kartalarni xavfsiz Turkiya to'lov provayderimiz PayTR orqali qabul qilamiz.",
     "faqQ4": "Ma'lumotlarim xavfsizmi?",
     "faqA4": "Albatta. Ma'lumotlaringizni xavfsiz saqlash uchun sanoat standartidagi shifrlash va xavfsizlik amaliyotlaridan foydalanamiz.",
     "off": "CHEGIRMA",
     "mostPopular": "Eng mashhur",
-    "currentPlan": "Joriy tarif",
-    "selectPlan": "Tarifni tanlash",
+    "currentPlan": "Hisobingizda faol",
+    "selectPlan": "Modulni tanlash",
     "month": "oy",
     "year": "yil",
     "save": "Tejash",
     "youSave": "Tejash",
     "endsOn": "gacha",
-    "dayFreeTrial": " kun bepul",
+    "dayFreeTrial": "Yadro doimo bepul",
     "subtitle": "Paketlar yo'q. Yadro bepul; faqat ishlatgan modulingiz uchun to'laysiz.",
     "freeCore": {
       "title": "Bepul yadro",
@@ -1062,20 +1062,20 @@
   "subscriptions": {
     "plans": {
       "FREE": {
-        "displayName": "Bepul tarif",
-        "description": "Endigina boshlayotgan kichik restoranlar uchun ideal"
+        "displayName": "Bepul yadro",
+        "description": "POS, oshxona ekrani, menyu, stollar, QR menyu va asosiy hisobotlar — doimo bepul va cheksiz"
       },
       "BASIC": {
-        "displayName": "Asosiy tarif",
-        "description": "O'sib borayotgan restoranlar uchun ajoyib"
+        "displayName": "Endi ishlatilmaydi",
+        "description": "Paket va tarif modeli bekor qilindi; pullik modullar yillik litsenziya bilan bittalab olinadi"
       },
       "PRO": {
-        "displayName": "Professional tarif",
-        "description": "Bir nechta filiallari bo'lgan barqaror restoranlar uchun"
+        "displayName": "Endi ishlatilmaydi",
+        "description": "Paket va tarif modeli bekor qilindi; pullik modullar yillik litsenziya bilan bittalab olinadi"
       },
       "BUSINESS": {
-        "displayName": "Biznes tarif",
-        "description": "Yirik restoran tarmoqlari uchun korporativ yechim"
+        "displayName": "Endi ishlatilmaydi",
+        "description": "Paket va tarif modeli bekor qilindi; pullik modullar yillik litsenziya bilan bittalab olinadi"
       }
     },
     "unlimited": "Cheksiz",
@@ -1107,7 +1107,7 @@
     "headline": "Restoran operatsiyalarini",
     "headlineHighlight": "optimallashtiring",
     "subtitle": "Restoranlar uchun zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
-    "startFreeTrial": "Bepul sinov boshlash",
+    "startFreeTrial": "Bepul boshlang",
     "learnMore": "Ko'proq bilish",
     "activeRestaurants": "Faol restoranlar",
     "ordersPerDay": "Kunlik buyurtmalar",
@@ -1149,7 +1149,7 @@
     "features": "Xususiyatlar",
     "pricing": "Narxlar",
     "contact": "Aloqa",
-    "freeTrial": "Bepul sinov",
+    "freeTrial": "Bepul yadro",
     "company": "Kompaniya",
     "contactUs": "Biz bilan bog'laning",
     "about": "Biz haqimizda",
@@ -1162,7 +1162,7 @@
     "getStarted": "Boshlash",
     "freeTrialNoCreditCard": "Karta talab qilinmaydi",
     "setupIn5Minutes": "5 daqiqada sozlash",
-    "cancelAnytime": "Istalgan vaqtda bekor qilish",
+    "cancelAnytime": "Majburiyat yo'q",
     "testimonials": "Sharhlar",
     "whatClientsSay": "Mijozlarimiz nima deydi",
     "testimonialSubtitle": "Kundalik operatsiyalari uchun HummyTummy'ga ishongan yuzlab restoranlarqa qo'shiling",

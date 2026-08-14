@@ -51,9 +51,17 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
         status: "entegre",
         logo: "/brand/logos/trendyol.png",
       },
+      // Migros Yemek ships and works, but it is not a separate purchase: the
+      // catalogue sells only yemeksepeti/getir/trendyol_yemek, while the route
+      // gate is domain-wide (`@RequiresIntegration("delivery")` with no
+      // provider, delivery-platforms.controller.ts) and DeliveryConfigService
+      // .create() does no per-vendor check. So owning ANY delivery integration
+      // enables the Migros adapter too. `entegre` is the honest status; the
+      // note keeps us from implying a Migros SKU exists.
       {
         name: "Migros Yemek",
         status: "entegre",
+        note: "Delivery entegrasyonuna dahil, ayrı ürün olarak satılmıyor",
         logo: "/brand/logos/migros.png",
       },
     ],
@@ -76,7 +84,7 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
   {
     key: "odeme",
     title: "Ödeme",
-    desc: "Online tahsilat ve abonelik ödemeleri güvenli altyapıyla; kasada nakit/kart ödemeleri adisyona işlenir.",
+    desc: "Online tahsilat ile lisans ve modül ödemeleri güvenli altyapıyla; kasada nakit/kart ödemeleri adisyona işlenir.",
     icon: CreditCard,
     brands: [
       { name: "PayTR", status: "entegre", logo: "/brand/logos/paytr.png" },

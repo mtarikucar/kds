@@ -11,14 +11,23 @@ export interface MarketplaceAddOn {
   name: string;
   description?: string;
   kind: 'software' | 'integration' | 'capacity' | 'support';
-  billing: 'recurring' | 'oneTime';
+  /**
+   * Billing cadence. There is no monthly rail — the catalogue only ever emits
+   * `annual` (the licence and the yearly modules/integrations it unlocks;
+   * renewal is manual) or `oneTime` (credit packs, on-site setup). Mirrors the
+   * backend `BILLING = ["annual", "oneTime"]` DTO enum
+   * (marketplace/dto/addon.dto.ts) and the `billing String @default("annual")`
+   * column, both of which this type used to contradict.
+   */
+  billing: 'annual' | 'oneTime';
   priceCents: number;
   currency: string;
   deps: string[];
-  // True when the authenticated tenant's plan already grants everything this
-  // add-on would. Only present on the tenant-aware /addons/available endpoint
-  // (the public /addons catalogue omits it). Drives the "Planınıza dahil"
-  // treatment so we never try to sell a feature the tenant already has.
+  // True when the tenant's effective entitlements (the free core, plus any
+  // modules they already hold) already grant everything this add-on would.
+  // Only present on the tenant-aware /addons/available endpoint (the public
+  // /addons catalogue omits it). Drives the "Hesabınızda zaten etkin"
+  // treatment so we never try to sell something the tenant already has.
   includedInPlan?: boolean;
 }
 

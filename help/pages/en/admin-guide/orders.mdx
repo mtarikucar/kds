@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components'
 
 **Where it's managed:** **[POS](/en/admin-guide/pos)** (`/pos`) and the **[Kitchen Display](/en/admin-guide/kitchen)** (`/kitchen`)
 **Access:** ADMIN, MANAGER, WAITER, KITCHEN (by role)
-**Plan:** Taking orders needs POS (`posAccess`, BASIC+); the kitchen flow is on all plans
+**Requires:** Included in the free core — POS (`posAccess`), the kitchen flow and an unlimited number of monthly orders
 
 ## Purpose
 
@@ -41,7 +41,7 @@ An order moves through these statuses:
 | --- | --- |
 | `DINE_IN` | Served at the table (dine-in) |
 | `TAKEAWAY` | Takeaway |
-| `DELIVERY` | Delivery to an address (delivery integration) |
+| `DELIVERY` | Delivery to an address (delivery-platform integration — bought separately) |
 | `COUNTER` | Tableless self-pay / counter order (bucketed separately in the Z-report) |
 
 ## QR-menu approval queue and requests

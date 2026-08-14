@@ -7,6 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
+import { isFreeBaselineFeature } from "../entitlements/free-baseline.const";
 import { UpdateTenantSettingsDto } from "./dto/update-tenant-settings.dto";
 import { TenantStatus } from "../../common/constants/subscription.enum";
 import {
@@ -73,24 +74,25 @@ export class TenantsService {
     if (newSubdomain === currentSubdomain) return;
     if (!newSubdomain) return;
 
-    // v2.8.90 — engine-routed. Falls back to the plan column if the
-    // engine has no grants for this tenant yet (projector race).
+    // v2.8.90 — engine-routed. The fallback used to read
+    // `tenant.currentPlan.customBranding`, which the à-la-carte migration
+    // turned into a guaranteed `false`: `20260811120000_free_core` nulled
+    // every `currentPlanId`, so the projector race it was meant to cover
+    // started denying the feature outright instead of covering for it.
+    // Custom branding is unconditionally free now
+    // (FREE_BASELINE_GRANTS), so the honest fallback is the baseline itself.
     const engineSet = await this.entitlements.getForTenant(tenantId, null);
     const engineCustomBranding = engineSet.features["feature.customBranding"];
-    let hasCustomBranding: boolean;
-    if (typeof engineCustomBranding === "boolean") {
-      hasCustomBranding = engineCustomBranding;
-    } else {
-      const tenantWithPlan = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-        include: { currentPlan: true },
-      });
-      hasCustomBranding = tenantWithPlan?.currentPlan?.customBranding ?? false;
-    }
+    const hasCustomBranding =
+      typeof engineCustomBranding === "boolean"
+        ? engineCustomBranding
+        : isFreeBaselineFeature("feature.customBranding");
 
     if (!hasCustomBranding) {
+      // Reachable only when ops has suppressed a free-core capability for
+      // this one tenant (`override:admin`), so there is nothing to sell.
       throw new ForbiddenException(
-        "Custom subdomain is a Pro feature. Upgrade your plan or buy the add-on to set or change your subdomain.",
+        "Custom subdomain is part of the free core, but it is currently disabled on this account. Please contact support.",
       );
     }
   }

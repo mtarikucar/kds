@@ -1,73 +1,157 @@
 ---
-title: Deneme ve faturalama
-description: 7 günlük deneme, TRIAL_ENDED kilidi, faturalama döngüsü ve KDV dahil fiyatlandırma.
+title: Faturalama ve yenileme
+description: Yıl dönümü, orantılı fiyatlama, tek fatura, KDV dahil tutarlar ve manuel yıllık yenileme.
 ---
 
 import { Callout, Steps } from 'nextra/components'
 
-# Deneme ve faturalama
+# Faturalama ve yenileme
 
-## 7 günlük deneme
+Ücretsiz çekirdek için fatura kesilmez ve ödeme alınmaz. Bu sayfa yalnızca
+**ücretli kalemlerin** (lisans, modüller, entegrasyonlar, kapasite, kontör ve
+hizmetler) nasıl fiyatlandığını ve nasıl yenilendiğini anlatır.
 
-Her yeni işletme, kayıt anında otomatik olarak **Deneme** paketine alınır:
+## Yıl dönümü: hesabınızın tek tarihi
 
-- **Süre:** 7 gün.
-- **Kapsam:** Kurumsal paketin **tüm özellikleri** ve **sınırsız** limitler. Yani deneme boyunca hiçbir özellik kısıtlamasına takılmadan ürünü tam kapasite test edebilirsiniz.
-- **Satılamaz:** Deneme paketi plan seçim ekranında listelenmez; satın alınan bir paket değildir, kayıt anında size atanır.
+Lisansı satın aldığınız gün, hesabınızın **değişmez yıl dönümü** olur. Bu tarih
+sonradan kaymaz — yenilemeyi geç ödeseniz bile aynı kalır.
 
-Deneme, ayrı bir karşılama (onboarding) paketi olarak çalışır; herhangi bir ücretli pakete bağlı değildir. Deneme süreniz dolmadan bir ücretli paket seçmeniz beklenir.
+Bunun tek amacı şudur: **tek yenileme tarihi, tek fatura.** Yıl içinde ne
+alırsanız alın, hepsi aynı güne hizalanır; her ürün için ayrı tarih takip
+etmezsiniz.
 
-## Deneme bitince ne olur? (kilit)
+## Orantılı fiyatlama
 
-Deneme süreniz **bir ücretli paket seçmeden** dolarsa işletmeniz kilitlenir. Bu, sessizce daha düşük bir pakete düşürülme değil; **açık bir kilittir** — devam etmek için bir paket seçmeniz gerekir.
+Yıl içinde aldığınız yıllık bir kalem, **yıl dönümüne kalan gün kadar**
+fiyatlanır.
+
+**Örnek.** Lisansı 1 Mart'ta aldınız; yıl dönümünüz her yıl 1 Mart. 1 Eylül'de
+₺1.490'lık Stok & Maliyet modülünü eklerseniz:
+
+| | |
+| --- | --- |
+| Yıl dönümüne kalan | 181 gün (365 günlük döngüde) |
+| Şimdi ödeyeceğiniz | **₺738,88** (1.490 × 181 / 365) |
+| 1 Mart'ta yenileme | ₺1.490 (tam yıl) |
+
+<Callout type="info">
+  **Yıl dönümüne 14 gün veya daha az kalmışsa** kalem kalan güne sıkıştırılmaz:
+  kalan gün için hesaplanan tutar **artı bir sonraki tam yıl** birlikte
+  faturalanır ve ürün bir sonraki yıl dönümüne kadar açık kalır. Örneğin 10 gün
+  kala alınan ₺990'lık Rezervasyon modülü ₺27,12 + ₺990 = **₺1.017,12** olur.
+</Callout>
+
+Fiyatlamayla ilgili iki kural daha:
+
+- **Hiçbir satır ₺1'in altına inmez.** Orantı çok küçük bir tutar üretirse satır
+  ₺1'e yuvarlanır.
+- **Yenileme her zaman tam fiyattır.** Yıl içinde orantılı ödediğiniz bir kalem,
+  yıl dönümünde tam yıllık liste fiyatından yenilenir.
+- **Tek seferlik kalemler orantılanmaz.** Kontörler ve yerinde kurulum gibi
+  hizmetler sabit tutarlıdır ve yenilemeye girmez.
+
+## KDV dahil fiyatlandırma
+
+İlan edilen tüm fiyatlar **brüt** (KDV dahil) tutarlardır ve sizden tam olarak
+bu tutar tahsil edilir — fatura aşamasında üstüne ayrıca KDV eklenmez. Faturada
+toplam, içindeki KDV ayrı bir kalem olarak görünecek şekilde ayrıştırılır.
+
+**Örnek — Lisans ₺2.990:**
+
+| Kalem | Tutar |
+| --- | --- |
+| Ara toplam (net) | ₺2.491,67 |
+| KDV (%20) | ₺498,33 |
+| **Toplam (tahsil edilen)** | **₺2.990,00** |
+
+<Callout type="info">
+  Faturaya, işletmenizin **fatura kesim anındaki** vergi numarası yazılır. Vergi
+  numaranızı sonradan değiştirseniz bile geçmiş faturalarınız etkilenmez.
+</Callout>
+
+## Ödeme
+
+Tahsilat **PayTR** üzerinden ve yalnızca **TRY** olarak yapılır. Ödeme
+ekranında sepetinizdeki her kalem ayrı satır olarak görünür; ödeme başlamadan
+önce mesafeli satış belgelerini onaylamanız istenir.
+
+Satın alma ve ödeme için **Yönetici (ADMIN)** veya **Müdür (MANAGER)** rolü
+gerekir.
+
+<Callout type="warning">
+  Ödeme yarıda kalırsa hiçbir ücret alınmaz ve hiçbir hak eklenmez. Bir hak
+  ancak ödeme onaylandığında hesabınıza geçer.
+</Callout>
+
+## Yenileme manueldir
+
+**Otomatik kart çekimi yoktur; kayıtlı kartınız tutulmaz.** Yılda bir kez, siz
+ödeyerek yenilersiniz. Akış şöyle işler:
 
 <Steps>
 
-### Uygulama kilitlenir
-Deneme bittiğinde panelde gezinmeye çalıştığınızda, "Deneme süreniz sona erdi. Devam etmek için bir plan seçin." mesajıyla karşılaşırsınız ve normal ekranlara erişiminiz durur.
+### Yenileme sepeti hazırlanır
 
-### Hâlâ yapabilecekleriniz
-Kilitliyken bile **plan seçim ve ödeme ekranlarına** ulaşabilirsiniz: paketleri görebilir, bir paket seçip ödeme yapabilirsiniz. Diğer iş ekranları (POS, mutfak, raporlar vb.) bir paket seçene kadar kapalı kalır.
+Yıl dönümünüze yaklaşık **30 gün** kala, o an sahip olduğunuz yıllık ürünlerden
+oluşan yenileme sepeti oluşturulur ve tutarı **dondurulur**. Katalog fiyatı
+sonradan değişse bile size bildirilen tutarı ödersiniz.
 
-### Otomatik yönlendirme
-Kilitliyken uygulama sizi otomatik olarak plan seçim ekranına yönlendirir; oradan bir paket seçerek kilidi açarsınız.
+### Hatırlatmalar gelir
+
+Yıl dönümüne **30, 7 ve 1 gün** kala hatırlatma gönderilir. Tutar ve tarih
+**Lisans & Erişim** sayfasındaki yenileme kartında da görünür.
+
+### Ödersiniz
+
+Yenileme kartındaki bağlantıdan tek ödemeyle bütün sepeti kapatırsınız. Ürünler
+bir sonraki yıl dönümüne kadar açık kalır.
+
+### Ödemezseniz: 7 günlük ek süre
+
+Yıl dönümünden sonra **7 gün ek süre** tanınır; bu süre boyunca her şey açık
+kalmaya devam eder ve ödeme yaparak yenileyebilirsiniz.
+
+### Ek süre de dolarsa: erişim kararır
+
+Yenilenmeyen ücretli ürünler kapanır. Lisans kapanırsa, lisansa bağlı tüm
+modüllerin erişimi de kapanır.
 
 </Steps>
 
 <Callout type="warning">
-  Aynı kilit yalnızca deneme bitişinde değil, aboneliğiniz **süresi dolduğunda** veya **iptal edildiğinde** de devreye girer. Ödemesi geciken (PAST_DUE) bir abonelik ise 7 günlük ödemesiz dönem (grace) boyunca canlı sayılır ve kilitlenmez.
+  **Verileriniz silinmez.** Erişim kararırken hiçbir iş kaydınıza dokunulmaz —
+  stok kalemleriniz, rezervasyonlarınız, personel kayıtlarınız, ürettiğiniz AI
+  içerikleri, faturalarınız ve siparişleriniz yerinde durur. Ödeme yaptığınızda
+  her şey aynen geri açılır.
 </Callout>
-
-## Faturalama döngüsü
-
-İki faturalama döngüsünden birini seçersiniz: **Aylık** veya **Yıllık**. Seçtiğiniz döngü; abonelik başlatma, yükseltme ve düşürmede dönem uzunluğunu ve ödeyeceğiniz tutarı belirler. **Yıllık ödeme, aylık tutarın 12 katından daha düşüktür** (yaklaşık %17 tasarruf).
-
-Geçmiş faturalarınızı paneldeki faturalar ekranından görüntüleyip indirebilirsiniz; her fatura için tarih, tutar ve dönem bilgisi listelenir.
-
-## KDV dahil fiyatlandırma
-
-İlan edilen tüm paket fiyatları **brüt** (KDV dahil) tutarlardır ve sizden tam olarak bu tutar tahsil edilir — fatura aşamasında üstüne ayrıca KDV eklenmez. Faturada toplam tutar, içindeki KDV ayrı bir kalem olarak gösterilecek şekilde ayrıştırılır.
-
-**Örnek — Profesyonel aylık ₺1.299:**
-
-| Kalem | Tutar |
-| --- | --- |
-| Ara toplam (net) | ₺1.082,50 |
-| KDV (%20) | ₺216,50 |
-| **Toplam (tahsil edilen)** | **₺1.299,00** |
 
 <Callout type="info">
-  Faturaya, işletmenizin **fatura kesim anındaki** vergi numarası yazılır. Vergi numaranızı sonradan değiştirseniz bile geçmiş faturalarınız etkilenmez.
+  Ücretsiz çekirdek bu durumdan etkilenmez: POS, mutfak ekranı, menü, masa
+  planı, QR menü, sipariş, kasa ve ekip yönetimi çalışmaya devam eder.
 </Callout>
 
-## İptal ve yeniden etkinleştirme
+## Faturalarınızı görmek
 
-- **İptal** — Aboneliğinizi panelden iptal edebilirsiniz (yalnızca Yönetici). İptalin **anında mı yoksa dönem sonunda mı** geçerli olacağını seçebilir ve isterseniz kısa bir **iptal nedeni** girebilirsiniz.
-- **Yeniden etkinleştirme** — İptal edilmiş bir aboneliği panelden yeniden etkinleştirebilirsiniz (yalnızca Yönetici).
+**Lisans & Erişim** (`/admin/license`) sayfasının alt kısmında faturalarınız
+listelenir: fatura numarası, tarih, kalem sayısı ve toplam tutar. Her fatura
+kalem kalem ayrıştırılmıştır — hangi ürün için ne ödediğinizi tek tek
+görebilirsiniz.
+
+Aynı sayfada ayrıca şunlar bulunur: lisans durumunuz ve yenileme tarihiniz,
+sahip olduğunuz ürünlerin listesi (bitiş tarihi ve yenileme tutarıyla) ve
+kontör bakiyeleriniz.
+
+## Kontörlerin faturalaması
+
+Kontör paketleri **tek seferlik** alınır, **süresi yoktur** ve **tükenene
+kadar** geçerlidir. Yenileme sepetine girmezler; bittiğinde yeniden satın
+alırsınız. Kontör alabilmek için ilgili modüle sahip olmanız gerekir (AI
+kontörleri AI Menü Stüdyosu'nu, SMS kontörü SMS Bildirimleri'ni ister).
 
 ## İlgili sayfalar
 
-- Plan seçme, yükseltme ve ödeme akışları: **[Plan seçimi ve yükseltme](/tr/plans/choosing-and-upgrading)**
-- Paketlerin tam özellik/limit karşılaştırması: **[Özellik matrisi](/tr/plans/feature-matrix)**
+- Ücretsiz çekirdek ve tam fiyat listesi: **[Lisans ve Modüller](/tr/plans)**
+- Hangi özelliğin hangi modülle açıldığı: **[Özellik matrisi](/tr/plans/feature-matrix)**
+- İhtiyacınıza göre modül seçimi: **[Hangi modüller size uygun](/tr/plans/choosing-and-upgrading)**
 
-Geliştirici/entegrasyon detayları (uç noktalar, JSON, fatura/iptal API'leri, TRIAL_ENDED kilit zarfı): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)
+Geliştirici/entegrasyon detayları (uç noktalar, JSON, fatura/yenileme API'leri): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

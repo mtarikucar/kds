@@ -1,20 +1,20 @@
 ---
 title: Core Concepts
-description: Tenant, Branch, Roles, and the 7-day trial — the concepts to understand before working in HummyTummy.
+description: Tenant, Branch, Roles, and the free core — the concepts to understand before working in HummyTummy.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Core Concepts
 
-Understanding four core concepts will make HummyTummy much easier to use: **Tenant**, **Branch**, **Roles**, and the **trial (TRIAL)**.
+Understanding four core concepts will make HummyTummy much easier to use: **Tenant**, **Branch**, **Roles**, and the **free core**.
 
 ## Tenant (Restaurant / Business)
 
 A **tenant** is your entire business as it lives in the system — that is, your restaurant. When you register, a tenant is created for you, and all of your data (menu, tables, orders, staff, reports) is stored under it.
 
 - Each tenant is **fully isolated**: you cannot see another business's data, and they cannot see yours.
-- A tenant has a **subscription status** (trial / active / etc.) and a **plan**.
+- Every tenant runs on the **free core**; once you buy a paid module, your tenant also has a **licence term** (its anniversary).
 - The first user who creates the tenant is always an **ADMIN**.
 
 ## Branch
@@ -22,7 +22,7 @@ A **tenant** is your entire business as it lives in the system — that is, your
 A **branch** is a physical location under your tenant. At registration, a default branch named **"Main"** is created automatically — so you have a branch without doing anything.
 
 - Single-location businesses run on one branch.
-- Multi-branch chains can add more branches (subject to plan limits).
+- **The first branch is free.** Multi-branch chains add branches by buying the **Extra Branch** item (annual, with the licence as a prerequisite) per branch.
 - A lot of data — menu, tables, orders, stock — is **branch-scoped**, meaning each branch has its own tables and its own orders.
 
 <Callout type="info">
@@ -37,7 +37,7 @@ Every user has a **role** that determines what they can access. There are five r
 
 | Role | Who? | Typical permissions |
 |---|---|---|
-| **ADMIN** | Owner / top-level admin | Everything: settings, plan/subscription, user management, all branches, reports |
+| **ADMIN** | Owner / top-level admin | Everything: settings, licence/billing and purchases, user management, all branches, reports |
 | **MANAGER** | Branch / operations manager | Operations, menu/tables/staff, reports (on assigned branches) |
 | **WAITER** | Waiter | Take orders from POS, table actions (in their own branch) |
 | **KITCHEN** | Kitchen staff | Kitchen Display (KDS): update order status |
@@ -50,20 +50,26 @@ Every user has a **role** that determines what they can access. There are five r
   branches. You add other staff and assign their roles later from the Admin panel.
 </Callout>
 
-## Trial (TRIAL — 7 days)
+## The free core
 
-Every newly registered tenant starts on a **dedicated 7-day trial plan (TRIAL)**:
+Every newly registered tenant runs on the **free core** straight away — there is no trial stage:
 
-- **All premium features unlocked**, no charge, no card required.
-- The subscription status during the trial is **TRIALING**.
-- The trial is **one-time per tenant** (abuse is prevented).
+- **Free forever**, no charge, no card required, no licence needed.
+- What it covers: POS and tabs, kitchen display (KDS), menu management, tables and floor plan, QR menu, order management, cash drawer, basic reports, team and role management, customers, the device and branch panel, custom branding and domain.
+- **Users, tables, products, categories and monthly orders are unlimited.** The first branch is free.
+- The account is never locked for "the trial ended" — the free core does not switch off.
 
-**What happens after 7 days?** The trial ends and the account **locks** (`TRIAL_ENDED`): to continue, you must choose a **paid plan**. It does not silently drop to a free tier — this is a deliberate design choice.
+## Licence and modules
 
-<Callout type="warning">
-  When the trial ends, the UI redirects you to the plan-selection page and
-  branch-scoped actions are locked until a paid plan is activated. Your data is not
-  deleted; you pick up right where you left off as soon as a plan is activated.
+Anything beyond the core is sold as **individual annual modules** (Advanced Reports & Analytics, Inventory & Cost, Reservations, Staff, AI Menu Studio, API & Webhook, Partner Display API, Priority Support), integrations (Yemeksepeti, Getir, Trendyol Yemek, e-Invoice, Fiscal Printer, Caller-ID, SMS), or capacity (Extra Branch).
+
+- The **HummyTummy Licence** (annual) is the prerequisite for every paid module: you need it both to buy one and to use it.
+- Until you buy a module you pay nothing, and there is no tier to upgrade or downgrade.
+
+<Callout type="info">
+  The day you buy the licence becomes your account's **fixed anniversary**. Every
+  annual item bought later in the year is priced pro rata for the days left until
+  that anniversary, so you stay on one invoice with one renewal date.
 </Callout>
 
-For plan options and pricing, see the **[Plans](/en/plans)** page.
+For the free core, the licence, and current module prices, see the **[Licence & Pricing](/en/plans)** page.

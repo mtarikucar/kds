@@ -1,47 +1,144 @@
 ---
-title: Planlar
-description: HummyTummy abonelik paketleri — fiyatlar, kapsam ve hangi paketin sizin için doğru olduğu.
+title: Lisans ve Modüller
+description: Ücretsiz çekirdek, yıllık HummyTummy lisansı ve tek tek satın alınan modüller — kapsam ve güncel fiyat listesi.
 ---
 
 import { Callout, Cards } from 'nextra/components'
 
-# Planlar
+# Lisans ve Modüller
 
-HummyTummy üç satılabilir paket sunar: **Başlangıç (BASIC)**, **Profesyonel (PRO)** ve **Kurumsal (BUSINESS)**. Her yeni işletme, kayıt anında **7 günlük tam özellikli Deneme (TRIAL)** ile başlar; deneme bittiğinde devam etmek için ücretli bir paket seçmek gerekir.
+HummyTummy'nin **çekirdeği ücretsizdir ve süresiz açık kalır**. Paket, kademe,
+plan ya da deneme süresi yoktur. İhtiyaç duyduğunuz ücretli modülleri **tek tek**,
+yıllık olarak satın alırsınız — kullanmadığınız hiçbir şey için ödeme yapmazsınız.
 
-Tüm fiyatlar **Türk Lirası (TRY)** cinsinden ve **KDV dahildir**.
+Tüm fiyatlar **Türk Lirası (TRY)** cinsinden ve **KDV dahildir**; ekranda
+gördüğünüz tutar tahsil edilecek tutardır.
 
-## Paketler ve fiyatlar
+## Ücretsiz çekirdek
 
-| Paket | Aylık | Yıllık | Kime uygun |
-| --- | --- | --- | --- |
-| **Başlangıç** (BASIC) | **₺499/ay** | **₺4.490/yıl** | Kafe ve küçük restoranlar için temel POS + stok takibi |
-| **Profesyonel** (PRO) | **₺1.299/ay** | **₺12.990/yıl** | Rezervasyon + delivery + personel takibi gereken şehir merkezi restoranlar |
-| **Kurumsal** (BUSINESS) | **₺2.999/ay** | **₺29.990/yıl** | Çok şubeli zincirler — sınırsız + API erişimi + öncelikli destek |
+Aşağıdakiler her işletmede **süresiz**, **kredi kartı istenmeden** ve **lisans
+gerekmeden** açıktır:
+
+- **POS ve adisyon** — sipariş alma, satış ekranı
+- **Mutfak ekranı (KDS)**
+- **Menü yönetimi**
+- **Masa ve kat planı**
+- **QR menü**
+- **Sipariş yönetimi**
+- **Kasa ve nakit**
+- **Temel raporlar**
+- **Ekip ve rol yönetimi**
+- **Müşteriler**
+- **Cihaz ve şube paneli**
+- **Özel marka ve alt alan adı (subdomain)**
+
+Kullanım limitleri de çekirdeğin parçasıdır:
+
+- **Kullanıcı, masa, ürün, kategori ve aylık sipariş sayısı sınırsızdır.**
+- **İlk şubeniz ücretsizdir.** Şube panelinin kendisi de ücretsizdir; ücretli
+  olan tek kapasite kalemi **ikinci ve sonraki şubelerdir**.
 
 <Callout type="info">
-  Yıllık ödemede ~%17 tasarruf edersiniz: 12 aylık tutar yerine yıllık tutarı ödersiniz (ör. Başlangıç'ta 12 × ₺499 = ₺5.988 yerine ₺4.490).
+  Çekirdeği kullanmaya başlamak için ödeme bilgisi girmeniz gerekmez ve
+  kapanacak bir deneme süresi yoktur. Sistemi kendi verinizle kurmadan önce
+  incelemek isterseniz panelden **paylaşımlı demo restoranına** geçip gerçek
+  veriyle dolaşabilirsiniz.
 </Callout>
 
-## Her pakette ne var?
+## Lisans ne işe yarar?
 
-Üç paketin de temel restoran işletmeciliği için ihtiyaç duyduğunuz çekirdek modülleri içerir:
+| Ürün | Yıllık |
+| --- | --- |
+| **HummyTummy Lisansı** | **₺2.990** |
 
-- **POS erişimi** (`posAccess`) — sipariş alma ve satış ekranı
-- **KDS entegrasyonu** (`kdsIntegration`) — mutfak ekranı
-- **Stok takibi** (`inventoryTracking`) — ürün ve malzeme stoğu
+Lisans, ücretli modülleri **hem satın almanın hem de kullanmanın ön koşuludur**.
+Modül satın alırken lisansınız yoksa mağaza lisansı adisyonunuza otomatik ekler.
 
-Paketler yukarı çıktıkça gelişmiş raporlar, çok şube, rezervasyon, personel yönetimi, delivery entegrasyonu, özel marka, API erişimi gibi yetenekler açılır ve kullanım limitleri (kullanıcı, masa, şube, ürün, sipariş) yükselir.
+Lisansı aldığınız gün hesabınızın **değişmez yıl dönümü** olur: sonradan
+aldığınız her yıllık kalem bu tarihe kadar orantılı fiyatlanır ve hesabınız tek
+faturayla, tek tarihte yenilenir. Ayrıntı: [Faturalama ve yenileme](/tr/plans/trial-and-billing).
 
 <Callout type="warning">
-  **Ücretsiz (FREE) paket kaldırılmıştır.** Eski tenant'lar için enum değeri yalnızca uyumluluk amacıyla durur; satışa açık değildir ve hiçbir yeni işletme bu pakete düşmez. Deneme süresi biten işletmeler `TRIAL_ENDED` durumuna geçer ve uygulama bir paket seçilene kadar kilitlenir — bkz. [Deneme ve faturalama](/tr/plans/trial-and-billing).
+  Lisans karardığında (yenilenmezse) **ücretli modüllerin erişimi de kapanır** —
+  lisansa bağlı ürünlerin hakları lisans aktif olmadığı sürece verilmez.
+  Verileriniz silinmez; ödeme yapıldığında her şey aynen geri açılır.
 </Callout>
+
+## Modüller
+
+Her biri yıllık; hepsi lisans ön koşuluna tabidir.
+
+| Modül | Yıllık | Ne açar |
+| --- | --- | --- |
+| Gelişmiş Rapor & Analitik | **₺1.290** | Detaylı satış, ürün, personel ve müşteri analitiği; muhasebe back-office ve e-belge ayarları |
+| Stok & Maliyet Yönetimi | **₺1.490** | Reçete, stok sayımı, satın alma siparişi, fire takibi, tedarikçi yönetimi, şubeler arası transfer |
+| Rezervasyon Sistemi | **₺990** | Rezervasyon takvimi, müsaitlik hesabı, halka açık online rezervasyon sayfası |
+| Personel Yönetimi | **₺990** | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
+| AI Menü Stüdyosu | **₺1.990** | Yapay zekâ ile ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretimler kontörle harcanır) |
+| API & Webhook Erişimi | **₺2.490** | REST API anahtarları ve giden webhook'lar |
+| Partner Ekran API | **₺1.990** | Üçüncü taraf ekranların menünüzü göstermesi için ekran bazlı API |
+| Öncelikli Destek | **₺1.990** | Destek taleplerinde öncelikli sıra ve garantili yanıt süresi |
+
+## Entegrasyonlar
+
+| Entegrasyon | Yıllık | Ne açar |
+| --- | --- | --- |
+| Yemeksepeti | **₺2.490** | Yemeksepeti siparişleri otomatik olarak POS ve mutfağa düşer |
+| Getir | **₺2.490** | Getir siparişleri otomatik olarak POS ve mutfağa düşer |
+| Trendyol Yemek | **₺2.490** | Trendyol Yemek siparişleri otomatik olarak POS ve mutfağa düşer |
+| e-Fatura (Nilvera) | **₺1.990** | Satış faturalarının Nilvera üzerinden e-Fatura / e-Arşiv olarak gönderilmesi |
+| ÖKC / Yazarkasa (Hugin) | **₺2.990** | Hugin yazarkasa ile entegre fiş kesimi ve mali rapor senkronizasyonu |
+| Çağrı-ID | **₺1.490** | Gelen çağrıda müşteriyi otomatik tanıma, tek tıkla sipariş açma |
+| SMS Bildirimleri | **₺990** | Sipariş, rezervasyon ve kampanya SMS'leri (gönderimler kontörle harcanır) |
+
+<Callout type="info">
+  Teslimat entegrasyonları birikir: birden fazla platformu aynı anda
+  kullanabilirsiniz, hepsi tek mutfak akışına düşer.
+</Callout>
+
+## Kapasite
+
+| Kalem | Yıllık | Not |
+| --- | --- | --- |
+| Ek Şube | **₺3.990 / adet** | İlk şube ücretsizdir. Adet olarak alınır; hesap başına en fazla 100 adet |
+
+## Kontör (tek seferlik)
+
+Kontörler **tek seferlik** satın alınır, **süresi yoktur** ve **tükenene kadar**
+geçerlidir. Yıllık yenilemeye girmezler.
+
+| Kontör | Tutar | Ön koşul |
+| --- | --- | --- |
+| 100 AI görsel | **₺690** | AI Menü Stüdyosu |
+| 20 AI video | **₺890** | AI Menü Stüdyosu |
+| 10 AI 3D model | **₺790** | AI Menü Stüdyosu |
+| 500 SMS | **₺490** | SMS Bildirimleri |
+
+## Hizmet (tek seferlik)
+
+| Hizmet | Tutar | Ne içerir |
+| --- | --- | --- |
+| Yerinde Kurulum & Eğitim | **₺7.500** | Tam gün yerinde kurulum, cihaz devreye alma ve personel eğitimi |
+
+<Callout type="warning">
+  Yerinde kurulum bir **hizmet** kalemidir: ödenir ve faturalanır ama hesabınıza
+  bir özellik veya limit eklemez, tekrarlanmaz.
+</Callout>
+
+## Panelde nerede?
+
+- **Lisans & Erişim** (`/admin/license`, sol menüde *Ayarlar & Erişim → Plan &
+  Erişim*) — lisans durumunuz, sahip olduğunuz ürünler, kontör bakiyeleriniz,
+  yenileme tarihiniz ve faturalarınız.
+- **Mağaza** (`/admin/store`, üst bardaki mağaza simgesi) — katalogdan
+  istediğiniz kalemleri işaretler, toplamı anında görür ve tek ödemeyle
+  alırsınız.
 
 ## Devam edin
 
 <Cards>
   <Cards.Card title="Özellik matrisi" href="/tr/plans/feature-matrix" />
-  <Cards.Card title="Plan seçimi ve yükseltme" href="/tr/plans/choosing-and-upgrading" />
-  <Cards.Card title="Deneme ve faturalama" href="/tr/plans/trial-and-billing" />
-  <Cards.Card title="Marketplace eklentileri" href="/tr/marketplace" />
+  <Cards.Card title="Hangi modüller size uygun" href="/tr/plans/choosing-and-upgrading" />
+  <Cards.Card title="Faturalama ve yenileme" href="/tr/plans/trial-and-billing" />
+  <Cards.Card title="Marketplace" href="/tr/marketplace" />
 </Cards>

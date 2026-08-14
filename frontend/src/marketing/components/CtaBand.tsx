@@ -10,7 +10,7 @@ interface CtaBandProps {
 
 export default function CtaBand({
   title = "Bugün kurun, bugün sipariş alın",
-  subtitle = "7 gün boyunca tüm özellikleri ücretsiz deneyin. Kredi kartı istemiyoruz.",
+  subtitle = "POS, mutfak ekranı, menü, masa ve QR menü süresiz ücretsiz. Kredi kartı istemiyoruz.",
   chips = ["Kurulum ücreti yok", "Kredi kartı gerekmez", "Türkçe destek"],
 }: CtaBandProps) {
   return (
@@ -32,7 +32,7 @@ export default function CtaBand({
             to="/register"
             className="inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-7 py-3.5 text-base font-semibold text-white transition hover:bg-[#ea580c]"
           >
-            7 Gün Ücretsiz Başla <ArrowRight className="h-4 w-4" />
+            Ücretsiz Başla <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             to="/login"

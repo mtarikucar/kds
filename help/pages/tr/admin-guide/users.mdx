@@ -8,7 +8,7 @@ import { Callout, Steps } from 'nextra/components'
 # Kullanıcılar & Roller
 
 **Menü yolu:** Operasyon → Kullanıcılar &nbsp;•&nbsp; **URL:** `/admin/users`
-**Erişim:** ADMIN, MANAGER  •  **Plan:** Tüm planlar
+**Erişim:** ADMIN, MANAGER  •  **Gereksinim:** Ücretsiz çekirdeğe dahildir (kullanıcı sayısı **sınırsız**)
 
 ## Amacı
 
@@ -16,8 +16,8 @@ Bu ekran, restoranınızda çalışan **personelin sistem hesaplarını** yönet
 
 <Callout type="info">
   Bu ekran **ADMIN** ve **MANAGER** rollerine açıktır (bir kullanıcının **rolünü**
-  değiştirmek yalnızca **ADMIN** yetkisindedir). Plan kısıtı yoktur; ancak planınızın
-  **kullanıcı limiti** doluysa yeni hesap ekleyemezsiniz (aşağıya bakın).
+  değiştirmek yalnızca **ADMIN** yetkisindedir). Ekip ve rol yönetimi ücretsiz
+  çekirdeğe dahildir; **kullanıcı sayısı sınırsızdır**, kişi başı ücret yoktur.
 </Callout>
 
 ## Ekranın düzeni
@@ -60,17 +60,17 @@ Kullanıcı **durumu** dört değerden birini alır ve satırdaki işlemler duru
   asıl yetki sunucudadır. Silme işlemi **geri alınamaz** ve hesabı kalıcı olarak kaldırır.
 </Callout>
 
-## Kullanıcı limiti
+## Kullanıcı sayısı
 
-Planınızın bir **azami kullanıcı sayısı** olabilir. Üstteki bilgi şeridi `mevcut / limit` oranını gösterir. Limite ulaşıldığında **"Kullanıcı Ekle"** butonu kilitlenir, pasif bir kullanıcıyı **yeniden aktifleştirmek de** engellenir ve bir yükseltme kartı çıkar.
+**Kullanıcı sayısı sınırsızdır** — ekibinizin tamamına hesap açabilirsiniz. Üstteki bilgi şeridi `mevcut / limit` oranını gösterir ve sınırsız olduğu için limit tarafında **∞** görürsünüz; **"Kullanıcı Ekle"** butonu bir kotaya takılıp kilitlenmez, pasif bir kullanıcıyı yeniden aktifleştirmek de engellenmez.
 
-<Callout type="warning">
-  Limit kontrolü arayüzde gösterilir, fakat asıl sınırı **sunucu** uygular. Limiti
-  artırmak için planınızı yükseltmeniz gerekir — ayrıntı: **[Abonelik](/tr/plans)**.
+<Callout type="info">
+  Ekip ve rol yönetimi ücretsiz çekirdeğin parçasıdır: kişi başı ücret, koltuk
+  (seat) ücreti ya da kullanıcı kotası yoktur — ayrıntı: **[Planlar](/tr/plans)**.
 </Callout>
 
 ## İlgili sayfalar
 
-- **[Personel](/tr/admin-guide/personnel)** — vardiya, izin ve İK kayıtları (bu ekrandan ayrıdır).
+- **[Personel](/tr/admin-guide/personnel)** — vardiya, izin ve İK kayıtları (bu ekrandan ayrıdır; Personel Yönetimi modülü gerekir).
 - **[Şubeler](/tr/admin-guide/branches)** — kullanıcıların çalıştığı şubeler.
-- **[Abonelik](/tr/plans)** — plan ve kullanıcı limiti.
+- **[Planlar](/tr/plans)** — ücretsiz çekirdek ve ücretli modüller.

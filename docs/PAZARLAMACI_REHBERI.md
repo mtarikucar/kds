@@ -6,110 +6,184 @@
 > teknik ayrıntılar için `backend/docs/marketing-phase5-split-runbook.md`
 > dosyasına bakın.
 
-Bu döküman, KDS Restoran Yönetim Sistemi'ni sahaya çıkaran pazarlama ekibi içindir. Sistemi tanımak, sattığın aboneliklerden komisyon kazanmak ve müşteri portföyünü panelden takip etmek için referans olarak kullan.
+Bu döküman, KDS Restoran Yönetim Sistemi'ni sahaya çıkaran pazarlama ekibi içindir. Sistemi tanımak, sattığın ürünlerden komisyon kazanmak ve müşteri portföyünü panelden takip etmek için referans olarak kullan.
+
+> **Önce şunu ezberle:** Paket yok, kademe yok, plan yok, deneme süresi yok.
+> Çekirdek süresiz ücretsizdir; müşteri sadece ihtiyaç duyduğu ücretli modülü,
+> yıllık olarak satın alır. "Hangi paketi alalım?" sorusu artık yok; soru
+> "hangi modüle ihtiyacınız var?".
 
 ---
 
 ## 1. KDS Nedir, Niye Satılır?
 
-KDS, Türkiye'deki kafe ve restoranlar için tek bir hesapta:
+KDS, Türkiye'deki kafe ve restoranlar için tek bir hesapta çalışan bir SaaS üründür. Ürünün **çekirdeği ücretsiz ve süresizdir**; işletmenin günlük operasyonunu döndüren her şey buradadır:
 
-- **POS** (kasa ve adisyon),
-- **Mutfak ekranı (KDS)** — siparişin garson tabletinden mutfak ekranına anlık geçmesi,
-- **QR menü ve self-pay** — müşteri masadan QR ile menüyü açar, sipariş verir, telefonundan öder,
-- **Online rezervasyon** — herkese açık rezervasyon sayfası, masa tutma ve no-show takibi,
-- **Stok ve reçete** — ürüne reçete bağla, satış stoktan otomatik düşsün,
-- **Personel** — vardiya, mola, mesai,
-- **Online sipariş entegrasyonları** — Yemeksepeti, Trendyol Yemek,
-- **Çok şube** — tek panelden farklı lokasyonların raporları
+- **POS ve adisyon** (kasa, sipariş alma, satış ekranı)
+- **Mutfak ekranı (KDS)** — siparişin garson tabletinden mutfak ekranına anlık geçmesi
+- **Menü yönetimi**
+- **Masa ve kat planı**
+- **QR menü**
+- **Sipariş yönetimi**
+- **Kasa ve nakit**
+- **Temel raporlar**
+- **Ekip ve rol yönetimi**
+- **Müşteriler**
+- **Cihaz ve şube paneli**
+- **Özel marka ve alan adı (subdomain)**
 
-bütününü sağlayan SaaS bir üründür. Müşteri PayTR üzerinden 14 günlük ücretsiz deneme ile başlar, otomatik aylık/yıllık yenilenir.
+Bunların hepsi **kredi kartı istenmeden**, **lisans gerekmeden** ve **süre sınırı olmadan** açıktır. Üstelik **kullanıcı, masa, ürün, kategori ve aylık sipariş sayısı sınırsızdır** ve **ilk şube ücretsizdir**.
+
+Ücretli tarafta ise tek tek satın alınan yıllık kalemler var: stok ve maliyet, gelişmiş raporlar, rezervasyon, personel, AI menü stüdyosu, API, teslimat platformu entegrasyonları (Yemeksepeti / Getir / Trendyol Yemek), e-Fatura, ÖKC, çağrı-ID, SMS, ek şube.
 
 **Neden satması kolay?**
 
-- Tek üründe POS + QR menü + rezervasyon + stok. Müşteri 3 farklı yazılım almak yerine tek faturayla halledir.
-- 14 gün denemeli — riski sıfır.
-- Türkçe arayüz, Türkiye'ye özel KDV split, PayTR'la entegre tahsilat.
-- Aylık iptal — sözleşme zorunluluğu yok.
+- **Fiyat itirazı en başta ölüyor.** Müşteri hiçbir şey ödemeden gerçek veriyle kullanmaya başlıyor. Sen ürünü değil, ihtiyacı satıyorsun.
+- **Sadece kullandığına ödüyor.** Rezervasyon almıyorsa rezervasyon modülüne para vermiyor. Rakiplerin paketinde bu mümkün değil.
+- **Kapanacak bir sayaç yok.** "Deneme bitince ne olacak?" endişesi yok; çekirdek kapanmaz.
+- **Tek fatura, tek yenileme tarihi.** Hesabın yıl dönümü sabit; müşteri yılda bir kez, tek kalemde öder.
+- **Otomatik kart çekimi yok.** Kart saklamıyoruz. Bu, KOBİ'de en sık duyduğun "sonra kartımdan çekmeye başlarsınız" korkusunun cevabı.
+- Türkçe arayüz, TR vergi kuralları, PayTR ile TRY tahsilat, 5 dilde arayüz (TR/EN/RU/UZ/AR).
 
 ---
 
-## 2. Planlar ve Fiyatlar
+## 2. Fiyat Listesi
 
-Aşağıdaki fiyatlar `subscription_plans` tablosundaki canlı kayıtlardır; superadmin değiştirmediği sürece bunlar geçerlidir.
+Tüm fiyatlar **Türk Lirası**, **KDV dahil** ve **yıllıktır** (aksi belirtilmedikçe). Ekranda gördüğün tutar tahsil edilen tutardır; üstüne KDV eklenmez. Katalog superadmin tarafından güncellenebilir — sahada fiyat verirken panelden teyit et.
 
-| Plan | Aylık | Yıllık (2 ay bedava) | Trial | Hedef Profil |
-|---|---:|---:|:---:|---|
-| **Ücretsiz** (FREE) | ₺0 | ₺0 | — | Sadece deneme sonrası fallback; satılmaz |
-| **Başlangıç** (BASIC) | ₺499 | ₺4 490 | 14 gün | 1–2 masalı kafe, küçük büfe |
-| **Profesyonel** (PRO) | ₺1 299 | ₺12 990 | 14 gün | Şehir merkezi restoran, rezervasyon + delivery |
-| **Kurumsal** (BUSINESS) | ₺2 999 | ₺29 990 | 14 gün | Çok şubeli zincir, sınırsız + API + öncelikli destek |
+### Ücretsiz çekirdek — ₺0, süresiz
 
-### Plan Karşılaştırma Tablosu
+Yukarıdaki 1. bölümdeki listenin tamamı. Ücreti yok, süresi yok, lisans gerekmiyor, kart istenmiyor.
 
-| Özellik | BASIC | PRO | BUSINESS |
-|---|:---:|:---:|:---:|
-| Kullanıcı sayısı | 5 | 15 | Sınırsız |
-| Masa sayısı | 20 | 50 | Sınırsız |
-| Ürün sayısı | 100 | 500 | Sınırsız |
-| Aylık sipariş | 500 | 2 000 | Sınırsız |
-| Stok takibi | ✓ | ✓ | ✓ |
-| KDS mutfak ekranı | ✓ | ✓ | ✓ |
-| Gelişmiş raporlar | — | ✓ | ✓ |
-| Çok şube | — | ✓ | ✓ |
-| Özel marka (logo/renk) | — | ✓ | ✓ |
-| Rezervasyon sistemi | — | ✓ | ✓ |
-| Personel takibi | — | ✓ | ✓ |
-| Yemeksepeti/Trendyol | — | ✓ | ✓ |
-| Öncelikli destek | — | ✓ | ✓ |
-| API erişimi | — | — | ✓ |
+### Lisans (ücretli tarafın ön koşulu)
 
-### Satış Konuşmasında Plana Yön Verme
+| Ürün | Yıllık |
+|---|---:|
+| **Lisans** (mağazada *HummyTummy Lisansı*) | **₺2.990** |
 
-- **Müşteri "sadece kasa istiyorum" diyorsa** → BASIC, 14 gün dene, sonra ay başında upgrade'i öner.
-- **Rezervasyon, motokurye, delivery uygulaması ile çalışıyorsa** → PRO. PRO'nun rezervasyon + delivery + personel modülleri kendi başına bir uygulamanın yerini tutar.
-- **2+ şubesi var, zincirleşmiş** → BUSINESS. Çok şube tek panelde, API ile muhasebe / kendi mobil uygulaması ile entegrasyon, öncelikli destek.
+Lisans, ücretli modülleri **hem satın almanın hem de kullanmanın** ön koşuludur. Müşteri sepete bir modül attığında mağaza lisansı otomatik ekler. Lisans yenilenmezse ücretli modüllerin erişimi de kapanır — **ücretsiz çekirdek etkilenmez**.
 
----
+### Modüller (yıllık, lisans ön koşuluyla)
 
-## 3. Pazarlamacı Kazanç Modeli
+| Modül | Yıllık | Ne açar |
+|---|---:|---|
+| Gelişmiş Rapor & Analitik | **₺1.290** | Detaylı satış/ürün/personel/müşteri analitiği, muhasebe back-office, e-belge ayarları |
+| Stok & Maliyet Yönetimi | **₺1.490** | Reçete, sayım, satın alma siparişi, fire takibi, tedarikçi, şubeler arası transfer |
+| Rezervasyon Sistemi | **₺990** | Rezervasyon takvimi, müsaitlik hesabı, halka açık online rezervasyon sayfası |
+| Personel Yönetimi | **₺990** | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
+| AI Menü Stüdyosu | **₺1.990** | AI ile ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretimler kontörle harcanır) |
+| API & Webhook Erişimi | **₺2.490** | REST API anahtarları, giden webhook'lar |
+| Partner Ekran API | **₺1.990** | Üçüncü taraf ekranların menüyü göstermesi için ekran bazlı API |
+| Öncelikli Destek | **₺1.990** | Destek taleplerinde öncelikli sıra, garantili yanıt süresi |
 
-### Komisyon Oranı
+### Entegrasyonlar (yıllık, lisans ön koşuluyla)
 
-Her plan satışından plan'ın `commissionRate` değeri kadar komisyon kazanırsın. Varsayılan **%10**; superadmin yüksek-marjlı planlarda bunu artırabilir.
+| Entegrasyon | Yıllık | Ne açar |
+|---|---:|---|
+| Yemeksepeti | **₺2.490** | Yemeksepeti siparişleri otomatik POS ve mutfağa düşer |
+| Getir | **₺2.490** | Getir siparişleri otomatik POS ve mutfağa düşer |
+| Trendyol Yemek | **₺2.490** | Trendyol Yemek siparişleri otomatik POS ve mutfağa düşer |
+| e-Fatura (Nilvera) | **₺1.990** | Satış faturalarının Nilvera üzerinden e-Fatura / e-Arşiv gönderimi |
+| ÖKC / Yazarkasa (Hugin) | **₺2.990** | Hugin yazarkasa ile fiş kesimi ve mali rapor senkronizasyonu |
+| Çağrı-ID | **₺1.490** | Gelen çağrıda müşteriyi otomatik tanıma, tek tıkla sipariş |
+| SMS Bildirimleri | **₺990** | Sipariş/rezervasyon/kampanya SMS'i (gönderimler kontörle harcanır) |
 
-### Komisyon Tipleri (3'ü de senin cebine girer)
+Teslimat entegrasyonları birikir: müşteri üç platformu da alabilir, hepsi tek mutfak akışına düşer.
 
-| Tip | Ne zaman? | Örnek (PRO aylık) |
+### Kapasite
+
+| Kalem | Yıllık | Not |
+|---|---:|---|
+| Ek Şube | **₺3.990 / adet** | İlk şube ücretsiz. Adet adet alınır, en fazla 100 adet |
+
+### Kontör (tek seferlik, süresiz — tükenene kadar geçerli)
+
+| Kontör | Tutar | Ön koşul |
+|---|---:|---|
+| 100 AI görsel | **₺690** | AI Menü Stüdyosu |
+| 20 AI video | **₺890** | AI Menü Stüdyosu |
+| 10 AI 3D model | **₺790** | AI Menü Stüdyosu |
+| 500 SMS | **₺490** | SMS Bildirimleri |
+
+Kontörler yıllık yenilemeye girmez. Bittiğinde müşteri yenisini alır.
+
+### Hizmet (tek seferlik)
+
+| Hizmet | Tutar | İçerik |
+|---|---:|---|
+| Yerinde Kurulum & Eğitim | **₺7.500** | Tam gün yerinde kurulum, cihaz devreye alma, personel eğitimi |
+
+### Tipik sepetler (fiyat konuşmasında kullan)
+
+| Profil | Sepet | Yıllık toplam |
 |---|---|---:|
-| **SIGNUP** | Müşteri ilk kez ücretli aboneliğe geçtiğinde | ₺1 299 × %10 = **₺129,90** |
-| **RENEWAL** | Müşteri her ay/yıl yenilediğinde | ₺1 299 × %10 = **₺129,90** |
-| **UPSELL** | Müşteri daha yüksek plana çıktığında | ₺2 999 × %10 = **₺299,90** |
+| Küçük kafe, sadece kasa istiyor | Hiçbir şey — ücretsiz çekirdek | **₺0** |
+| Stok maliyetini kontrol etmek isteyen restoran | Lisans + Stok & Maliyet | **₺4.480** |
+| Rezervasyon alan şehir merkezi restoranı | Lisans + Rezervasyon + Gelişmiş Rapor | **₺5.270** |
+| Paket servis yapan işletme | Lisans + Yemeksepeti + Getir + Trendyol Yemek | **₺10.460** |
+| 3 şubeli zincir | Lisans + 2 × Ek Şube + Gelişmiş Rapor | **₺12.260** |
 
-**Kritik:** Komisyon **ömür boyu** akar. Müşteri 3 yıl boyunca PRO kalırsa, **36 ay × ₺129,90 = ₺4 676,40** kazanırsın — tek satıştan.
+---
 
-### Senaryolar
+## 3. Faturalama Kuralları (Müşteriye Birebir Anlat)
 
-**1 ayda 5 PRO satıyorsun, hepsi yıllık seçiyor:**
-- SIGNUP: 5 × ₺12 990 × %10 = **₺6 495** (ilk ay)
-- 2. yıl yenilemeler aynı: **₺6 495** (12 ay sonra otomatik düşer)
+Bu bölüm satışın en kritik parçası. Yanlış anlatılan tek cümle iptal sebebidir.
 
-**1 ayda 10 BASIC + 3 PRO + 1 BUSINESS aylık satarsan:**
-- BASIC: 10 × ₺49,90 = ₺499
-- PRO: 3 × ₺129,90 = ₺389,70
-- BUSINESS: 1 × ₺299,90 = ₺299,90
-- **Toplam ilk ay: ₺1 188,60 + her ay aynısı yenilemeden tekrar**
+- **Yıl dönümü sabittir.** Müşteri lisansı hangi gün aldıysa o gün hesabın **değişmez yıl dönümüdür**.
+- **Yıl içinde alınan kalem orantılı fiyatlanır.** Yıl dönümüne 90 gün kalmışken alınan ₺1.490'lık modül, o 90 gün için fiyatlanır — sonraki yıl dönümünde tam fiyattan yenilenir. Amaç: hesabın tek tarihte toplanması.
+- **Yıl dönümüne 14 günden az kalmışsa** kalem sonraki tam döngüye taşınır (kalan gün + bir tam yıl). Kimse 5 günlük bir kalem satın almaz.
+- **Hiçbir fatura satırı ₺1'in altına inmez.**
+- **Tek fatura, tek yenileme tarihi.** Müşteri yılda bir kez, kalemlerinin tamamını gösteren tek bir faturayla öder.
+- **Yenileme MANUELDİR.** Kayıtlı kart yok, otomatik çekim yok. Yıl dönümünden **30, 7 ve 1 gün önce** hatırlatma gider; yıl dönümünden sonra **7 gün ek süre** vardır.
+- **Ödenmezse veri SİLİNMEZ.** Ek süre de geçerse yalnızca ücretli kalemlerin **erişimi** kapanır. Menü, sipariş geçmişi, müşteriler, raporlar yerinde durur; ödeme yapıldığında her şey aynen geri açılır. **Ücretsiz çekirdek hiç etkilenmez** — işletme kasa çalıştırmaya devam eder.
+- **Tahsilat PayTR üzerinden, yalnızca TRY.** Başka bir ödeme sağlayıcısı yok.
+- **Tüm fiyatlar KDV dahildir.** Faturada KDV ayrı kalem olarak ayrıştırılır ama toplam değişmez.
 
-Bir müşteri PRO → BUSINESS'a geçerse: ₺299,90 UPSELL + sonraki yenilemeler ₺299,90 olur (PRO'dan ₺129,90 değil).
+---
 
-### Komisyon Onay Akışı
+## 4. Pazarlamacı Kazanç Modeli
+
+### Komisyon nasıl hesaplanır?
+
+Komisyon, **gerçekleşen bir ödeme** üzerinden yazılır ve sepetin **toplam tutarı** ile sepetteki **en yüksek tutarlı kalemin komisyon oranı** çarpılarak hesaplanır. Varsayılan oran **%10**; superadmin katalogda ürün bazında değiştirebilir.
 
 ```
-SIGNUP olur (PENDING)
+Komisyon = Ödenen sepet toplamı × En yüksek tutarlı kalemin oranı
+```
+
+| Sepet | Toplam | Oran | Komisyonun |
+|---|---:|:---:|---:|
+| Lisans + Stok & Maliyet | ₺4.480 | %10 | **₺448** |
+| Lisans + Rezervasyon + Gelişmiş Rapor | ₺5.270 | %10 | **₺527** |
+| Lisans + 3 teslimat entegrasyonu | ₺10.460 | %10 | **₺1.046** |
+| Lisans + 2 Ek Şube + Gelişmiş Rapor | ₺12.260 | %10 | **₺1.226** |
+
+**Orantılı fiyat komisyonu da düşürür.** Yıl ortasında eklenen bir modülün faturası orantılı kesilir; komisyon o orantılı tutar üzerinden yazılır. Büyük sepeti yıl dönümüne yakın değil, **yıl dönümünde** kurdur.
+
+### Komisyon tipleri
+
+| Tip | Ne zaman? |
+|---|---|
+| **SIGNUP** | Ödenen sepette **lisans** varsa — müşterinin ücretli tarafa ilk geçişi (ve yıl dönümü yenilemesi, çünkü lisans da yenilenir) |
+| **UPSELL** | Lisansı zaten aktif olan müşteri yıl içinde yeni bir modül/entegrasyon/şube eklediğinde |
+| **RENEWAL** | Komisyon defterinin yenileme tipi; yenileme kayıtları bu tiple raporlanır |
+
+Pratikte senin için önemli olan şu: **her ödeme bir komisyon fırsatıdır.** İlk satış tek seferlik bir olay değil; müşteri yıl içinde modül ekledikçe (UPSELL) ve her yıl dönümünde yenileme yaptıkça yeni ödemeler oluşur.
+
+> **Dikkat — komisyonun ödemeye bağlanması:** Komisyon, ödeme kaydına iliştirilmiş
+> pazarlamacı referansı üzerinden yazılır. Referans, **ödeme anında** çözülür ve
+> kayda **donar**. Bir satışın sana yazıldığını panelinden teyit et; görünmüyorsa
+> manager'a `tenant` adı + ödeme tarihi ile yaz, manuel bağlansın. Yıl dönümü
+> yenilemelerinde de aynı kontrolü yap — takvimine müşterinin yıl dönümünü işle.
+
+### Komisyon onay akışı
+
+```
+Ödeme gerçekleşir → commission yazılır (PENDING)
    ↓
 Manager paneline düşer, gözden geçirir
    ↓
-APPROVED (manager onay) — kazancın muhasebe için kesinleşir
+APPROVED (manager onayı) — kazancın muhasebe için kesinleşir
    ↓
 PAID (manager ödedi işaretler) — hesabına yatırıldı
 ```
@@ -118,38 +192,40 @@ Her durum değişikliği audit log'a düşer ("kim, ne zaman, hangi tutarla onay
 
 ---
 
-## 4. Referans Kodu Sistemi (Self-Serve Satış)
+## 5. Referans Kodu Sistemi (Self-Serve Satış)
 
-Her pazarlamacının panelinde **kişisel referans kodu** vardır (örn. `MRT9X3K`). Bu kodla:
+Her pazarlamacının panelinde **kişisel referans kodu** vardır (örn. `MRT9X3K`).
 
-### A. Link Paylaşımı (En Hızlı Yol)
+### A. Link paylaşımı (en hızlı yol)
 
 Pazarlamacı paneli → Dashboard → ReferralCodeCard üzerinden:
 
 - **Kodu kopyala**: `MRT9X3K`
 - **Linki kopyala**: `https://kds.app/?ref=MRT9X3K`
 
-Linki WhatsApp grubuna, Instagram bio'na, e-postaya, kartvizite koy. Müşteri tıkladığında kod 30 gün boyunca tarayıcısında tutulur. Daha sonra kayıt olup ödeme yaparsa otomatik sana yazılır.
+Linki WhatsApp grubuna, Instagram bio'na, e-postaya, kartvizite koy. Müşteri ücretsiz hesabını bu link üzerinden açtığında sana bağlanır.
 
-### B. Manuel Kod (Tanıdıktan Tanıdığa)
+### B. Manager üzerinden bağlama
 
-Müşteri checkout sayfasına geldiğinde "Pazarlamacı kodu (opsiyonel)" alanına kodunu girer. Cookie ile gelmemişse bu yedek yoldur.
+Link/kod yolu bir sebeple işlemediyse (tarayıcı cookie'yi bloklamış, müşteri farklı cihazdan kayıt olmuş) satış otomatik sana yazılmaz. Bu durumda manager manuel olarak bağlar. **Bu yüzden 4. bölümdeki teyit adımı zorunludur.**
 
-### Akış (Arka Planda Ne Oluyor?)
+### Akış (arka planda ne oluyor?)
 
-1. Müşteri `?ref=MRT9X3K` ile gelir → cookie set edilir.
-2. Müşteri 14 günlük trial alır → arka planda sana **otomatik bir Lead** yaratılır (kaynak: REFERRAL, durum: WON).
-3. Müşteri trial bitince ilk ödemeyi yapar → **SIGNUP commission** (PENDING) yazılır + sana bildirim gelir.
-4. Müşteri yenileme yaptıkça → her seferinde **RENEWAL commission**.
-5. Müşteri plan yükseltirse → **UPSELL commission**.
+1. Müşteri `?ref=MRT9X3K` ile gelir.
+2. Müşteri ücretsiz hesabını açar → arka planda sana **otomatik bir Lead** yaratılır (kaynak: REFERRAL).
+3. Müşteri mağazadan ücretli bir kalem satın alır ve ödeme gerçekleşir → **commission** (PENDING) yazılır + sana bildirim gelir.
+4. Müşteri yıl içinde modül eklediğinde → yeni ödeme, yeni komisyon.
+5. Yıl dönümünde yenileme ödemesi yaptığında → yenileme komisyonu.
 
-**Yanlış / geçersiz kod ne olur?** Sessizce yok sayılır. Müşterinin checkout'u bloklanmaz, sen de boş bir kayıt almamış olursun. Riziko sıfır.
+**Yanlış / geçersiz kod ne olur?** Sessizce yok sayılır. Müşterinin ödemesi bloklanmaz, sen de boş bir kayıt almamış olursun. Riziko sıfır.
+
+**Kodumu yenilersem eski satışlarım ne olur?** Referans, ödeme anında **çözülmüş haliyle** kayda donar. Kodunu sonradan yenilesen bile geçmiş satışların sende kalır.
 
 **Müşteri yöneticinin elle dönüştürdüğü bir lead'e zaten sahipse?** Yönetici ataması her zaman kazanır — kodun yarış koşulunda overwrite edilmez.
 
 ---
 
-## 5. Pazarlamacı Paneli Turu (`/marketing`)
+## 6. Pazarlamacı Paneli Turu (`/marketing`)
 
 | Sayfa | Ne yapar? |
 |---|---|
@@ -158,53 +234,91 @@ Müşteri checkout sayfasına geldiğinde "Pazarlamacı kodu (opsiyonel)" alanı
 | **Lead Detail** | Tek müşterinin geçmişi: aramalar, ziyaretler, gönderilen teklifler, açık görevler |
 | **Tasks** | "Şu müşteriyi cuma ara" gibi görevler — vadesi gelince hatırlatılır |
 | **Calendar** | Görevlerin aylık görünümü |
-| **Offers** | Lead'e özel fiyat / trial gün uzatma teklifi gönder |
+| **Offers** | Lead'e özel teklif gönder; geçerlilik tarihi (`validUntil`) ver |
 | **Commissions** | Tüm komisyon hareketleri — tip, durum, periyot, detay modal |
 | **Reports** | Lead kaynak dağılımı, bölgesel performans, conversion funnel (yöneticiye özel) |
 
-### Commission Detay Modal'da Ne Var?
+### Commission detay modal'da ne var?
 
 Komisyon listesinde bir satıra tıkladığında:
 
 - **Tutar** (büyük, vurgulu)
 - **Tip + Durum** badge'leri
 - **Müşteri** (tenant adı + subdomain)
-- **Plan** (commissionRate ile birlikte: PRO %10)
-- **Periyot** (2026-05)
-- **Hesaplama**: `Ödenen ₺1 299 × %10 = ₺129,90`
+- **Ürün ve oran** (örn. Stok & Maliyet, %10)
+- **Periyot**
+- **Hesaplama**: `Ödenen sepet toplamı × Oran`
 - **Bağlı Lead** (kaynağı ve dönüşüm tarihi)
 - **Audit Log Timeline**: "Oluşturuldu → Manager X tarafından onaylandı → Manager Y tarafından ödendi"
 
 ---
 
-## 6. Sahaya Çıkış Stratejisi
+## 7. Sahaya Çıkış Stratejisi
 
-### Hedef Müşteri Profili Önceliği
+### Satışın yeni şekli: önce kur, sonra sat
 
-1. **Yeni açılan kafe/restoran** — POS henüz yok, ihtiyaç akut. En kısa satış döngüsü.
-2. **Eski POS'tan şikayetçi olan işletme** — özellikle Adisyon/Sterm gibi yıllardır güncellenmeyen sistemlerden geçenler.
-3. **QR menü kullanmayan restoran** — pandemi sonrası eksik kalmış işletme.
-4. **2+ şube açmak isteyen** — BUSINESS'ın çok-şube modülü ile direkt eşleşir.
+Eski modelde "hangi paket?" diye başlıyordun. Artık akış şu:
 
-### Satış Argümanları (Soğuk Aramada İlk 30 Saniye)
+1. **Ücretsiz hesabı aç ve kurdur.** Menüyü gir, masaları çiz, QR'ı bas. Bu adımda müşteriden tek kuruş istemiyorsun — itiraz yüzeyi sıfır.
+2. **İşletmeyi çalışırken izle.** Hangi eksik canını yakıyor? Fire mi veriyor, telefonla rezervasyon mu alıyor, Yemeksepeti tabletiyle mi boğuşuyor?
+3. **O eksiğin modülünü sat.** Tek kalem, net fayda, net fiyat. "Fireyi görmek için Stok & Maliyet: yılda ₺1.490 + lisans."
+4. **Yıl dönümünde genişlet.** Yıl dönümü, orantı kaybı olmadan yeni kalem eklemenin en doğru anıdır.
 
-- "Tek hesapta hem kasa, hem mutfak ekranı, hem QR menü çalışıyor — Yemeksepeti'yle de entegre."
-- "14 gün ücretsiz deneyebilirsiniz, kart bilgisi istemiyoruz."
-- "Aylık ₺499'dan başlıyor. İstediğiniz an iptal edebilirsiniz."
-- "Türkçe arayüz, KDV split otomatik, e-fatura entegrasyonu var."
+### Hedef müşteri profili önceliği
 
-### Beklenmedik İtirazlar İçin Cevaplar
+1. **Yeni açılan kafe/restoran** — POS henüz yok, ihtiyaç akut, ücretsiz çekirdek "hemen evet" dedirtiyor. En kısa satış döngüsü.
+2. **Eski POS'tan şikayetçi olan işletme** — yıllardır güncellenmeyen sistemlerden geçenler. Geçiş riskini ücretsiz çekirdek sıfırlıyor.
+3. **Paket servis yapan işletme** — ayrı ayrı platform tabletleriyle uğraşıyorsa teslimat entegrasyonu direkt satılır.
+4. **Fire/maliyet derdi olan mutfak** — Stok & Maliyet modülünün en net ROI'si burada.
+5. **2+ şube açmak isteyen** — ilk şube ücretsiz, ikinciden itibaren Ek Şube kalemi.
 
-- **"Adisyon yazılımım var, değiştirmek istemem"** → 14 gün deneme süresince mevcudunuzu kapatmıyoruz. Test edin, beğenmezseniz hiçbir ücret çıkmaz.
-- **"Çok pahalı"** → BASIC ₺499/ay. Yıllık alırsanız 2 ay bedava — pratikte ₺374/ay'a denk geliyor.
-- **"İnternet keserse?"** → POS offline-first çalışır, internet gelince senkronize olur.
-- **"Personelim Türkçe konuşmuyor"** → Uygulama TR/EN/RU/UZ/AR dilinde.
+### Soğuk aramada ilk 30 saniye
+
+- "Kasa, mutfak ekranı, QR menü ve masa planı bizde **ücretsiz** — süresiz. Kart bilgisi bile istemiyoruz."
+- "Kullanıcı, masa, ürün ve aylık sipariş sayısında sınır yok. İlk şube ücretsiz."
+- "Sadece stok, rezervasyon, Yemeksepeti gibi ek ihtiyaçlar ücretli, onları da tek tek, yıllık alıyorsunuz."
+- "Türkçe arayüz, KDV dahil fiyat, PayTR ile tahsilat, e-Fatura ve ÖKC entegrasyonu var."
+
+### İtiraz karşılama
+
+- **"Ücretsizse siz nerede kazanıyorsunuz? İşin içinde bir şey olmalı."**
+  → Çekirdek gerçekten ücretsiz; biz stok, rezervasyon, gelişmiş rapor, teslimat entegrasyonu gibi **ek modüllerden** kazanıyoruz. İşletmelerin bir kısmı hiç ücretli kalem almıyor ve bizim için sorun değil — büyüdüklerinde ilk akla gelen biz oluyoruz. Fiyat listesi açık, panelde yazıyor; sürpriz kalem yok.
+
+- **"Şimdi ücretsiz diyorsunuz, sonra para istersiniz."**
+  → Ücretsiz çekirdeğin kapsamı ürünün içinde tanımlı: POS, mutfak ekranı, menü, masa planı, QR menü, sipariş, kasa, temel raporlar, ekip, müşteriler, cihaz/şube paneli, özel marka. Bunlar kapatılmıyor. Ücretli olan kalemler zaten baştan listede ve ancak siz sepete atarsanız ücretlenir.
+
+- **"Ödeme yapmazsam verilerim silinir mi?"**
+  → Hayır. Ödenmeyen bir yenilemede yalnızca **ücretli kalemlerin erişimi** kapanır. Menünüz, sipariş geçmişiniz, müşterileriniz, raporlarınız durur; ödeme yaptığınızda aynen geri açılır. Ücretsiz çekirdek hiç etkilenmez, kasanız çalışmaya devam eder.
+
+- **"Kartımı kaydedip her ay çekmeye başlarsınız."**
+  → Kart saklamıyoruz, otomatik tahsilat yapmıyoruz. Yenileme manuel: 30, 7 ve 1 gün kala hatırlatırız, siz ödemeye karar verirsiniz. Ödemezseniz de 7 gün ek süre var.
+
+- **"Aylık ödeyebilir miyim?"**
+  → Ücretli kalemler yıllıktır. Bunun karşılığında yıl içinde eklediğiniz her kalem, hesabınızın yıl dönümüne kalan gün kadar orantılı fiyatlanır — yani yılın ortasında alırsanız tam yıl ödemezsiniz, tek faturada tek tarihte toplanırsınız.
+
+- **"Bu 'lisans' da ne? Modülün fiyatı yetmiyor mu?"**
+  → Lisans, ücretli tarafı açan yıllık anahtardır: hem satın almanın hem de kullanmanın ön koşuludur ve hesabınızın yıl dönümünü belirler. Bir kez alınır, kaç modül eklerseniz ekleyin bir tanedir.
+
+- **"KDV üstüne binecek mi?"**
+  → Hayır. İlan edilen tutarlar KDV dahildir; faturada KDV ayrı gösterilir ama toplam değişmez.
+
+- **"Deneme süresi kaç gün?"**
+  → Deneme süresi yok — çekirdek süresiz ücretsiz. İsterseniz kendi verinizi girmeden önce panelden **paylaşımlı demo restoranına** geçip örnek menü, masalar ve canlı siparişlerle sistemi gerçek akışında gezebilirsiniz.
+
+- **"Adisyon yazılımım var, değiştirmek istemem."**
+  → Mevcudunuzu kapatmanızı istemiyoruz. Ücretsiz çekirdeği paralel kurun, bir hafta iki sistemi yan yana çalıştırın. Beğenmezseniz hiçbir ücret çıkmaz, çünkü baştan ödeme yok.
+
+- **"İnternet keserse?"**
+  → POS offline-first çalışır; internet gelince senkronize olur.
+
+- **"Personelim Türkçe konuşmuyor."**
+  → Arayüz TR/EN/RU/UZ/AR.
 
 ---
 
-## 7. CRM Disiplinleri
+## 8. CRM Disiplinleri
 
-### Lead Pipeline'ı (Durum Geçişleri)
+### Lead pipeline'ı (durum geçişleri)
 
 ```
 NEW → CONTACTED → MEETING_DONE → DEMO_SCHEDULED → OFFER_SENT → WAITING → WON
@@ -212,41 +326,49 @@ NEW → CONTACTED → MEETING_DONE → DEMO_SCHEDULED → OFFER_SENT → WAITING
 ```
 
 - Her temas (telefon, ziyaret, WhatsApp) **mutlaka** Activity olarak kaydedilir. "Hatırımda" sayılmaz.
-- Teklif gönderdiyseniz Offer kaydı açılır + `validUntil` belirleyin. Sistem 30 dakikada bir vadesi geçenleri otomatik EXPIRED'a düşürür.
-- Görev (Task) atadığınız zaman bir dueDate vermek zorunludur — vadesi yaklaştığında size bildirim gider.
+- Teklif gönderdiysen Offer kaydı açılır + `validUntil` belirle. Sistem 30 dakikada bir vadesi geçenleri otomatik EXPIRED'a düşürür.
+- Görev (Task) atadığın zaman bir dueDate vermek zorunludur — vadesi yaklaştığında bildirim gider.
+- **Yeni disiplin:** Ücretsiz hesabı açan her müşteriye, hesabın **yıl dönümü** ve **hangi modülü konuştuğunuz** notunu düş. Yıl dönümü senin en verimli satış gününü belirler.
 
 ### "Lead'i kaybettim" demeden önce
 
-- En az 3 farklı kanaldan (telefon + WhatsApp + e-posta) iletişim denenmemişse LOST'a atmayın.
-- LOST'a atarken `lostReason` zorunlu (örn: `no_budget`, `competitor_chosen`, `closed_business`, `not_reachable`). Bu veri sonraki ay'ın funnel raporunda görünür.
+- En az 3 farklı kanaldan (telefon + WhatsApp + e-posta) iletişim denenmemişse LOST'a atma.
+- LOST'a atarken `lostReason` zorunlu (örn: `no_budget`, `competitor_chosen`, `closed_business`, `not_reachable`). Bu veri sonraki ayın funnel raporunda görünür.
+- **Ücretsiz çekirdeği kurup ücretli kalem almayan müşteri LOST değildir.** O hesap canlıdır ve gelecek yılın en kolay satışıdır. Takipte tut.
 
-### Yöneticinin Beklediği
+### Yöneticinin beklediği
 
-- Haftalık takip: kaç yeni lead, kaç dönüştürüldü, kaç komisyon onayda
-- Aylık plan: hedef satış sayısı (hangi planı, hangi şehirde)
-- Geri besleme: iptal eden müşterinin nedeni (refund/cancellation reason)
+- Haftalık takip: kaç yeni lead, kaç ücretsiz hesap açıldı, kaç ücretli satış, kaç komisyon onayda
+- Aylık plan: hedef satış sayısı (hangi modül, hangi şehirde)
+- Geri besleme: yenilemeyi yapmayan müşterinin nedeni
 
 ---
 
-## 8. Sıkça Sorulan Sorular
+## 9. Sıkça Sorulan Sorular
 
 **S: Komisyonum ne zaman hesabıma yatıyor?**
-A: SIGNUP/RENEWAL/UPSELL oluştuğunda **PENDING** olarak panelinde görünür. Manager APPROVED'a aldıktan sonra muhasebe sürecine girer. PAID olduğunda hesabınıza yatmıştır. Tipik olarak ay sonunda toplu ödeme yapılır.
+A: Komisyon oluştuğunda **PENDING** olarak panelinde görünür. Manager APPROVED'a aldıktan sonra muhasebe sürecine girer. PAID olduğunda hesabına yatmıştır. Tipik olarak ay sonunda toplu ödeme yapılır.
+
+**S: Müşteri sadece ücretsiz çekirdeği kullanıyor, komisyon alır mıyım?**
+A: Hayır — komisyon gerçekleşen bir **ödeme** üzerinden yazılır. Ama o hesap kaybedilmiş değildir: işletme büyüdükçe stok, rezervasyon veya teslimat entegrasyonu ihtiyacı doğar. Bu yüzden ücretsiz kurulum yaptığın her hesabı CRM'de canlı tut.
 
 **S: Referans kodum sızdırılırsa ne olur?**
-A: Manager panelinden "Kodumu yenile" diyebilirsiniz. Eski kod ölür, yeni kod aktif olur. Eski linkle gelen yeni kayıtlar çözülmez ama eski satışlarınızdan komisyon akmaya devam eder (link kişiye değil, kayda bağlı).
+A: Manager panelinden "Kodumu yenile" diyebilirsin. Eski kod ölür, yeni kod aktif olur. Eski linkle gelen **yeni** kayıtlar çözülmez ama geçmiş satışlarının komisyonu sende kalır (referans, ödeme anında çözülüp kayda donar).
 
-**S: Müşteri trial'da iptal ederse komisyon kazanırım mı?**
-A: Hayır. Komisyon ilk **gerçek ödeme** ile yazılır. Trial sırasında müşteri kart vermez, ödeme olmaz.
+**S: Müşteri yenilemeyi yapmazsa geçmiş komisyonum geri alınır mı?**
+A: Hayır. Ödenmiş bir kalemin komisyonu ödenmiştir. Sadece o yıl dönümünde yeni bir yenileme ödemesi olmadığı için yeni komisyon yazılmaz.
 
-**S: Müşteri kart bilgilerini değiştirip benim kodumu silmiyorsa kendi başına ne yapacak?**
-A: Müşterinin checkout'unda kod alanı vardır — istediği zaman değiştirebilir/silebilir. Ama girdiği kod **ödeme anında** snapshot olarak kayda alınır. Sonradan müşteri kod değiştirse de ilk satışın komisyonu sizde kalır.
+**S: Müşteri yıl ortasında modül ekledi, komisyonum tam fiyattan mı hesaplanıyor?**
+A: Hayır, **fiilen ödenen** tutardan. Yıl ortasında eklenen kalem yıl dönümüne kalan güne göre orantılı fiyatlanır; komisyon o orantılı tutarın üzerinden yazılır. Sonraki yıl dönümünde tam fiyattan yenilenir.
 
-**S: Müşterim BUSINESS'tan PRO'ya düştü, ne olur?**
-A: Bu downgrade'dir — UPSELL değil. Yeni komisyon yazılmaz. Bir sonraki yenilemeden itibaren PRO oranında (₺1 299 × %10 = ₺129,90) komisyon alırsınız (daha önce ₺299,90 alıyordunuz).
+**S: Sepette birden fazla ürün var, hangi oran uygulanıyor?**
+A: Sepetteki **en yüksek tutarlı kalemin** oranı, sepetin **toplamına** uygulanır. Varsayılan oran %10.
+
+**S: Müşteriye indirim yapabilir miyim?**
+A: Katalog fiyatları superadmin tarafından yönetilir; sen sahada fiyat değiştiremezsin. Lead'e özel bir teklif gerekiyorsa Offers üzerinden kaydını aç ve manager'a danış.
 
 **S: Yöneticim olmadan kendim onay yapabilir miyim?**
-A: Hayır. SIGNUP/RENEWAL/UPSELL otomatik olarak PENDING düşer; APPROVE ve MARK_PAID aksiyonları sadece manager rolündedir. Şeffaflık ve denetim için.
+A: Hayır. Komisyonlar otomatik olarak PENDING düşer; APPROVE ve MARK_PAID aksiyonları sadece manager rolündedir. Şeffaflık ve denetim için.
 
 **S: Aynı müşterinin tekrar kayıtlanmasını engelliyor musunuz?**
 A: Evet — `Lead.convertedTenantId` unique. Aynı tenant'a ikinci bir Lead bağlanmaz. Müşteri eski hesabını silip yenisini açarsa farklı bir tenant olur — kim ilk getirirse o alır.
@@ -254,31 +376,34 @@ A: Evet — `Lead.convertedTenantId` unique. Aynı tenant'a ikinci bir Lead bağ
 **S: Komisyon kaybetmemek için ne yapayım?**
 A: Üç şey:
 1. Müşteriye **link** ver — kod yazmayı unutabilir.
-2. Müşteri **trial'a başladığını** sana doğrula (panel'de yeni lead göründü mü?). Görünmediyse, kod kayboldu demektir — manuel attach için manager'a yaz.
-3. Müşterinin profil mailini doğruladığından emin ol — doğrulanmamışsa ödeme yapamaz.
+2. Müşterinin hesabının sana bağlandığını **panelden doğrula** (yeni lead göründü mü?). Görünmediyse manuel bağlama için manager'a yaz — ödeme yapılmadan önce.
+3. Müşterinin **yıl dönümünü** takvimine işle. Yenileme ve ek modül satışının tamamı o tarihte olur.
 
 ---
 
-## 9. İlk Hafta Yapılacaklar
+## 10. İlk Hafta Yapılacaklar
 
 - [ ] **Gün 1**: Pazarlamacı paneline gir, kişisel referans kodunu öğren ve link'ini hazır tut. WhatsApp durumuna, Instagram bio'ya koy.
-- [ ] **Gün 1**: Demo restoran hesabıyla gir (`marketing@e2e.local`), sistemi göz at. Bir abone gibi POS akışını tıkla.
-- [ ] **Gün 2**: Çevrenden 5 kişiye/işletmeye demo yap. Bu pratik turu sahaya hazırlık.
-- [ ] **Gün 3–5**: Mahallenizdeki yeni açılan/küçük 10 işletmeyi listele. CRM'e Lead olarak gir.
+- [ ] **Gün 1**: 2. bölümdeki fiyat listesini ezberle. Özellikle: neyin ücretsiz olduğu, lisansın ne işe yaradığı, yenilemenin manuel olduğu.
+- [ ] **Gün 1**: Bir hesap açıp demo restorana geç, POS akışını bir müşteri gibi tıkla.
+- [ ] **Gün 2**: Çevrenden 5 kişiye/işletmeye demo yap. Ücretsiz çekirdeği canlı kur — bu senin en güçlü satış aracın.
+- [ ] **Gün 3–5**: Mahallendeki yeni açılan/küçük 10 işletmeyi listele. CRM'e Lead olarak gir.
 - [ ] **Gün 5**: İlk 3 ziyaret/aramayı yap, Activity olarak panele kaydet.
 - [ ] **Hafta sonu**: Yöneticinle 15 dakikalık görüşme — pipeline'ı birlikte gözden geçirin.
 
-**İlk ay hedefi:** En az **1 ücretli abonelik** (BASIC veya üzeri). Trial'a alıp ay sonunda ödemeye dönen müşteri = senin SIGNUP komisyonun + her ay yenilemeden gelen RENEWAL.
+**İlk ay hedefi:** En az **5 ücretsiz kurulum** + **1 ücretli satış** (lisans + en az bir modül). Ücretsiz kurulumlar bir sonraki ayın ücretli satış havuzudur.
 
 ---
 
-## 10. Acil Durum / Destek
+## 11. Acil Durum / Destek
 
 - **Pazarlamacı paneline erişemiyorum** → manager'a yaz, parola sıfırlatsın
 - **Müşterim ödeme yapamıyor (PayTR hatası)** → ekran görüntüsü + hata kodu ile manager'a ulaş, billing ekibi inceler
-- **Komisyon yanlış hesaplanmış görünüyor** → komisyon detay modal'ından hesaplamayı kontrol et (`Ödenen × Oran`). Hâlâ uyuşmuyorsa, manager'a `commissionId` ile yaz
-- **Referans kodum çalışmıyor** → müşteri linki açtığında DevTools → Application → Cookies → `kds_ref` değeri kodunu içermeli. Yoksa cookie tarayıcı tarafından bloklanmış olabilir; müşteriden manuel kod girmesini iste
+- **Komisyon yanlış hesaplanmış görünüyor** → komisyon detay modal'ından hesaplamayı kontrol et (`Ödenen sepet toplamı × Oran`). Hâlâ uyuşmuyorsa manager'a `commissionId` ile yaz
+- **Satış bana yazılmamış** → ödeme tarihi + tenant adı ile manager'a yaz; manuel bağlama yapılabilir. Bunu ay kapanmadan hallet
+- **Referans kodum çalışmıyor** → müşteri linki açtığında DevTools → Application → Cookies değerinde kodun görünmesi gerekir. Görünmüyorsa cookie tarayıcı tarafından bloklanmış olabilir; müşteriyi kaydettikten sonra manager'dan manuel bağlama iste
+- **Müşteri "ücretli özelliklerim kapandı" diyor** → yenileme ödenmemiş olabilir. Lisans & Erişim ekranından yenileme durumunu kontrol ettir; ödeme yapıldığında erişim aynen geri açılır, veri kaybı olmaz
 
 ---
 
-*Bu döküman canlı bir referanstır. Komisyon oranları, plan fiyatları veya akışları değiştiğinde manager güncelleyecektir. Son güncelleme: 2026-05-20.*
+*Bu döküman canlı bir referanstır. Komisyon oranları, katalog fiyatları veya akışlar değiştiğinde manager güncelleyecektir. Son güncelleme: 2026-08-14.*

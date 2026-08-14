@@ -1,6 +1,6 @@
 ---
 title: Masalar & Kat Planı
-description: HummyTummy masa yönetimi — masa ekleme/düzenleme/silme, kapasite, tek dokunuşla durum değişimi, doluluk istatistikleri ve plan limitleri. Amacı, kullanımı ve ipuçları.
+description: HummyTummy masa yönetimi — masa ekleme/düzenleme/silme, kapasite, tek dokunuşla durum değişimi ve doluluk istatistikleri. Amacı, kullanımı ve ipuçları.
 ---
 
 import { Callout } from 'nextra/components'
@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components'
 
 **Menü yolu:** Menü & Masa → Masalar &nbsp;•&nbsp; **URL:** `/admin/tables`
 **Erişim:** ADMIN, MANAGER
-**Plan:** Tüm planlarda açık (masa sayısı **plana bağlı**)
+**Gereksinim:** Ücretsiz çekirdeğe dahildir (masa sayısı **sınırsız**)
 
 ## Amacı
 
@@ -19,7 +19,7 @@ Bu ekran restoranınızın **masalarını** tanımlar ve durumlarını yönetir.
 
 - **Üst istatistik şeridi:** Toplam masa, **boş**, **dolu**, **rezerve** sayıları ve canlı bir **doluluk yüzdesi** (dolu masaların oranı).
 - **Masa kartları ızgarası:** Her kart masa numarasını, durumunu (renkli rozet), kapasitesini ve eylem butonlarını gösterir.
-- **Plan limiti bilgi bandı:** Planınızın masa limitine yaklaşıyorsanız bilgilendirir; limit dolduğunda "Masa Ekle" kilitlenir ve yükseltme önerisi çıkar.
+- **Kullanım bandı:** Kaç masa tanımladığınızı gösterir; masa sayısı sınırsız olduğu için "Masa Ekle" bir kotaya takılıp kilitlenmez.
 
 ## Masa durumları
 
@@ -37,9 +37,10 @@ Bu ekran restoranınızın **masalarını** tanımlar ve durumlarını yönetir.
 - **Yaklaşan rezervasyon rozeti:** Masada yakında (~2 saat içinde) başlayacak onaylı/bekleyen bir rezervasyon varsa kartta saat + müşteri adı gösterilir — staff bir bakışta hangi masaya misafir geleceğini görür.
 
 <Callout type="info">
-  **Masa limiti plana bağlıdır:** Başlangıç (BASIC) **20 masa**, Profesyonel (PRO)
-  **50 masa**, Kurumsal (BUSINESS) **sınırsız**. Limite ulaşınca yeni masa ekleyemezsiniz;
-  planı yükseltin veya kullanılmayan masaları silin. Tam limitler için **[Planlar](/tr/plans)**.
+  **Masa sayısı sınırsızdır:** Masalar ve kat planı ücretsiz çekirdeğe dahildir; masa
+  başına ücret yoktur ve bir üst kademeye geçme diye bir şey yoktur. Yalnızca **ikinci
+  ve sonraki şubeler** ücretlidir (**Ek Şube**, 3.990 ₺/yıl/adet) — ayrıntı için
+  **[Planlar](/tr/plans)**.
 </Callout>
 
 ## İpuçları
@@ -52,5 +53,5 @@ Bu ekran restoranınızın **masalarını** tanımlar ve durumlarını yönetir.
 ## İlgili ekranlar
 
 - **[POS](/tr/admin-guide/pos)** — masa seçimi, transfer, birleştirme ve hesap bölme buradan yapılır.
-- **[Rezervasyonlar](/tr/admin-guide/reservations)** — masa bazlı rezervasyon ve otomatik tutma (PRO).
+- **[Rezervasyonlar](/tr/admin-guide/reservations)** — masa bazlı rezervasyon ve otomatik tutma (Rezervasyon Sistemi modülü).
 - **[Raporlar & Analitik](/tr/admin-guide/reports)** — masa kullanım/doluluk analizi.

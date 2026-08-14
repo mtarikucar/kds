@@ -36,6 +36,7 @@ Every error response follows this shape:
 | `timestamp` | `string` | Request timestamp (ISO 8601). |
 | `path` | `string` | Request path. |
 | `requestId` | `string?` | Tracking id — include it in support requests. |
+| `actionable` | `object?` | Structured remediation payload. Today it carries the entitlement denial: `requirement`, `offer`, `licenseRequired`, `reason`. |
 | `details` | `any?` | Present only in the `development` environment. |
 | `stack` | `string?` | Present only in the `development` environment. |
 
@@ -55,6 +56,14 @@ Every error response follows this shape:
 
 The following codes come from the `ErrorCode` enum and are attached to business
 logic exceptions (`BusinessException`).
+
+<Callout type="info">
+  Some gates (the entitlement guard, the purchasability gate, the stock gate)
+  throw their own code in a `code` field; the global error filter
+  **standardises it onto `errorCode`**, so the client still branches on a single
+  field. Those codes are listed under
+  [Entitlements and purchasing](#entitlements-and-purchasing).
+</Callout>
 
 ### Authentication
 
@@ -96,9 +105,9 @@ logic exceptions (`BusinessException`).
 | `ORDER_ALREADY_PAID` | The order is already paid. |
 | `TABLE_OCCUPIED` | The table is occupied. |
 | `INVALID_ORDER_STATUS` | The action isn't allowed in the order's current status. |
-| `SUBSCRIPTION_REQUIRED` | An active subscription is required (HTTP 402). |
-| `FEATURE_NOT_AVAILABLE` | The feature isn't on the current plan; an upgrade is required (HTTP 402). |
-| `QUOTA_EXCEEDED` | A plan limit was exceeded (HTTP 402). |
+| `QUOTA_EXCEEDED` | The credit balance is insufficient (HTTP 402). `details`: `{ kind, remaining, requested, offerCode }` — `offerCode` is the credit pack the client can deep-link to. |
+| `SUBSCRIPTION_REQUIRED` | **Dormant.** Retired with the plan rail; no code path throws it any more. It stays in the enum only so old clients don't break. |
+| `FEATURE_NOT_AVAILABLE` | **Dormant.** Replaced by `ENTITLEMENT_REQUIRED` (HTTP 403), whose envelope carries the missing entitlement and the product that unlocks it, with its price. |
 
 ### Payment
 
@@ -129,6 +138,30 @@ logic exceptions (`BusinessException`).
 | --- | --- |
 | `TENANT_NOT_FOUND` | Tenant not found. |
 | `INVALID_TENANT` | Invalid tenant. |
+
+## Entitlements and purchasing
+
+These codes are not in the `ErrorCode` enum; the gates throw them in a `code`
+field and the global filter moves it onto `errorCode`, so the client still
+branches on a single field.
+
+| `errorCode` | HTTP | Meaning |
+| --- | --- | --- |
+| `ENTITLEMENT_REQUIRED` | `403` | The route requires an entitlement the tenant does not hold. `actionable` carries `requirement`, `offer`, `licenseRequired`, `reason`. |
+| `LICENSE_REQUIRED` | `409` | A cart line needs a licence, and there is none owned or in the cart. |
+| `ADDON_ALREADY_OWNED` | `409` | The product (or the licence) is already active. |
+| `ADDON_ALREADY_GRANTED` | `409` | Everything the product grants is already in the entitlement set. |
+| `ADDON_REQUIRES_DEPENDENCY` | `409` | Its dependency is neither owned nor in the cart. |
+| `ADDON_LIMIT_REDUNDANT` | `409` | The capacity it adds is already unlimited. |
+| `ADDON_MAX_QUANTITY` | `409` | The catalog quantity ceiling would be exceeded. |
+| `HARDWARE_OUT_OF_STOCK` | `409` | Not enough real stock for a hardware line. |
+| `CATALOG_INVALID` | `400` | A superadmin catalog write violates the product invariants; `message` carries **every** problem as an array. |
+
+Every `409` above is returned **before any charge**, inside
+`POST /v1/checkout/intent`: the rejected line stops the whole cart, no
+`CheckoutIntent` row is written, and PayTR is never called. Details in the
+[Licensing & Billing API](/en/developer/billing-api) and the
+[Entitlement Matrix](/en/reference/plan-matrix).
 
 ## Database errors → HTTP
 
@@ -166,10 +199,25 @@ const res = await fetch('/api/v1/display/orders', { method: 'POST', /* … */ })
 if (!res.ok) {
   const err = await res.json(); // ErrorResponse
   switch (err.errorCode) {
+    case 'ENTITLEMENT_REQUIRED': {
+      // 403 — err.actionable.offer is the product that unlocks the missing
+      // entitlement, priced for THIS tenant today.
+      // reason === 'lapsed' → "Renew", otherwise → "Buy".
+      const { offer, reason, licenseRequired } = err.actionable ?? {};
+      showPurchasePrompt({ offer, reason, licenseRequired });
+      break;
+    }
     case 'QUOTA_EXCEEDED':
-    case 'FEATURE_NOT_AVAILABLE':
-    case 'SUBSCRIPTION_REQUIRED':
-      // Send the user to the upgrade flow (HTTP 402)
+      // 402 — credits exhausted. Deep-link to err.details.offerCode.
+      break;
+    case 'LICENSE_REQUIRED':
+    case 'ADDON_ALREADY_OWNED':
+    case 'ADDON_ALREADY_GRANTED':
+    case 'ADDON_REQUIRES_DEPENDENCY':
+    case 'ADDON_LIMIT_REDUNDANT':
+    case 'ADDON_MAX_QUANTITY':
+      // 409 — the cart needs fixing; nothing was charged.
+      showToast(err.message);
       break;
     case undefined:
       // No errorCode → branch on statusCode (e.g. 409 ConcurrentUpdate → retry)

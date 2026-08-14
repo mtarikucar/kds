@@ -250,10 +250,10 @@
   "cta": {
     "title": "Restoraningizni o'zgartirishga tayyormisiz?",
     "subtitle": "Operatsiyalarni soddalashtirish va biznesini rivojlantirish uchun HummyTummy'dan foydalanayotgan {count} ta restoraniga qo'shiling.",
-    "primaryBtn": "Bepul sinovni boshlash",
+    "primaryBtn": "Bepul boshlash",
     "secondaryBtn": "Sotuvlar bilan gaplashing",
     "trustBadge1": "Kredit karta talab qilinmaydi",
-    "trustBadge2": "14 kunlik bepul sinov",
+    "trustBadge2": "Yadro abadiy bepul",
     "trustBadge3": "Istalgan vaqtda bekor qilish"
   },
   "mascot": {
@@ -393,7 +393,7 @@
       },
       "payment": {
         "title": "To'lov shartlari",
-        "content": "Pullik rejalar oylik yoki yillik asosda oldindan hisob-kitob qilinadi. Ushbu shartlarda aniq ko'rsatilgan holatlardan tashqari, barcha to'lovlar qaytarilmaydi. Biz narxlarimizni 30 kun oldindan xabar berish bilan o'zgartirish huquqini saqlab qolamiz."
+        "content": "Yadro muddatsiz bepul va kredit karta talab qilmaydi; siz faqat sotib olgan yillik litsenziya, modullar, integratsiyalar va sig'im bandlari hamda bir martalik kreditlar va xizmatlar uchun to'laysiz. Yillik bandlar oldindan hisob-kitob qilinadi va hisobingizning yillik sanasigacha qolgan kunlar soniga mutanosib hisoblanadi; shu sababli hammasi bitta hisob-fakturada jamlanadi va bitta sanada yangilanadi. Yangilash qo'lda amalga oshiriladi: biz kartani saqlamaymiz va avtomatik yechib olmaymiz. To'lov qilinmasa, 7 kunlik qo'shimcha muhlatdan so'ng faqat tegishli pullik imkoniyatlarga kirish to'xtaydi, ma'lumotlaringiz o'chirilmaydi. To'lovlar PayTR orqali faqat Turkiya lirasida qabul qilinadi. Ushbu shartlarda aniq ko'rsatilgan holatlardan tashqari, barcha to'lovlar qaytarilmaydi. Biz narxlarimizni 30 kun oldindan xabar berish bilan o'zgartirish huquqini saqlab qolamiz."
       },
       "intellectual": {
         "title": "Intellektual mulk",
@@ -442,7 +442,6 @@
     "viewSource": "Ishlab chiqaruvchi sahifasi",
     "from": "{currency}{amount}",
     "warrantyMonths": "{months} oy kafolat",
-    "rentalFrom": "yoki {currency}{amount}/oy ijaraga",
     "gibCertified": "GİB sertifikatlangan",
     "outOfStock": "Sotuvda yo'q",
     "discontinued": "Ishlab chiqarish to'xtatilgan",
@@ -497,12 +496,12 @@
     "sections": {
       "general": {
         "title": "Umumiy aloqa",
-        "content": "Xizmatimiz, obuna rejalari yoki hamkorlik haqida savollaringiz uchun bizga email yuboring. Eng kechi 2 ish kuni ichida javob beramiz."
+        "content": "Xizmatimiz, narxlarimiz yoki hamkorlik haqida savollaringiz uchun bizga email yuboring. Eng kechi 2 ish kuni ichida javob beramiz."
       },
       "support": {
         "title": "Texnik yordam",
         "content": "Texnik muammolar, hisob yoki to'lov masalalari uchun quyidagi manzilga yozing.",
-        "hours": "Ish kunlari 09:00 – 18:00 (Turkiya vaqti) javob beriladi. Shoshilinch masalalar obunangiz SLA shartlariga bo'ysunadi."
+        "hours": "Ish kunlari 09:00 – 18:00 (Turkiya vaqti) javob beriladi. Shoshilinch masalalar «Ustuvor yordam» modulingiz SLA shartlariga bo'ysunadi."
       },
       "kvkk": {
         "title": "KVKK murojaatlari",

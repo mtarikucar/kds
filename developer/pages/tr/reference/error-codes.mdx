@@ -36,6 +36,7 @@ Her hata yanıtı aşağıdaki yapıyı izler:
 | `timestamp` | `string` | İstek zaman damgası (ISO 8601). |
 | `path` | `string` | İstek yolu. |
 | `requestId` | `string?` | İzleme için istek kimliği — destek talebinde paylaşın. |
+| `actionable` | `object?` | Yapılandırılmış remediation yükü. Bugün yetki reddini taşır: `requirement`, `offer`, `licenseRequired`, `reason`. |
 | `details` | `any?` | Yalnızca `development` ortamında bulunur. |
 | `stack` | `string?` | Yalnızca `development` ortamında bulunur. |
 
@@ -54,6 +55,13 @@ Her hata yanıtı aşağıdaki yapıyı izler:
 
 Aşağıdaki kodlar `ErrorCode` enum'ından gelir ve iş mantığı istisnalarıyla
 (`BusinessException`) iliştirilir.
+
+<Callout type="info">
+  Bazı kapılar (yetki guard'ı, satın alınabilirlik kapısı, stok kapısı) kendi
+  kodlarını `code` alanıyla fırlatır; global hata filtresi bunları
+  **`errorCode`'a standardize eder**. Yani istemci tek bir alana bakar. Bu
+  kodlar aşağıda [Yetki ve satın alma](#yetki-ve-satın-alma) başlığında.
+</Callout>
 
 ### Kimlik doğrulama
 
@@ -95,9 +103,9 @@ Aşağıdaki kodlar `ErrorCode` enum'ından gelir ve iş mantığı istisnaları
 | `ORDER_ALREADY_PAID` | Sipariş zaten ödenmiş. |
 | `TABLE_OCCUPIED` | Masa dolu. |
 | `INVALID_ORDER_STATUS` | İşlem siparişin mevcut durumunda yapılamaz. |
-| `SUBSCRIPTION_REQUIRED` | Etkin abonelik gerekir (HTTP 402). |
-| `FEATURE_NOT_AVAILABLE` | Özellik mevcut planda yok; üst plan gerekir (HTTP 402). |
-| `QUOTA_EXCEEDED` | Plan limiti aşıldı (HTTP 402). |
+| `QUOTA_EXCEEDED` | Kontör bakiyesi yetersiz (HTTP 402). `details`: `{ kind, remaining, requested, offerCode }` — `offerCode`, istemcinin doğrudan derin bağ verebileceği kontör paketidir. |
+| `SUBSCRIPTION_REQUIRED` | **Devre dışı.** Plan rayıyla birlikte emekliye ayrıldı; hiçbir kod yolu artık bunu fırlatmıyor. Enum'da yalnızca eski istemciler kırılmasın diye duruyor. |
+| `FEATURE_NOT_AVAILABLE` | **Devre dışı.** Yerine `ENTITLEMENT_REQUIRED` (HTTP 403) döner — o zarf eksik yetkiyi ve onu açan ürünü fiyatıyla taşır. |
 
 ### Ödeme
 
@@ -128,6 +136,30 @@ Aşağıdaki kodlar `ErrorCode` enum'ından gelir ve iş mantığı istisnaları
 | --- | --- |
 | `TENANT_NOT_FOUND` | Tenant bulunamadı. |
 | `INVALID_TENANT` | Geçersiz tenant. |
+
+## Yetki ve satın alma
+
+Bu kodlar `ErrorCode` enum'ında değildir; ilgili kapılar `code` alanıyla
+fırlatır, global filtre de bunu `errorCode`'a taşır — istemci yine tek alana
+bakar.
+
+| `errorCode` | HTTP | Anlamı |
+| --- | --- | --- |
+| `ENTITLEMENT_REQUIRED` | `403` | Rota bir yetki istiyor ve tenant'ta yok. `actionable` içinde `requirement`, `offer`, `licenseRequired`, `reason` gelir. |
+| `LICENSE_REQUIRED` | `409` | Sepetteki ürün lisans ister; ne sahiplikte ne sepette lisans var. |
+| `ADDON_ALREADY_OWNED` | `409` | Ürün (ya da lisans) zaten aktif. |
+| `ADDON_ALREADY_GRANTED` | `409` | Ürünün verdiği her şey zaten yetki setinde. |
+| `ADDON_REQUIRES_DEPENDENCY` | `409` | Bağımlı olduğu ürün ne sahiplikte ne sepette. |
+| `ADDON_LIMIT_REDUNDANT` | `409` | Eklediği kapasite zaten sınırsız. |
+| `ADDON_MAX_QUANTITY` | `409` | Katalog adet tavanı aşılıyor. |
+| `HARDWARE_OUT_OF_STOCK` | `409` | Donanım satırı için yeterli gerçek stok yok. |
+| `CATALOG_INVALID` | `400` | Süperadmin katalog yazımı ürün değişmezlerini ihlal ediyor; `message` **tüm** sorunları dizi olarak taşır. |
+
+`409` kodlarının tamamı **tahsilattan önce**, `POST /v1/checkout/intent`
+içinde döner: reddedilen satır sepetin tamamını durdurur, `CheckoutIntent`
+satırı yazılmaz ve PayTR hiç çağrılmaz. Ayrıntılar için
+[Lisans & Ödeme API](/tr/developer/billing-api) ve
+[Yetki Matrisi](/tr/reference/plan-matrix).
 
 ## Veritabanı hatalarının HTTP eşlemesi
 
@@ -165,10 +197,24 @@ const res = await fetch('/api/v1/display/orders', { method: 'POST', /* … */ })
 if (!res.ok) {
   const err = await res.json(); // ErrorResponse
   switch (err.errorCode) {
+    case 'ENTITLEMENT_REQUIRED': {
+      // 403 — err.actionable.offer, eksik yetkiyi açan ürünü BU tenant için
+      // bugünkü fiyatıyla taşır. reason === 'lapsed' → "Yenile", aksi → "Satın al".
+      const { offer, reason, licenseRequired } = err.actionable ?? {};
+      showPurchasePrompt({ offer, reason, licenseRequired });
+      break;
+    }
     case 'QUOTA_EXCEEDED':
-    case 'FEATURE_NOT_AVAILABLE':
-    case 'SUBSCRIPTION_REQUIRED':
-      // Kullanıcıyı plan yükseltmeye yönlendir (HTTP 402)
+      // 402 — kontör bitti. err.details.offerCode ile kontör paketine derin bağ ver.
+      break;
+    case 'LICENSE_REQUIRED':
+    case 'ADDON_ALREADY_OWNED':
+    case 'ADDON_ALREADY_GRANTED':
+    case 'ADDON_REQUIRES_DEPENDENCY':
+    case 'ADDON_LIMIT_REDUNDANT':
+    case 'ADDON_MAX_QUANTITY':
+      // 409 — sepet düzeltilmeli; hiçbir tahsilat yapılmadı.
+      showToast(err.message);
       break;
     case undefined:
       // errorCode yok → statusCode'a göre dallan (ör. 409 ConcurrentUpdate → retry)

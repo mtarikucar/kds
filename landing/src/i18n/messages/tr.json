@@ -250,10 +250,10 @@
   "cta": {
     "title": "Restoranınızı dönüştürmeye hazır mısınız?",
     "subtitle": "Operasyonları kolaylaştırmak ve işlerini büyütmek için HummyTummy kullanan {count} restorana katılın.",
-    "primaryBtn": "Ücretsiz denemeye başla",
+    "primaryBtn": "Ücretsiz başla",
     "secondaryBtn": "Satışla konuş",
     "trustBadge1": "Kredi kartı gerekmez",
-    "trustBadge2": "14 günlük ücretsiz deneme",
+    "trustBadge2": "Süresiz ücretsiz çekirdek",
     "trustBadge3": "İstediğiniz zaman iptal"
   },
   "mascot": {
@@ -393,7 +393,7 @@
       },
       "payment": {
         "title": "Ödeme Şartları",
-        "content": "Ücretli planlar aylık veya yıllık olarak peşin faturalandırılır. Bu şartlarda açıkça belirtilenler dışında tüm ücretler iade edilmez. 30 gün önceden bildirimde bulunarak fiyatlarımızı değiştirme hakkını saklı tutarız."
+        "content": "Çekirdek özellikler süresiz ücretsizdir ve kredi kartı gerektirmez; ödeme yalnızca satın aldığınız yıllık lisans, modül, entegrasyon ve kapasite kalemleri ile tek seferlik kontör ve hizmetler için alınır. Yıllık kalemler peşin faturalandırılır ve hesabınızın yıl dönümüne kalan gün sayısına göre orantılanır; tüm kalemler tek faturada toplanır ve tek tarihte yenilenir. Yenileme manueldir: kayıtlı kartla otomatik tahsilat yapmayız. Ödeme yapılmazsa 7 günlük ek sürenin ardından yalnızca ilgili ücretli özelliklere erişim durur, verileriniz silinmez. Tahsilat PayTR üzerinden yalnızca Türk Lirası ile yapılır. Bu şartlarda açıkça belirtilenler dışında tüm ücretler iade edilmez. 30 gün önceden bildirimde bulunarak fiyatlarımızı değiştirme hakkını saklı tutarız."
       },
       "intellectual": {
         "title": "Fikri Mülkiyet",
@@ -442,7 +442,6 @@
     "viewSource": "Üretici sayfası",
     "from": "{currency}{amount}",
     "warrantyMonths": "{months} ay garanti",
-    "rentalFrom": "veya {currency}{amount}/ay kira",
     "gibCertified": "GİB onaylı YN ÖKC",
     "outOfStock": "Stokta yok",
     "discontinued": "Üretimi durduruldu",
@@ -497,12 +496,12 @@
     "sections": {
       "general": {
         "title": "Genel İletişim",
-        "content": "Hizmetimiz, abonelik planlarımız veya iş birliği fırsatları hakkında bilgi almak için bize e-posta gönderebilirsiniz. Tüm mesajları en geç 2 iş günü içinde yanıtlamaya özen gösteririz."
+        "content": "Hizmetimiz, fiyatlandırmamız veya iş birliği fırsatları hakkında bilgi almak için bize e-posta gönderebilirsiniz. Tüm mesajları en geç 2 iş günü içinde yanıtlamaya özen gösteririz."
       },
       "support": {
         "title": "Teknik Destek",
         "content": "Hizmeti kullanırken karşılaştığınız teknik sorunlar, hesabınız veya faturalama ile ilgili konular için aşağıdaki adresten bize ulaşabilirsiniz.",
-        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için aboneliğinize bağlı SLA hükümleri geçerlidir."
+        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için Öncelikli Destek modülünüzün SLA hükümleri geçerlidir."
       },
       "kvkk": {
         "title": "KVKK Başvuruları",

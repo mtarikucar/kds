@@ -207,12 +207,12 @@
     "videoNeeds": "Video uchun boshlang'ich rasm va oxirgi kadr kerak.",
     "quotaPhotos": "Suratlar",
     "quotaVideos": "Videolar",
-    "quotaExhaustedPhotos": "Oylik AI surat limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring.",
-    "quotaExhaustedVideos": "Oylik AI video limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
+    "quotaExhaustedPhotos": "AI rasm krediti tugadi. Do'kondan 100 ta rasmlik kredit paketini sotib olishingiz mumkin (690 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi.",
+    "quotaExhaustedVideos": "AI video krediti tugadi. Do'kondan 20 ta videolik kredit paketini sotib olishingiz mumkin (890 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi."
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "Oylik AI 3D model limiti tugadi — keyingi oy boshida yangilanadi. Yuqoriroq limit uchun tarifingizni oshiring."
+    "quotaExhausted": "AI 3D model krediti tugadi. Do'kondan 10 ta modellik kredit paketini sotib olishingiz mumkin (790 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi."
   },
   "import": {
     "invalidRows": "{{n}} ta qator to‘liq emas yoki xato (bo‘sh nom yoki manfiy narx) — to‘g‘rilang yoki o‘chiring"

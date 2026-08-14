@@ -1,20 +1,20 @@
 ---
 title: Temel Kavramlar
-description: Tenant, Şube, Roller ve 7 günlük deneme — HummyTummy'de işinizi anlamadan önce bilmeniz gereken kavramlar.
+description: Tenant, Şube, Roller ve ücretsiz çekirdek — HummyTummy'de işinizi anlamadan önce bilmeniz gereken kavramlar.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Temel Kavramlar
 
-HummyTummy'yi kullanmadan önce dört temel kavramı anlamak işinizi kolaylaştırır: **Tenant**, **Şube (Branch)**, **Roller** ve **Deneme (TRIAL)**.
+HummyTummy'yi kullanmadan önce dört temel kavramı anlamak işinizi kolaylaştırır: **Tenant**, **Şube (Branch)**, **Roller** ve **Ücretsiz Çekirdek**.
 
 ## Tenant (Restoran / İşletme)
 
 **Tenant**, sisteme kaydolan işletmenizin tamamıdır — yani restoranınız. Kayıt olduğunuzda sizin için bir tenant oluşturulur ve tüm verileriniz (menü, masalar, siparişler, personel, raporlar) bu tenant altında saklanır.
 
 - Her tenant **tamamen izoledir**: başka bir işletmenin verisini göremezsiniz, onlar da sizinkini göremez.
-- Bir tenant'ın bir **abonelik durumu** (deneme / aktif / vb.) ve bir **planı** vardır.
+- Her tenant **ücretsiz çekirdekle** çalışır; ücretli bir modül aldığınızda tenant'ınızın bir **lisans dönemi** (yıl dönümü) olur.
 - Tenant'ı kuran ilk kullanıcı her zaman **ADMIN** rolündedir.
 
 ## Şube (Branch)
@@ -22,7 +22,7 @@ HummyTummy'yi kullanmadan önce dört temel kavramı anlamak işinizi kolaylaşt
 **Şube**, tenant'ınız altındaki fiziksel bir lokasyondur. Kayıt sırasında otomatik olarak **"Main"** adında bir ana şube oluşturulur — yani hiçbir şey yapmadan zaten bir şubeniz olur.
 
 - Tek lokasyonlu işletmeler tek şube ile çalışır.
-- Çok şubeli zincirler birden fazla şube ekleyebilir (plan limitlerine bağlı).
+- **İlk şube ücretsizdir.** Çok şubeli zincirler, her ek şube için **Ek Şube** kalemini (yıllık, lisans ön koşuluyla) satın alarak şube ekler.
 - Menü, masa, sipariş ve stok gibi pek çok veri **şube bazlıdır** — yani her şubenin kendi masaları, kendi siparişleri olur.
 
 <Callout type="info">
@@ -37,7 +37,7 @@ Her kullanıcının bir **rolü** vardır. Rol, kullanıcının nelere erişebil
 
 | Rol | Kim? | Tipik yetkiler |
 |---|---|---|
-| **ADMIN** | İşletme sahibi / üst yönetici | Her şey: ayarlar, plan/abonelik, kullanıcı yönetimi, tüm şubeler, raporlar |
+| **ADMIN** | İşletme sahibi / üst yönetici | Her şey: ayarlar, lisans/faturalama ve satın alma, kullanıcı yönetimi, tüm şubeler, raporlar |
 | **MANAGER** | Şube/operasyon müdürü | Operasyon yönetimi, menü/masa/personel, raporlar (atandığı şubelerde) |
 | **WAITER** | Garson | POS'tan sipariş alma, masa işlemleri (kendi şubesinde) |
 | **KITCHEN** | Mutfak personeli | Mutfak ekranı (KDS): sipariş durumu güncelleme |
@@ -50,20 +50,26 @@ Her kullanıcının bir **rolü** vardır. Rol, kullanıcının nelere erişebil
   Diğer personeli daha sonra Yönetici panelinden ekleyip rol atarsınız.
 </Callout>
 
-## Deneme (TRIAL — 7 gün)
+## Ücretsiz Çekirdek
 
-Yeni kaydolan her tenant, **özel 7 günlük deneme planı (TRIAL)** ile başlar:
+Yeni kaydolan her tenant doğrudan **ücretsiz çekirdek** ile çalışmaya başlar — deneme süresi diye bir aşama yoktur:
 
-- **Tüm premium özellikler açık**, ücret alınmaz, kart bilgisi istenmez.
-- Abonelik durumu deneme boyunca **TRIALING**'dir.
-- Deneme **tenant başına tek seferliktir** (kötüye kullanım engellenir).
+- **Süresiz ücretsiz**, kart bilgisi istenmez, lisans gerekmez.
+- Kapsam: POS ve adisyon, mutfak ekranı (KDS), menü yönetimi, masa ve kat planı, QR menü, sipariş yönetimi, kasa ve nakit, temel raporlar, ekip ve rol yönetimi, müşteriler, cihaz ve şube paneli, özel marka ve alan adı.
+- **Kullanıcı, masa, ürün, kategori ve aylık sipariş sayısı sınırsızdır.** İlk şube ücretsizdir.
+- Hesap hiçbir zaman "deneme bitti" diye kilitlenmez; çekirdek kapanmaz.
 
-**7 gün dolunca ne olur?** Deneme biter ve hesap **kilitlenir** (`TRIAL_ENDED`): devam etmek için bir **ücretli plan** seçmeniz gerekir. Otomatik olarak ücretsiz bir plana düşmez — bilinçli bir tasarım kararıdır.
+## Lisans ve Modüller
 
-<Callout type="warning">
-  Deneme bittiğinde, ücretli bir plan seçilene kadar arayüz sizi plan seçim
-  sayfasına yönlendirir ve şube-bazlı işlemler kilitlenir. Verileriniz silinmez;
-  plan aktive edilir edilmez kaldığınız yerden devam edersiniz.
+Çekirdeğin dışındaki yetenekler **tek tek satın alınan yıllık modüllerdir** (Gelişmiş Rapor & Analitik, Stok & Maliyet, Rezervasyon, Personel, AI Menü Stüdyosu, API & Webhook, Partner Ekran API, Öncelikli Destek), entegrasyonlardır (Yemeksepeti, Getir, Trendyol Yemek, e-Fatura, ÖKC/Yazarkasa, Çağrı-ID, SMS) veya kapasitedir (Ek Şube).
+
+- **HummyTummy Lisansı** (yıllık) ücretli modüllerin ön koşuludur: hem satın almak hem kullanmak için gerekir.
+- Modül almadığınız sürece hiçbir ödeme yapmazsınız; kademe/plan yükseltme diye bir kavram yoktur.
+
+<Callout type="info">
+  Lisansı aldığınız gün hesabınızın **değişmez yıl dönümü** olur. Yıl içinde
+  aldığınız her yıllık kalem, yıl dönümüne kalan gün kadar orantılı fiyatlanır;
+  böylece tek fatura ve tek yenileme tarihi ile ilerlersiniz.
 </Callout>
 
-Plan seçenekleri ve fiyatlandırma için **[Planlar](/tr/plans)** sayfasına bakın.
+Ücretsiz çekirdek, lisans ve güncel modül fiyatları için **[Lisans ve Fiyatlandırma](/tr/plans)** sayfasına bakın.

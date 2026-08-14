@@ -9,16 +9,16 @@ import { Callout } from 'nextra/components'
 
 **Menu path:** Back Office → Personnel &nbsp;•&nbsp; **URL:** `/admin/personnel`
 **Access:** ADMIN, MANAGER
-**Plan:** `personnelManagement` — **Professional (PRO)** and above
+**Requires:** `personnelManagement` — the **Staff Management** module (₺990/year, with the licence as a prerequisite)
 
 ## Purpose
 
 The personnel module manages your team's **working time**: who clocked in/out and when (attendance), shift templates, the weekly schedule, and performance. It updates in real time (over WebSocket) — when a staff member clocks in, the screen reflects it instantly.
 
 <Callout type="info">
-  The personnel module is unlocked on **Professional (PRO)** and higher plans. If your
-  plan doesn't include it, Personnel is hidden from the menu and the direct URL shows an
-  upgrade card.
+  Personnel is unlocked by the **Staff Management** module (₺990/year; the HummyTummy
+  Licence at ₺2,990/year is a prerequisite). Without the module, Personnel is hidden
+  from the menu and the direct URL shows a purchase card.
 
   **Personnel ≠ Users:** this module is for **working time/shifts**. To open a system
   account (role, email, password), use the **Operations → Users** (`/admin/users`)
@@ -49,5 +49,5 @@ The personnel module manages your team's **working time**: who clocked in/out an
 
 ## Related screens
 
-- **Users** (`/admin/users`) — system accounts, role and status management (on all plans).
+- **Users** (`/admin/users`) — system accounts, role and status management (included in the free core).
 - **[Reports & Analytics](/en/admin-guide/reports)** — Staff performance report tab.

@@ -14,21 +14,43 @@ A modern cloud-based restaurant POS system built with NestJS, React, and Postgre
 - ✅ **Stock Tracking** - Simple inventory management with low-stock alerts
 - ✅ **Payment Processing** - Track payments with multiple methods
 - ✅ **Reports** - Daily sales, top products, payment summaries
-- ✅ **Subscription System** - Complete SaaS billing with Stripe & Iyzico
-  - Monthly and yearly billing cycles
-  - 4 subscription tiers (FREE, BASIC, PRO, BUSINESS)
-  - One-time trial period per restaurant
-  - Upgrade/downgrade/cancel anytime
-  - Plan-based feature access control
-  - Auto-renewable subscriptions
+- ✅ **Free Core + À-la-carte Licensing** - No plans, no tiers, no trial
+  - The core is free forever: POS, KDS, menu, tables/floor plan, QR menu, orders,
+    cash drawer, basic reports, team & roles, customers, device/branch panel, custom
+    branding. Users, tables, products, categories and monthly orders are uncapped
+    (`-1`); the first branch is free
+    (`backend/src/modules/entitlements/free-baseline.const.ts`)
+  - Paid capability is bought item by item from one catalog — an annual licence
+    unlocks the paid rail, then individual modules, integrations, extra branches,
+    one-time credit packs and services
+    (`backend/src/modules/marketplace/alacarte-catalog.const.ts`)
+  - Entitlement engine folds free baseline + purchased grants into one set that
+    both the backend guards and the SPA read
+    (`backend/src/modules/entitlements/`)
+  - Day-prorated to a fixed account anniversary (the licence purchase date); lines
+    within 14 days of the anniversary roll into the next full cycle, no line below
+    1 TRY (`backend/src/modules/licensing/anniversary.ts`)
+  - Manual renewal — no stored card, no automatic capture. Reminders at 30/7/1 days,
+    then a 7-day grace period; after that access dims but data is retained
+    (`backend/src/modules/licensing/renewal-scheduler.service.ts`)
+  - Collection runs on PayTR, TRY only
+    (`backend/src/modules/payments/adapters/paytr.adapter.ts`)
   - Email notifications and invoice PDFs
-  - Region-aware payment routing (Turkey → Iyzico, International → Stripe)
+- ✅ **Recipe/BOM & Cost Control** - Recipes, recipe costing, stock deduction, counts,
+  waste logs, purchase orders/invoices, suppliers, reorder suggestions
+- ✅ **Delivery Platform Integrations** - Yemeksepeti, Getir and Trendyol Yemek orders
+  flow into the POS and kitchen (a Migros adapter also exists in code but is not in
+  the sold catalog)
+- ✅ **e-Document & Fiscal** - e-Invoice/e-Archive via Nilvera (plus Paraşüt, Logo,
+  Foriba adapters), ÖKC/fiscal core, Z-Reports
+- ✅ **Advanced Analytics** - Analytics module with scheduled aggregation; daily sales
+  CSV export for accountants
+- ✅ **Customers** - Customer records plus a points-based loyalty service
+  (Bronze/Silver/Gold/Platinum earn multipliers) and a referral service
 
 ### Coming Soon (Phase 2)
-- 🔄 Delivery management with courier tracking
-- 🔄 Recipe/BOM (Bill of Materials) tracking
-- 🔄 Third-party integrations (delivery platforms, e-Invoice)
-- 🔄 Advanced analytics and exports
+- 🔄 In-house courier/dispatch management (today's delivery flow relies on the
+  marketplace platforms' own couriers)
 - 🔄 Mobile applications (React Native)
 
 ## 🏗️ Tech Stack
@@ -40,7 +62,7 @@ A modern cloud-based restaurant POS system built with NestJS, React, and Postgre
 - **Authentication**: JWT + RBAC
 - **Real-time**: Socket.IO
 - **Cache**: Redis
-- **Payments**: Stripe SDK + Iyzico SDK
+- **Payments**: PayTR (direct REST + hash integration, no vendor SDK)
 - **Email**: Nodemailer with Handlebars templates
 - **PDF Generation**: PDFKit
 - **Task Scheduling**: @nestjs/schedule (Cron jobs)
@@ -136,7 +158,7 @@ Frontend runs on: `http://localhost:5173`
 # Copy environment file
 cp .env.docker .env
 
-# Edit .env with your API keys (Stripe, Iyzico, Email)
+# Edit .env with your API keys (PayTR, Email)
 nano .env
 
 # Start all services
@@ -145,8 +167,8 @@ docker-compose up -d
 # Run migrations
 docker-compose exec backend npx prisma migrate deploy
 
-# Seed subscription plans
-docker-compose exec backend npx ts-node prisma/seed-subscriptions.ts
+# Seed the à-la-carte marketplace catalog (add-ons, hardware SKUs, providers)
+docker-compose exec backend npm run seed:marketplace
 
 # View logs
 docker-compose logs -f
@@ -160,10 +182,14 @@ docker-compose logs -f
 
 **📚 Detailed Documentation:**
 - Quick Start: Run `./quick-start.sh`
-- **Desktop App**: See `DESKTOP_APP_GUIDE.md` 🆕
-- Deployment Checklist: See `DEPLOYMENT_CHECKLIST.md`
-- Docker Guide: See `DOCKER_DEPLOYMENT.md`
-- Subscription System: See `SUBSCRIPTION_SYSTEM.md`
+- **Desktop App**: See [`desktop/README.md`](desktop/README.md)
+- **Deployment**: See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- **Licensing & Billing**: the design spec is
+  [`docs/superpowers/specs/2026-08-11-alacarte-licensing-design.md`](docs/superpowers/specs/2026-08-11-alacarte-licensing-design.md);
+  the runtime sources of truth are `backend/src/modules/marketplace/alacarte-catalog.const.ts`
+  (catalog + prices) and `backend/src/modules/entitlements/free-baseline.const.ts` (free core).
+  `backend/SUBSCRIPTION_SYSTEM.md` describes the tiered Stripe/Iyzico rail that was retired
+  in migration `20260811140000_retire_subscription_rail` — keep it only as history.
 - Multi-Environment Setup: See section below
 - **Architecture Quality Audit**: See [`docs/architecture/QUALITY_AUDIT.md`](docs/architecture/QUALITY_AUDIT.md) — 30-attribute scorecard with evidence and roadmap
 - **Architecture Decision Records**: See [`docs/architecture/adr/`](docs/architecture/adr/)
@@ -237,7 +263,7 @@ sudo nano .env.production
 #   - SERVER_HOST: Your server IP
 #   - SERVER_USERNAME: SSH username
 #   - SERVER_SSH_KEY: Private SSH key
-#   - Plus all environment-specific secrets (JWT_SECRET, STRIPE_SECRET_KEY, etc.)
+#   - Plus all environment-specific secrets (JWT_SECRET, PAYTR_MERCHANT_KEY, etc.)
 ```
 
 ### Deployment Workflow
@@ -396,10 +422,14 @@ kds/
 │   │   │   ├── kds/
 │   │   │   ├── stock/
 │   │   │   ├── reports/
-│   │   │   └── subscriptions/  # NEW: Subscription system
+│   │   │   ├── entitlements/   # Free core baseline + entitlement engine/guards
+│   │   │   ├── marketplace/    # À-la-carte catalog (single source of prices)
+│   │   │   ├── licensing/      # Anniversary, proration, manual renewal cycle
+│   │   │   ├── checkout/       # Purchase intents, settlement, quotes
+│   │   │   ├── payments/       # PayTR adapter
+│   │   │   └── subscriptions/  # Billing records, invoices, notifications
 │   │   │       ├── controllers/
 │   │   │       ├── services/
-│   │   │       ├── guards/
 │   │   │       ├── decorators/
 │   │   │       └── templates/emails/
 │   │   ├── common/         # Shared utilities
@@ -418,9 +448,11 @@ kds/
 │   │   │   ├── kitchen/
 │   │   │   ├── admin/
 │   │   │   ├── qr-menu/
-│   │   │   └── subscription/   # NEW: Pricing, checkout
+│   │   │   └── subscription/   # PayTR payment result page
 │   │   ├── components/    # Reusable components
 │   │   ├── features/      # Feature-specific code
+│   │   │   ├── marketplace/    # Add-on storefront
+│   │   │   └── licensing/      # Catalog store, licence & renewal pages
 │   │   ├── lib/          # Utilities & config
 │   │   └── types/        # TypeScript types
 │   └── public/
@@ -445,10 +477,8 @@ kds/
 │
 ├── deploy.sh                       # Multi-environment deployment script
 ├── quick-start.sh                  # Automated setup script
-├── DEPLOYMENT_CHECKLIST.md         # Deployment guide
-├── DOCKER_DEPLOYMENT.md            # Docker guide
-├── SUBSCRIPTION_SYSTEM.md          # Subscription docs
-├── COMPLETE_IMPLEMENTATION_GUIDE.md # Full implementation
+├── docs/DEPLOYMENT.md              # Deployment guide
+├── desktop/README.md               # Desktop (Tauri) guide
 └── README.md
 ```
 
@@ -542,13 +572,12 @@ JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
 CORS_ORIGIN=https://yourdomain.com
 
-# Payment Providers
-STRIPE_SECRET_KEY=sk_live_your_key
-STRIPE_PUBLISHABLE_KEY=pk_live_your_key
-STRIPE_WEBHOOK_SECRET=whsec_your_secret
-IYZICO_API_KEY=your_api_key
-IYZICO_SECRET_KEY=your_secret_key
-IYZICO_BASE_URL=https://api.iyzipay.com
+# Payment Provider (PayTR — the only gateway we collect through; TRY only)
+PAYTR_MERCHANT_ID=your_merchant_id
+PAYTR_MERCHANT_KEY=your_merchant_key
+PAYTR_MERCHANT_SALT=your_merchant_salt
+PAYTR_BASE_URL=https://www.paytr.com
+PAYTR_TEST_MODE=false
 
 # Email
 EMAIL_HOST=smtp.gmail.com
@@ -556,17 +585,12 @@ EMAIL_PORT=587
 EMAIL_USER=your-email@domain.com
 EMAIL_PASSWORD=your-password
 EMAIL_FROM=noreply@yourdomain.com
-
-# Subscription
-DEFAULT_TRIAL_DAYS=14
-TRIAL_REMINDER_DAYS=3
 ```
 
 **Frontend (.env):**
 ```env
 VITE_API_URL=https://api.yourdomain.com
 VITE_WS_URL=https://api.yourdomain.com
-VITE_STRIPE_PUBLISHABLE_KEY=pk_live_your_key
 ```
 
 ## 🤝 Contributing
@@ -592,16 +616,17 @@ For issues and questions:
 ## 🗺️ Roadmap
 
 - [x] MVP Core Features
-- [x] Subscription System (Stripe + Iyzico)
+- [x] Free core + à-la-carte licensing on PayTR
 - [x] Email Notifications
 - [x] Invoice PDF Generation
 - [x] Docker Deployment
+- [x] Delivery partner integrations (Yemeksepeti, Getir, Trendyol Yemek)
+- [x] Advanced inventory (recipes/BOM, costing, purchasing)
+- [x] Multi-location support (free branch hub; extra branches are a paid capacity add-on)
+- [x] Loyalty & referral
+- [x] E-Invoice integration (Nilvera and other e-document adapters)
 - [ ] Mobile app (React Native)
-- [ ] Delivery partner integrations
-- [ ] Advanced inventory (BOM)
-- [ ] Multi-location support
-- [ ] Loyalty programs
-- [ ] E-Invoice integration
+- [ ] In-house courier/dispatch management
 
 ---
 

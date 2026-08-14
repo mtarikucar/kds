@@ -40,8 +40,10 @@ interface PublicProduct {
   compat: Record<string, unknown> | null;
   details: Record<string, unknown> | null;
   serviceMeta: Record<string, unknown> | null;
+  // Outright purchase price. Hardware rental was retired in July 2026 —
+  // the API still returns rentalMonthlyCents, but it is always null and
+  // the storefront no longer reads or renders it.
   priceCents: number;
-  rentalMonthlyCents: number | null;
   currency: string;
   warrantyMonths: number;
   images: string[];
@@ -237,14 +239,6 @@ export default async function ProductDetailPage(
                   <div className="text-3xl font-semibold text-slate-900">
                     {formatPrice(product.priceCents, product.currency)}
                   </div>
-                  {product.rentalMonthlyCents ? (
-                    <div className="mt-1 text-sm text-slate-500">
-                      {t('rentalFrom', {
-                        currency: '',
-                        amount: formatPrice(product.rentalMonthlyCents, product.currency),
-                      })}
-                    </div>
-                  ) : null}
                   <div className="mt-1 text-xs text-slate-500">
                     {t('warrantyMonths', { months: product.warrantyMonths })}
                   </div>

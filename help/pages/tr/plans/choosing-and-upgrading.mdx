@@ -1,98 +1,147 @@
 ---
-title: Plan seçimi ve yükseltme
-description: Paket seçme, yükseltme (proration), düşürme (dönem sonunda) ve ödeme akışları (PayTR / havale).
+title: Hangi modüller size uygun
+description: İhtiyacınıza göre modül seçimi, örnek sepetler, satın alma akışı ve sonradan modül ekleme/bırakma.
 ---
 
 import { Callout, Steps } from 'nextra/components'
 
-# Plan seçimi ve yükseltme
+# Hangi modüller size uygun
 
-Paket seçimi ve değişikliği panelde iki ekran üzerinden yürür:
+Seçilecek bir paket, geçilecek bir kademe yoktur. Ücretsiz çekirdekle
+başlarsınız ve **yalnızca eksik kalan yeteneği** satın alırsınız. Yanlış bir
+seçim yapıp kilitlenme riski yoktur: bir modülü sonradan da ekleyebilirsiniz ve
+yıl dönümünüze kalan gün kadar orantılı ödersiniz.
 
-- **Plan seçim ekranı** — satılabilir paketleri listeler, aylık/yıllık seçtirir.
-- **Plan değiştir ekranı** — canlı bir abonelik üzerinde yükseltme veya düşürme yaptırır.
+Satın alma ve ödeme için işletmenizde **Yönetici (ADMIN)** veya **Müdür
+(MANAGER)** rolüne sahip olmanız gerekir; bir ürünü iptal etmek **yalnızca
+Yönetici (ADMIN)** yetkisidir.
 
-Tüm fiyatlar **TRY** ve **KDV dahildir**; ekranda gördüğünüz tutar tahsil edilecek tutardır. Plan ve ödeme işlemleri için işletmenizde **Yönetici (ADMIN)** veya **Müdür (MANAGER)** rolüne sahip olmanız gerekir; bir planı fiilen değiştirme yetkisi **yalnızca Yönetici (ADMIN)** içindir.
+## Önce şunu sorun: çekirdek yetmiyor mu?
 
-## Satılabilir paketleri görme
+POS, mutfak ekranı, menü, masa planı, QR menü, sipariş, kasa, temel raporlar,
+ekip yönetimi ve müşteriler **zaten ücretsizdir ve sınırsızdır**. Bir modüle
+ancak aşağıdaki ihtiyaçlardan biri doğduğunda para ödersiniz.
 
-Plan seçim ekranı yalnızca **satışta olan** paketleri gösterir: Başlangıç, Profesyonel ve Kurumsal. Kayıt sırasında aldığınız Deneme paketi ve kaldırılmış eski Ücretsiz paket bu listede yer almaz.
+| İhtiyacınız | Almanız gereken | Yıllık |
+| --- | --- | ---: |
+| Reçete/maliyet, stok sayımı, satın alma siparişi, fire takibi | Stok & Maliyet Yönetimi | ₺1.490 |
+| Kohort/analitik derinliği, muhasebe back-office, e-belge ayarları | Gelişmiş Rapor & Analitik | ₺1.290 |
+| Masa rezervasyonu, online rezervasyon sayfası | Rezervasyon Sistemi | ₺990 |
+| Puantaj, vardiya planlama, performans | Personel Yönetimi | ₺990 |
+| Yemeksepeti / Getir / Trendyol siparişlerinin mutfağa düşmesi | İlgili teslimat entegrasyonu | ₺2.490 (her biri) |
+| Yasal e-Fatura / e-Arşiv gönderimi | e-Fatura (Nilvera) | ₺1.990 |
+| Yazarkasadan mali fiş | ÖKC / Yazarkasa (Hugin) | ₺2.990 |
+| Telefonla sipariş alan bir mutfak | Çağrı-ID Entegrasyonu | ₺1.490 |
+| Müşteriye SMS bildirimi | SMS Bildirimleri | ₺990 |
+| Ürün görselini/videosunu yapay zekâyla üretmek | AI Menü Stüdyosu | ₺1.990 |
+| Kendi sisteminizi bağlamak | API & Webhook Erişimi | ₺2.490 |
+| Üçüncü taraf ekranın menünüzü göstermesi | Partner Ekran API | ₺1.990 |
+| Garantili yanıt süresi | Öncelikli Destek | ₺1.990 |
+| İkinci (ve sonraki) şube | Ek Şube | ₺3.990 / adet |
 
-Her paket kartında aylık ve yıllık fiyat (₺, KDV dahil), o pakete dahil özellikler ve kullanım limitleri görünür. Aktif bir kampanya varsa indirimli fiyat doğrudan kart üzerinde gösterilir — gösterilen indirimli fiyat, ödeme ekranında karşınıza çıkacak tutarla birebir aynıdır.
+Bunların hepsi **lisans (₺2.990/yıl)** ön koşuluna tabidir: ilk ücretli
+kaleminizle birlikte lisans da adisyonunuza girer.
 
-## Seçim akışı: hangi ekrana gidersiniz?
+## Örnek sepetler
 
-Bir paket kartında **Seç** dediğinizde sistem, işletmenizin mevcut abonelik durumuna bakarak sizi doğru ekrana yönlendirir:
+Aşağıdaki tutarlar, hepsi **aynı anda** alındığında ödenen ilk yıl toplamlarıdır
+(hepsi tam yıl fiyatından). Tümü KDV dahildir.
+
+| Profil | Sepet | İlk yıl |
+| --- | --- | ---: |
+| Maliyetini görmek isteyen küçük kafe | Lisans + Stok & Maliyet | **₺4.480** |
+| Rezervasyon alan, vardiyalı şehir merkezi restoranı | Lisans + Rezervasyon + Personel + Gelişmiş Rapor | **₺6.260** |
+| Paket/kurye ağırlıklı işletme | Lisans + Yemeksepeti + Getir + Çağrı-ID | **₺9.460** |
+| İki şubeli işletme | Lisans + Ek Şube + Stok & Maliyet + Gelişmiş Rapor | **₺9.760** |
+
+<Callout type="info">
+  Bu sepetlerin hiçbiri zorunlu bir set değildir; her satır tek tek alınabilir ve
+  tek tek bırakılabilir. Listede olmayan hiçbir şey için ödeme yapmazsınız.
+</Callout>
+
+## Satın alma akışı
 
 <Steps>
 
-### Canlı aboneliğiniz var, farklı bir paket seçtiniz
-**Plan değiştir** ekranına gidersiniz. Yükseltme ya da düşürme yalnızca canlı (aktif veya deneme) bir abonelik döneminde anlamlıdır.
+### Mağazayı açın
 
-### Canlı aboneliğiniz var, zaten o paketteyim
-Hiçbir işlem yapılmaz; aynı pakete tekrar geçilmez.
+Üst bardaki mağaza simgesinden **Mağaza**'ya (`/admin/store`) gidin. Katalog;
+lisans, modüller, entegrasyonlar, kapasite, kontör ve hizmetler başlıkları
+altında listelenir.
 
-### Aboneliğiniz dolmuş, iptal edilmiş veya hiç abonelik yok
-Sıfırdan bir **ödeme (checkout)** ekranına gidersiniz ve yeni, tam dönemli bir abonelik başlatırsınız.
+### İstediğiniz kalemleri işaretleyin
 
-### Deneme hakkınız varsa
-Henüz deneme hakkınız sürüyorsa ödeme adımı atlanır ve deneme akışı devreye girer; ücret alınmadan devam edersiniz.
+Birden fazla kalemi aynı anda işaretleyebilirsiniz; **adisyon** panelinde toplam
+anında güncellenir. Ücretli bir modül işaretlediğinizde lisansınız yoksa lisans
+otomatik olarak adisyona eklenir.
+
+### Tutarı gözden geçirin
+
+Her kalemin yanında hem **şimdi ödeyeceğiniz orantılı tutar** hem de **yıl
+dönümündeki tam yenileme tutarı** görünür. Toplam her zaman sunucuda yeniden
+hesaplanır; ekranda gördüğünüz tutar tahsil edilecek tutardır (KDV dahil).
+
+### Yasal belgeleri onaylayın
+
+Ödeme başlamadan önce mesafeli satış belgelerini onaylamanız istenir. Onay
+verilmeden ödeme adımı başlatılmaz.
+
+### PayTR ile ödeyin
+
+Ödeme **PayTR** üzerinden ve yalnızca **TRY** olarak alınır. Sepetinizdeki her
+kalem ödeme ekranında ayrı satır olarak görünür.
+
+### Haklar açılır
+
+Ödeme onaylandığı anda satın aldığınız hak hesabınıza eklenir; ilgili ekranlar
+hemen kullanılabilir hâle gelir. Ödemeyi yarıda bırakırsanız ücret alınmaz ve
+hiçbir hak eklenmez.
 
 </Steps>
 
-## Yükseltme (anında, oransal ücretle)
+## Sonradan modül eklemek
 
-Canlı bir abonelikteyken daha üst bir pakete geçmek **yükseltme** sayılır. Plan değiştir ekranında daha pahalı bir paket seçtiğinizde sistem, dönemin **kalan günlerine göre oransal (proration) bir tutar** hesaplar ve karşınıza çıkarır — yani sadece kalan süre için aradaki farkı ödersiniz, bütün ayı/yılı yeniden ödemezsiniz.
+İstediğiniz zaman yeni bir modül ekleyebilirsiniz. Yeni kalem **yıl dönümünüze
+kalan gün kadar** fiyatlanır, böylece hesabınız tek yenileme tarihinde
+buluşmaya devam eder.
 
-<Steps>
-
-### Yeni (daha üst) paketi seçin
-Plan değiştir ekranında hedef paketi ve aylık/yıllık döngüyü işaretleyin.
-
-### Oransal tutarı onaylayın
-Ekran, ödenecek oransal farkı (₺, KDV dahil) gösterir. Kalan gün ne kadar azsa fark da o kadar düşüktür.
-
-### Ödemeyi tamamlayın
-Ödeme PayTR (kart) ya da havale ile alınır. Ödeme onaylandıktan **sonra** yükseltme uygulanır ve yeni özellikler/limitler hemen açılır.
-
-</Steps>
+Örnek: lisansı **1 Mart**'ta aldınız, yıl dönümünüz her yıl 1 Mart. **1
+Eylül**'de ₺1.490'lık Stok & Maliyet modülünü eklerseniz, yıl dönümüne 181 gün
+kaldığı için bu yıl **₺738,88** ödersiniz; modül 1 Mart'ta tam fiyatla yenilenir.
 
 <Callout type="info">
-  Oransal tutar; faturalama döneminizin bitişine kalan gün sayısına göre belirlenir. Kalan süre için ödenecek bir fark çıkarsa, yükseltme ancak bu ödeme alındıktan sonra devreye girer.
+  Yıl dönümüne **14 gün veya daha az** kalmışsa kalem kalan güne sıkıştırılmaz:
+  kalan gün + bir sonraki tam yıl birlikte faturalanır ve ürün bir sonraki yıl
+  dönümüne kadar açık kalır. Ayrıntı: [Faturalama ve yenileme](/tr/plans/trial-and-billing).
 </Callout>
 
-## Düşürme (dönem sonunda uygulanır)
+## Zaten sahip olduğunuz bir şeyi ikinci kez almazsınız
 
-Daha alt (daha ucuz) bir pakete geçmek **düşürme** sayılır ve **hemen uygulanmaz** — mevcut faturalama döneminizin **sonuna planlanır**. Böylece zaten ödediğiniz dönemi sonuna kadar üst paketle kullanmaya devam edersiniz.
+Mağaza, satın alınamayacak kalemleri işaretlettirmez ve ödeme adımı da aynı
+kontrolü tekrar yapar:
 
-- Düşürmeden önce sistem, mevcut kullanımınızın hedef paketin limitlerine uyup uymadığını kontrol eder. Örneğin **4 şubeniz** varsa, tek şube hakkı veren Başlangıç paketine düşemezsiniz; önce kullanımı limitlerin altına indirmeniz gerekir.
-- Düşürme planlandığında ekran size, değişikliğin uygulanacağı **dönem sonu tarihini** gösterir.
+- Hesabınızda **zaten aktif** olan bir ürün yeniden satılmaz.
+- Bir hak size **hediye edilmiş** (comp) veya başka bir ürünle zaten açılmışsa,
+  aynı hakkı veren ürün yeniden satılmaz.
+- Sınırsız olan bir limiti artıran kapasite kalemi satılmaz.
+- Lisansınız aktifken ikinci bir lisans satılmaz; lisans yıl dönümünde yenilenir.
+- **Ek Şube** bunun istisnasıdır: adet bazlıdır, ikinci ve üçüncü adedi
+  alabilirsiniz (hesap başına en fazla 100 adet).
 
-<Callout type="warning">
-  Zaten planlanmış bir plan değişikliğiniz varken yeni bir değişiklik yapmaya çalışırsanız, sistem önce mevcut planlı değişikliği iptal etmenizi ister. Düşürmeyi dönem sonu gelmeden iptal ederseniz mevcut paketinizde kalırsınız.
-</Callout>
+## Bir modülü bırakmak
 
-## Ödeme yöntemleri: PayTR ve havale
+- **Dönem sonunda iptal** — ürün ödediğiniz sürenin sonuna kadar açık kalır ve
+  yıl dönümündeki yenileme sepetine girmez.
+- **Hemen iptal** — ürünün hakları anında geri alınır.
 
-Yeni bir abonelik veya yükseltme ödemesini iki yöntemden biriyle tamamlayabilirsiniz:
-
-- **Kart (PayTR)** — varsayılan yöntem. PayTR yalnızca **TRY** tahsil eder. Ödeme ekranında kart bilgilerinizi girersiniz; ödeme onaylanınca aboneliğiniz otomatik olarak aktifleşir.
-- **Havale / EFT (banka transferi)** — alternatif yöntem. Ekran size platformun banka/IBAN bilgilerini gösterir; transferi yaptıktan sonra ödemeniz **yetkili onayıyla** etkinleştirilir. Bu seçenek yalnızca platform tarafında IBAN tanımlıysa görünür.
-
-<Callout type="info">
-  Marketplace’ten satın aldığınız eklentiler de **aynı kart ödeme akışını** kullanır ve yalnızca ödeme tamamlandıktan sonra etkinleşir. Bkz. [Marketplace](/tr/marketplace).
-</Callout>
-
-## Sonradan özellik edinme
-
-Bir özelliğe sonradan ihtiyaç duyduğunuzda iki yolunuz vardır:
-
-1. **Plan yükseltme** — daha üst pakete geçerek tüm özellik setini ve daha yüksek limitleri açın (bu sayfadaki yükseltme akışı).
-2. **Marketplace eklentisi** — tek bir yeteneği paket değiştirmeden ekleyin. Bkz. [Marketplace](/tr/marketplace).
+İptal bir faturalandırma kararıdır; yalnızca **Yönetici (ADMIN)** yapabilir.
+**Ek Şube** gibi adet bazlı kalemlerde adedi düşürmek de bir sonraki yenilemede
+uygulanır — ödediğiniz dönem sonuna kadar mevcut adediniz korunur.
 
 ## İlgili sayfalar
 
-- Deneme süreci ve faturalama: **[Deneme ve faturalama](/tr/plans/trial-and-billing)**
-- Paketlerin tam özellik/limit karşılaştırması: **[Özellik matrisi](/tr/plans/feature-matrix)**
+- Ücretsiz çekirdek ve tam fiyat listesi: **[Lisans ve Modüller](/tr/plans)**
+- Hangi özelliğin hangi modülle açıldığı: **[Özellik matrisi](/tr/plans/feature-matrix)**
+- Orantılı fiyatlama, yıl dönümü ve yenileme: **[Faturalama ve yenileme](/tr/plans/trial-and-billing)**
 
-Geliştirici/entegrasyon detayları (uç noktalar, JSON, proration/iptal API'leri): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)
+Geliştirici/entegrasyon detayları (uç noktalar, JSON, fiyat teklifi/ödeme API'leri): [Abonelik & Ödeme API](https://developer.hummytummy.com/tr/developer/billing-api)

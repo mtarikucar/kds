@@ -401,17 +401,15 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {/* v3.0.0 — POS is tier-gated (BASIC+). FREE plans (post-trial
-            fallback) see the UpsellCard; backend pos-settings endpoints
-            also return 403 for these tenants. Sidebar item is hidden
-            via the same posAccess feature flag below. */}
+            {/* POS is FREE core — `feature.posAccess` is granted to every
+            tenant unconditionally (FREE_BASELINE_GRANTS). Nothing sells it, so
+            the gate only ever closes when ops suppress the capability for one
+            tenant (abuse handling); the fallback says exactly that instead of
+            offering a product that does not exist. */}
             <Route
               path="/pos"
               element={
-                <FeatureGate
-                  feature="posAccess"
-                  fallback={<UpsellCard planName="BASIC" />}
-                >
+                <FeatureGate feature="posAccess" fallback={<UpsellCard freeCore />}>
                   <POSPage />
                 </FeatureGate>
               }
@@ -467,16 +465,23 @@ function App() {
               element={<Navigate to="/admin/team" replace />}
             />
             <Route path="/admin/qr-codes" element={<QRManagementPage />} />
-            {/* v2.8.88 page-root FeatureGate: direct URL access shows an
-            upsell instead of 403. Each fallback links to the matching
-            marketplace add-on. */}
+            {/* Page-root FeatureGate: direct URL access shows an upsell
+            instead of a 403. Each fallback names the à-la-carte product that
+            actually unlocks the screen (see backend
+            marketplace/alacarte-catalog.const.ts) so the card can quote the
+            module's real, day-prorated price. */}
             {/* Analitik + Raporlar birleşik sayfası (grup anahtarlı). */}
             <Route
               path="/admin/reports"
               element={
                 <FeatureGate
                   feature="advancedReports"
-                  fallback={<UpsellCard addOnCode="advanced_reports" />}
+                  fallback={
+                    <UpsellCard
+                      addOnCode="advanced_reports"
+                      featureKey="advancedReports"
+                    />
+                  }
                 >
                   <ReportsAnalyticsPage />
                 </FeatureGate>
@@ -519,7 +524,12 @@ function App() {
               element={
                 <FeatureGate
                   feature="reservationSystem"
-                  fallback={<UpsellCard planName="PRO" />}
+                  fallback={
+                    <UpsellCard
+                      addOnCode="module_reservations"
+                      featureKey="reservationSystem"
+                    />
+                  }
                 >
                   <ReservationsPage />
                 </FeatureGate>
@@ -534,7 +544,12 @@ function App() {
               element={
                 <FeatureGate
                   feature="inventoryTracking"
-                  fallback={<UpsellCard planName="BASIC" />}
+                  fallback={
+                    <UpsellCard
+                      addOnCode="module_inventory"
+                      featureKey="inventoryTracking"
+                    />
+                  }
                 >
                   <StockPage />
                 </FeatureGate>
@@ -568,12 +583,15 @@ function App() {
               <Route path="pos" element={<POSSettingsPage />} />
               <Route path="qr-menu" element={<QRMenuSettingsPage />} />
               <Route path="reports" element={<ReportsSettingsPage />} />
+              {/* Özel marka + alan adı ücretsiz çekirdeğe dahildir
+              (`feature.customBranding`, FREE_BASELINE_GRANTS) — satılan bir
+              ürünü yok, bu yüzden fallback satış değil destek yönlendirmesi. */}
               <Route
                 path="branding"
                 element={
                   <FeatureGate
                     feature="customBranding"
-                    fallback={<UpsellCard planName="PRO" />}
+                    fallback={<UpsellCard freeCore />}
                   >
                     <BrandingSettingsPage />
                   </FeatureGate>
@@ -594,7 +612,10 @@ function App() {
                   <FeatureGate
                     feature="apiAccess"
                     fallback={
-                      <UpsellCard addOnCode="api_access" planName="BUSINESS" />
+                      <UpsellCard
+                        addOnCode="api_access"
+                        featureKey="apiAccess"
+                      />
                     }
                   >
                     <IntegrationsSettingsPage />
@@ -609,7 +630,10 @@ function App() {
                   <FeatureGate
                     feature="apiAccess"
                     fallback={
-                      <UpsellCard addOnCode="api_access" planName="BUSINESS" />
+                      <UpsellCard
+                        addOnCode="api_access"
+                        featureKey="apiAccess"
+                      />
                     }
                   >
                     <WebhooksPage />
@@ -618,14 +642,20 @@ function App() {
               />
               {/* Phase 7: Partner Display API keys — lets third-party screens/apps
               browse menu, order, self-pay and watch status live via a
-              tenant-issued API key. Gated by the externalDisplay plan feature;
-              direct URL hit on a tenant lacking it shows the UpsellCard. */}
+              tenant-issued API key. Unlocked by the Partner Ekran API module
+              (`module_external_display`); direct URL hit without it shows the
+              UpsellCard. */}
               <Route
                 path="partner-keys"
                 element={
                   <FeatureGate
                     feature="externalDisplay"
-                    fallback={<UpsellCard planName="BUSINESS" />}
+                    fallback={
+                      <UpsellCard
+                        addOnCode="module_external_display"
+                        featureKey="externalDisplay"
+                      />
+                    }
                   >
                     <PartnerKeysPage />
                   </FeatureGate>
@@ -636,7 +666,12 @@ function App() {
                 element={
                   <FeatureGate
                     feature="reservationSystem"
-                    fallback={<UpsellCard planName="PRO" />}
+                    fallback={
+                      <UpsellCard
+                        addOnCode="module_reservations"
+                        featureKey="reservationSystem"
+                      />
+                    }
                   >
                     <ReservationSettingsPage />
                   </FeatureGate>
@@ -647,7 +682,12 @@ function App() {
                 element={
                   <FeatureGate
                     feature="personnelManagement"
-                    fallback={<UpsellCard planName="PRO" />}
+                    fallback={
+                      <UpsellCard
+                        addOnCode="module_personnel"
+                        featureKey="personnelManagement"
+                      />
+                    }
                   >
                     <ShiftTemplatesSettingsPage />
                   </FeatureGate>
@@ -658,7 +698,12 @@ function App() {
                 element={
                   <FeatureGate
                     feature="personnelManagement"
-                    fallback={<UpsellCard planName="PRO" />}
+                    fallback={
+                      <UpsellCard
+                        addOnCode="module_personnel"
+                        featureKey="personnelManagement"
+                      />
+                    }
                   >
                     <ScheduleSettingsPage />
                   </FeatureGate>
@@ -669,7 +714,12 @@ function App() {
                 element={
                   <FeatureGate
                     integration={{ domain: "sms" }}
-                    fallback={<UpsellCard />}
+                    fallback={
+                      <UpsellCard
+                        addOnCode="sms_integration"
+                        featureKey="integration.sms"
+                      />
+                    }
                   >
                     <SmsSettingsPage />
                   </FeatureGate>
@@ -683,10 +733,9 @@ function App() {
                     integration={{ domain: "delivery" }}
                     mode="any"
                     fallback={
-                      <UpsellCard
-                        addOnCode="delivery_yemeksepeti"
-                        planName="PRO"
-                      />
+                      /* Üç platform modülünden herhangi biri bu ekranı açar;
+                         fiyat/isim en ucuz teklife göre çözülür. */
+                      <UpsellCard featureKey="deliveryIntegration" />
                     }
                   >
                     <DeliveryPlatformsSettingsPage />
@@ -758,7 +807,7 @@ function App() {
             <Route path="/admin/store" element={<StoreHubPage />} />
             <Route
               path="/admin/marketplace"
-              element={<Navigate to="/admin/store?tab=addons" replace />}
+              element={<Navigate to="/admin/store?tab=catalog" replace />}
             />
             {/* v2.8.87: rich product/service detail page (real route, not modal). */}
             <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
@@ -789,7 +838,12 @@ function App() {
               element={
                 <FeatureGate
                   integration={{ domain: "caller" }}
-                  fallback={<UpsellCard addOnCode="caller_id_integration" />}
+                  fallback={
+                    <UpsellCard
+                      addOnCode="caller_id_integration"
+                      featureKey="integration.caller"
+                    />
+                  }
                 >
                   <CallerFeedPage />
                 </FeatureGate>

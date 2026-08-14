@@ -30,7 +30,7 @@ const TermsOfServicePage: React.FC = () => {
             {isEnglish ? 'Terms of Service' : 'Hizmet Şartları'}
           </h1>
           <p className="text-slate-500 mb-8">
-            {isEnglish ? 'Last updated: December 2024' : 'Son güncelleme: Aralık 2024'}
+            {isEnglish ? 'Last updated: August 2026' : 'Son güncelleme: Ağustos 2026'}
           </p>
 
           <div className="prose prose-gray max-w-none">
@@ -56,14 +56,22 @@ const TermsOfServicePage: React.FC = () => {
                   <li>You must notify us immediately upon becoming aware of any breach of security</li>
                 </ul>
 
-                <h2>4. Subscription and Payment</h2>
+                <h2>4. Fees and Payment</h2>
                 <p>
-                  Some aspects of the Service are provided for a fee. You will be charged in accordance with the pricing plan you select. All fees are exclusive of applicable taxes.
+                  The core of the Service — POS/order management, kitchen display, menu, tables and floor plan, QR menu, orders, cash, basic reports, team and roles, customers, device and branch management, and custom branding — is free and unlimited for every account and requires no credit card. You pay only for the items you choose to add.
                 </p>
                 <ul>
-                  <li>Subscription fees are billed in advance on a monthly or annual basis</li>
-                  <li>No refunds will be issued for partial months of service</li>
-                  <li>You may cancel your subscription at any time</li>
+                  <li>Paid items are the annual HummyTummy Licence together with individually purchased annual modules, integrations and capacity items, plus one-time credit packs and services. The licence is a prerequisite for buying and using any paid module.</li>
+                  <li>All listed prices are in Turkish Lira and include VAT (KDV).</li>
+                  <li>Annual items are billed in advance and prorated by day to the days remaining until your account's anniversary, so everything lands on a single invoice that renews on a single date.</li>
+                  <li>Renewal is manual. We do not store your card and never charge it automatically; we remind you 30, 7 and 1 day before your anniversary.</li>
+                  <li>If a renewal goes unpaid, a 7-day grace period follows. After it, access to the affected paid items stops — the free core keeps working, your data is not deleted, and access is restored as soon as payment is made.</li>
+                  <li>Payments are collected through PayTR in Turkish Lira only. Card details are never stored on our servers.</li>
+                  <li>
+                    Refund and withdrawal terms are set out in our{' '}
+                    <Link to="/legal/refund-policy">Refund Policy</Link> and{' '}
+                    <Link to="/legal/distance-sales">Distance Sales Agreement</Link>.
+                  </li>
                 </ul>
 
                 <h2>5. Acceptable Use</h2>
@@ -131,14 +139,22 @@ const TermsOfServicePage: React.FC = () => {
                   <li>Herhangi bir güvenlik ihlalinden haberdar olduğunuzda bizi derhal bilgilendirmelisiniz</li>
                 </ul>
 
-                <h2>4. Abonelik ve Ödeme</h2>
+                <h2>4. Ücretler ve Ödeme</h2>
                 <p>
-                  Hizmetin bazı yönleri ücretli olarak sunulmaktadır. Seçtiğiniz fiyatlandırma planına göre ücretlendirileceksiniz. Tüm ücretler geçerli vergiler hariçtir.
+                  Hizmetin çekirdeği — POS/adisyon, mutfak ekranı (KDS), menü, masa ve kat planı, QR menü, sipariş, kasa, temel raporlar, ekip ve roller, müşteriler, cihaz ve şube yönetimi ile özel marka — her hesap için ücretsiz ve sınırsızdır; kredi kartı gerektirmez. Yalnızca eklemeyi seçtiğiniz kalemler için ödeme yaparsınız.
                 </p>
                 <ul>
-                  <li>Abonelik ücretleri aylık veya yıllık olarak peşin faturalandırılır</li>
-                  <li>Kısmi hizmet ayları için iade yapılmayacaktır</li>
-                  <li>Aboneliğinizi istediğiniz zaman iptal edebilirsiniz</li>
+                  <li>Ücretli kalemler: yıllık HummyTummy Lisansı ile tek tek satın alınan yıllık modüller, entegrasyonlar ve kapasite kalemleri; ayrıca tek seferlik kontör paketleri ve hizmetler. Lisans, ücretli modülleri satın almanın ve kullanmanın ön koşuludur.</li>
+                  <li>Yayınlanan tüm fiyatlar Türk Lirası cinsindendir ve KDV dahildir.</li>
+                  <li>Yıllık kalemler peşin faturalandırılır ve hesabınızın yıl dönümüne kalan gün sayısına göre gün bazlı orantılanır; böylece tüm kalemleriniz tek faturada toplanır ve tek tarihte yenilenir.</li>
+                  <li>Yenileme manueldir. Kartınızı saklamayız ve otomatik tahsilat yapmayız; yıl dönümünüze 30, 7 ve 1 gün kala hatırlatırız.</li>
+                  <li>Yenileme ödenmezse 7 günlük ek süre tanınır. Bu sürenin sonunda yalnızca ilgili ücretli kalemlerin erişimi kapanır; ücretsiz çekirdek çalışmaya devam eder, verileriniz silinmez ve ödeme yapıldığında erişim aynen geri açılır.</li>
+                  <li>Tahsilat PayTR üzerinden yalnızca Türk Lirası ile yapılır. Kart bilgileriniz sunucularımızda saklanmaz.</li>
+                  <li>
+                    İade ve cayma koşulları{' '}
+                    <Link to="/legal/refund-policy">İade Politikası</Link> ve{' '}
+                    <Link to="/legal/distance-sales">Mesafeli Satış Sözleşmesi</Link>'nde düzenlenir.
+                  </li>
                 </ul>
 
                 <h2>5. Kabul Edilebilir Kullanım</h2>

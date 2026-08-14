@@ -21,25 +21,39 @@ function renderCard(props: Parameters<typeof UpsellCard>[0] = {}) {
 }
 
 describe('UpsellCard', () => {
-  it('always renders the "upgrade plan" CTA pointing at /admin/plan', () => {
+  it('always renders the licence CTA pointing at /admin/license', () => {
     renderCard();
-    const planLink = screen.getByRole('link', { name: /Pakete Geç/i });
-    expect(planLink).toHaveAttribute('href', '/admin/plan');
+    const licenceLink = screen.getByRole('link', {
+      name: /Lisansım ve modüllerim/i,
+    });
+    expect(licenceLink).toHaveAttribute('href', '/admin/license');
   });
 
-  it('renders the add-on CTA with an encoded deep link when addOnCode is given', () => {
+  it('renders the store CTA with an encoded deep link when addOnCode is given', () => {
     renderCard({ addOnCode: 'fiscal pro' });
-    const addOnLink = screen.getByRole('link', { name: /Eklentiyi Gör/i });
-    // The code is URL-encoded into ?focus=
-    expect(addOnLink).toHaveAttribute(
+    const storeLink = screen.getByRole('link', { name: /Mağazada incele/i });
+    // The code is URL-encoded into ?focus= on the catalog tab.
+    expect(storeLink).toHaveAttribute(
       'href',
-      '/admin/store?tab=addons&focus=fiscal%20pro',
+      '/admin/store?tab=catalog&focus=fiscal%20pro',
     );
   });
 
-  it('omits the add-on CTA entirely when no addOnCode is supplied', () => {
-    renderCard({ planName: 'PRO' });
-    expect(screen.queryByRole('link', { name: /Eklentiyi Gör/i })).toBeNull();
+  it('falls back to the bare catalog link when no product is identified', () => {
+    renderCard();
+    const storeLink = screen.getByRole('link', { name: /Mağazada incele/i });
+    expect(storeLink).toHaveAttribute('href', '/admin/store?tab=catalog');
+  });
+
+  it('omits the store CTA on a free-core screen, since there is nothing to sell', () => {
+    renderCard({ freeCore: true });
+    expect(
+      screen.queryByRole('link', { name: /Mağazada incele/i }),
+    ).toBeNull();
+    // The licence CTA stays: it is how the tenant sees what they already own.
+    expect(
+      screen.getByRole('link', { name: /Lisansım ve modüllerim/i }),
+    ).toBeInTheDocument();
   });
 
   it('uses an explicit title/description over the generic copy', () => {

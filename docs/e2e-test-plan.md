@@ -22,7 +22,7 @@ için açık görev listesi sunuyor.
 7. [Bölüm F — Envanter (stock + stock-management)](#bölüm-f--envanter)
 8. [Bölüm G — Ayarlar](#bölüm-g--ayarlar)
 9. [Bölüm H — Raporlama](#bölüm-h--raporlama)
-10. [Bölüm I — Abonelik & faturalandırma](#bölüm-i--abonelik--faturalandırma)
+10. [Bölüm I — Lisanslama & faturalandırma](#bölüm-i--lisanslama--faturalandırma)
 11. [Bölüm J — Customer Self-Pay](#bölüm-j--customer-self-pay)
 12. [Bölüm K — Delivery entegrasyonları](#bölüm-k--delivery-entegrasyonları)
 13. [Bölüm L — Platform (SuperAdmin)](#bölüm-l--platform-superadmin)
@@ -100,7 +100,7 @@ ile sisteme bağlanması.
 
 **Yan etkiler:**
 - `login` → `RefreshToken.create` (hashed); cookie `Set-Cookie: refreshToken=...; HttpOnly; SameSite=Strict; Path=/api/auth`
-- `register` (yeni tenant): `Tenant.create` + `Subscription.create(FREE)` + `User.create(ADMIN)` + welcome email (best-effort)
+- `register` (yeni tenant): `Tenant.create` + `Branch.create("Main", isHeadquarters)` + `User.create(ADMIN)` + welcome email (best-effort). **Abonelik/plan satırı YOK** — yeni kiracı ücretsiz çekirdeği `FREE_BASELINE_GRANTS`'ten projeksiyonla alır (`auth-provisioning.service.ts`)
 - `register` (mevcut tenant): `User.create(role)` with `status=PENDING_APPROVAL` → admin'lere notification + email
 - `forgot-password`: `PasswordResetToken.create` + email send (1 saatlik TTL, tek kullanımlık)
 - `refresh`: Eski token revoke + yeni token mint (rotation); reuse-detection: aynı token tekrar gelirse user'ın tüm refresh'leri iptal edilir
@@ -112,7 +112,6 @@ ile sisteme bağlanması.
 - `User.status` `SUSPENDED` ise login reddedilir, varolan access token sonraki istekte de reddedilir
 - `tenant.status !== ACTIVE` → login reddedilir
 - `pendingApproval` user → login başarısız, "ADMIN onayı bekleniyor" yanıtı
-- `emailVerified=false` → abonelik ödemesi (`/payments/create-intent`) blocked
 
 **Test planı:**
 
@@ -123,13 +122,13 @@ ile sisteme bağlanması.
 | A.1.3 | Logout → protected route redirect /login | ✅ |
 | A.1.4 | Refresh rotation (single + parallel) — TOKEN_REUSE değil | ✅ `cross-cutting/refresh-rotation` |
 | A.1.5 | Reload sonrası session korunuyor (ProtectedRoute bootstrap) | ✅ |
-| A.1.6 | Register (new tenant) → tenant + admin + FREE sub | ❌ — yeni tenant oluşturma testi yok |
+| A.1.6 | Register (new tenant) → tenant + Main branch + ADMIN; `Subscription` satırı YARATILMAZ; `/v1/entitlements/me` ücretsiz çekirdeği döner (`posAccess/kdsIntegration/customBranding/multiLocation` true, retired limitler `-1`, `maxBranches=1`) | ❌ — yeni tenant oluşturma testi yok |
 | A.1.7 | Register (existing tenant, role≠ADMIN) → `PENDING_APPROVAL` | ❌ |
 | A.1.8 | Pending approval user login → "ADMIN onayı" mesajı | ❌ |
 | A.1.9 | Forgot-password → email gönderildi (mock) + token üretildi | ❌ |
 | A.1.10 | Reset-password → eski refresh'ler iptal edildi | ❌ |
 | A.1.11 | Reset-password expired token → 4xx | ❌ |
-| A.1.12 | Verify-email → user.emailVerified=true, sonra `/payments/create-intent` blocked değil | ❌ |
+| A.1.12 | Verify-email → user.emailVerified=true | ❌ |
 | A.1.13 | OAuth Google flow → user yarat + login | ❌ — Google sandbox creds gerekir |
 | A.1.14 | Tenant SUSPENDED iken login reddi | ✅ `extra/tenant-suspension` |
 | A.1.15 | Refresh-token reuse — tüm token revoke + login zorunlu | ⚠️ — direkt assert yok, üretilen davranış ile gözleniyor |
@@ -277,7 +276,7 @@ ile sisteme bağlanması.
 - `delete` → soft-delete (status=DELETED) ya da hard-delete (cascade ile audit risk)
 
 **İnvariant'lar:**
-- maxUsers plan limiti (CheckLimit guard) — kapasiteye dolu tenant 6. user yaratamaz
+- **Kullanıcı sayısı SINIRSIZ.** `limit.maxUsers` ücretsiz çekirdekte `-1`; eski `@CheckLimit` decorator'ı plan rayıyla birlikte silindi. Bu anahtar yalnızca `-1` sentinel'i eski `plan:*` grant'lerini bastırsın diye duruyor (`entitlement-keys.const.ts`)
 - ADMIN kendisini silemez (last admin guard)
 - Email unique per tenant
 
@@ -287,7 +286,7 @@ ile sisteme bağlanması.
 |---|---|---|
 | B.2.1 | Admin yeni waiter yaratabiliyor | ❌ |
 | B.2.2 | Pending approval user onaylanınca status=ACTIVE + login OK | ❌ |
-| B.2.3 | maxUsers=2 → 3. user create reddedilir | ❌ |
+| B.2.3 | Kullanıcı sayısı sınırsız: `limit.maxUsers` `-1` iken 50. user create de kabul edilir (regresyon: eski plan kotası geri gelmesin) | ❌ |
 | B.2.4 | Role değişimi → eski token invalidate (sonraki istek 401) | ❌ |
 | B.2.5 | Last admin silinemez | ❌ |
 | B.2.6 | WAITER user listini göremez (role-gated) | ⚠️ — admin-users.spec.ts kısmen test ediyor |
@@ -335,7 +334,7 @@ ile sisteme bağlanması.
 
 **Amaç:** POS sipariş yaşam döngüsü.
 
-**Sahip olduğu modeller:** `Order`, `OrderItem`, `OrderItemModifier`, `OrderItemPayment`, `PendingPlanChange`.
+**Sahip olduğu modeller:** `Order`, `OrderItem`, `OrderItemModifier`, `OrderItemPayment`.
 
 **State machine:**
 ```
@@ -504,19 +503,32 @@ PAID → CANCELLED da izinli (refund/void için)
 - Status değişimi: orders.service ile bidirectional sync
 - Merge: orders TableGroup'a bağlanır, combined bill summary üzerinden
 - Unmerge: order'lar bireysel table'a geri döner
-- maxTables plan limiti CheckLimit guard
+- **Masa sayısı sınırsız** — `limit.maxTables` ücretsiz çekirdekte `-1`, `@CheckLimit` guard'ı kaldırıldı
 
 **Test planı:**
 
 | # | Senaryo | Coverage |
 |---|---|---|
 | C.3.1 | Create table + count artar | ✅ `admin-tables.spec.ts` |
-| C.3.2 | maxTables limit (plan veya override) → 6. red | ✅ `behavior/plan-limits` |
-| C.3.3 | maxTables=0 override → 1. bile red | ✅ `extra/plan-limits-all-keys` |
+| C.3.2 | Masa sayısı sınırsız: `limit.maxTables` `-1` iken üst sınır yok | ❌ — yazılacak (aşağıdaki uyarıya bak) |
+| C.3.3 | ~~maxTables=0 override → 1. bile red~~ | ⚠️ **BAYAT SPEC** — `extra/plan-limits-all-keys` kaldırılmış bir kotayı doğruluyor |
 | C.3.4 | RESERVED → OCCUPIED status manual update | ❌ |
 | C.3.5 | Merge → combined-bill-summary tüm order'ları döner | ❌ |
 | C.3.6 | Unmerge → order'lar tek tek table'a döner | ❌ |
 | C.3.7 | Table delete: aktif order varken reddedilir | ❌ |
+
+> ⚠️ **Kota spec'leri hakkında (à-la-carte geçişi).** `extra/plan-limits-all-keys.spec.ts`
+> hâlâ `maxTables` / `maxProducts` / `maxCategories` için superadmin
+> `limitOverrides` ile dar bir kota kurup create'in reddedilmesini bekliyor.
+> Bu davranış **kodda yok**: bu kotalar `FREE_BASELINE_GRANTS`'te `-1`
+> (sınırsız), `@CheckLimit` decorator'ı silindi ve
+> `update-tenant-overrides.dto.ts` yalnız `maxBranches`'ı koruyor. Yani bu
+> spec'ler emekli bir kuralı kilitliyor. Bu doküman spec'leri **çalıştırmadan**
+> güncellendi; ✅ işaretini korumak "test yeşil" demek olurdu ve bunu
+> doğrulayamayız. **Yapılacak:** spec'i çalıştır; yeşilse guard bir yerde
+> hayatta demektir (bug — sınırsız olması gerekiyor), kırmızıysa spec silinip
+> yerine "sınırsız kalıyor" regresyonu yazılmalı. Tek gerçek sayısal kota
+> `limit.maxBranches`'tır ve `branches.service.ts` içinde uygulanır.
 
 ---
 
@@ -535,15 +547,15 @@ PAID → CANCELLED da izinli (refund/void için)
 - `stockTracked` flag → manuel `PATCH /stock` ile decrement; recipe-based modifiye STK yok
 - Sipariş create → recipe varsa StockDeductionService trigger (Bölüm F)
 - Product image upload → filesystem + ProductImage row + ProductImageJunction (display order)
-- maxCategories, maxProducts plan limitleri
+- **Ürün ve kategori sayısı sınırsız** — `limit.maxProducts` / `limit.maxCategories` ücretsiz çekirdekte `-1`
 
 **Test planı:**
 
 | # | Senaryo | Coverage |
 |---|---|---|
 | C.4.1 | Create category + product | ✅ `admin-menu`, factory testleri |
-| C.4.2 | maxCategories cap → red | ✅ `extra/plan-limits-all-keys` |
-| C.4.3 | maxProducts cap → red | ✅ |
+| C.4.2 | ~~maxCategories cap → red~~ | ⚠️ **BAYAT SPEC** — bkz. C.3 altındaki kota uyarısı |
+| C.4.3 | ~~maxProducts cap → red~~ | ⚠️ **BAYAT SPEC** — aynı |
 | C.4.4 | Product price → orderItem subtotal'a yansır | ✅ |
 | C.4.5 | Modifier priceAdjustment finalAmount'a eklenir | ✅ |
 | C.4.6 | stockTracked manuel decrement (PATCH /stock) | ✅ `behavior/stock-deduction` |
@@ -1208,99 +1220,192 @@ Read-only aggregations; her biri `advancedReports` feature gate'i altında.
 
 ---
 
-## Bölüm I — Abonelik & faturalandırma
+## Bölüm I — Lisanslama & faturalandırma
 
-### I.1  `subscriptions`
+> **Model (11 Ağustos 2026'dan beri).** Plan/kademe/deneme yok. Çekirdek
+> süresiz ücretsiz ve sınırsız; ücretli her şey **à-la-carte yıllık ürün**
+> olarak satılır ve **yıllık lisans** (`license_annual`) ön koşuluyla açılır.
+> Lisansın alındığı gün hesabın **değişmez yıl dönümü**dür; sonradan alınan her
+> yıllık kalem o tarihe **gün bazlı orantılanır**, böylece hesap tek tarihte
+> tek kalemli faturayla yenilenir. **Yenileme manueldir** — kayıtlı kart yok,
+> otomatik çekim yok. Tahsilat **yalnız PayTR / TRY**.
+>
+> Kaynak: `entitlements/free-baseline.const.ts`,
+> `marketplace/alacarte-catalog.const.ts`, `licensing/anniversary.ts`,
+> `licensing/renewal-*.ts`, `checkout/*`.
 
-**Sahip olduğu modeller:** `SubscriptionPlan`, `Subscription`, `SubscriptionPayment`, `PendingPlanChange`, `Invoice` (subscription invoice — order invoice ile farklı).
+### I.1  `entitlements` + `licensing` (okuma yüzeyi)
 
-**Endpoint'ler:** (bölüm 2'deki tüm liste — current, plans, change-plan, cancel, reactivate, scheduled-downgrade, invoices).
+**Sahip olduğu modeller:** `MarketplaceAddOn` (katalog), `TenantAddOn`
+(sahiplik), `EntitlementGrant` (projeksiyon), `RenewalCycle`, `TenantInvoice`,
+kredi bakiyeleri.
 
-**Yan etkiler — change-plan:**
-- PayTR payment intent + PendingPlanChange row
-- Webhook success → Subscription.plan değişir + Tenant.currentPlanId update
-- Trial trial-eligible plan ise (usedTrialPlanIds'a bakılır) → Trial activation (no charge), planı TRIALING'e
-- Audit: SubscriptionPaymentSchedulerService cron'u recurring renewal'ları işler
+**Endpoint'ler:**
+| METHOD | Path | Açıklama |
+|---|---|---|
+| GET | `/v1/entitlements/me` | Katlanmış feature/limit/integration kümesi |
+| GET | `/v1/me/licensing?locale=` | Lisans durumu, sahip olunanlar, krediler, teklifler, satın alınabilirlik |
+| GET | `/v1/me/invoices` | Kalem kalem à-la-carte faturalar |
+| GET | `/v1/credits/me` | Ön ödemeli bakiyeler (PHOTO/VIDEO/MODEL3D/SMS) |
+| GET | `/v1/catalog/pricing` | Public fiyat listesi (auth yok) |
+| GET | `/v1/marketplace/addons` | Public katalog |
+| GET | `/v1/marketplace/addons/available` | Kiracıya göre işaretlenmiş katalog (ADMIN/MANAGER) |
+| DELETE | `/v1/marketplace/addons/:tenantAddOnId` | Sahip olunan ürünü iptal (ADMIN) |
 
-**Plan feature/limit precedence:**
-- effective = `featureOverrides[key] ?? plan[key]`
-- limit effective = `limitOverrides[key] ?? plan[key]`
-- maxX=-1 → unlimited
+**İnvariant'lar:**
+- Ücretsiz çekirdek her kiracıda koşulsuz açıktır: `feature.posAccess`,
+  `kdsIntegration`, `customBranding`, `multiLocation` = true; `maxUsers`,
+  `maxTables`, `maxProducts`, `maxCategories`, `maxMonthlyOrders` = `-1`
+- Tek fiyatlı sayısal kota `limit.maxBranches` — 1 ücretsiz, her `extra_branch`
+  adedi +1 (tavan 100), uygulama `branches.service.ts` içinde
+- `feature.license` yokken projector, `requiresLicense` olan HER ürünün
+  grant'lerini **bastırır** — hiçbir satır silinmez, ödeme gelince aynı küme geri döner
+- `license.status` **canlı entitlement'tan** türetilir (anchor'dan değil);
+  anchor "yıl dönümü ne zaman" sorusunu yanıtlar, "lisans var mı" sorusunu değil
+- `credit.*` entitlement değildir; fold'a girmez, canlı okunur
 
 **Test planı:**
 
 | # | Senaryo | Coverage |
 |---|---|---|
-| I.1.1 | GET current/effective-features/plans | ✅ `subscriptions/current-subscription` |
-| I.1.2 | FREE plan intent reddi | ✅ |
-| I.1.3 | Unverified email → intent reddi | ✅ |
-| I.1.4 | Plan limits override (maxTables, maxProducts, …) | ✅ |
-| I.1.5 | Plan features override OFF → routes 403 | ✅ |
-| I.1.6 | Plan = FREE: maxUsers=2, maxTables=5, maxProducts=25, reservationSystem OFF, etc. → fresh seed ile assertion | ❌ |
-| I.1.7 | Plan = BASIC: inventoryTracking=true, advancedReports=false | ❌ |
-| I.1.8 | Plan = PRO: tüm features ON, maxTables=50 | ❌ |
-| I.1.9 | Plan değişimi PRO→FREE (downgrade) → scheduled-downgrade row | ❌ |
-| I.1.10 | scheduled-downgrade cancel | ❌ |
-| I.1.11 | Subscription cancel immediate vs at-period-end | ❌ |
-| I.1.12 | Reactivate cancelled | ❌ |
+| I.1.1 | Taze kiracı → `/v1/entitlements/me` ücretsiz çekirdeği döner, ücretli feature'lar false | ❌ |
+| I.1.2 | `/v1/me/licensing` lisanssız kiracıda `status="none"`, `anchorAt=null` | ❌ |
+| I.1.3 | Superadmin `comp` ile `license_annual` verilir → `status="active"`, `anniversaryAt` set | ❌ |
+| I.1.4 | Lisans varken modül comp'lanır → ilgili route 403'ten 200'e döner | ❌ |
+| I.1.5 | Lisans `past_due` → `status="grace"`, entitlement HÂLÂ canlı | ❌ |
+| I.1.6 | Grace bitince → erişim kararır ama `TenantAddOn` satırları **silinmez** | ❌ |
+| I.1.7 | Feature override OFF → route 403 | ✅ `behavior/plan-feature-override`, `settings-effects/plan-feature-gates` |
+| I.1.8 | 403 gövdesi `ENTITLEMENT_REQUIRED` + `offer` + `reason` taşır (bare mesaj değil) | ❌ |
+| I.1.9 | `reason="lapsed"` vs `"not_owned"` ayrımı doğru | ❌ |
+| I.1.10 | `/v1/catalog/pricing` public erişilebilir ve katalogla aynı fiyatı döner | ❌ |
+| I.1.11 | `/v1/me/licensing`'in `purchasability`'si ile checkout'un reddi **aynı** (Buy butonu yalan söylemiyor) | ❌ |
+| I.1.12 | AI kredisi `module_ai_studio` olmadan alınamaz (`ADDON_REQUIRES_DEPENDENCY`) | ❌ |
 
 ---
 
-### I.2  `payments` (subscription PayTR intent)
+### I.2  `checkout` (tek satın alma rayı)
 
-**Endpoint:** `POST /payments/create-intent` (rate-limited 5/dk).
+**Endpoint'ler:**
+| METHOD | Path | Rol |
+|---|---|---|
+| POST | `/v1/checkout/quote` | herhangi bir tenant rolü (yazma yok) |
+| POST | `/v1/checkout/start` | ADMIN, MANAGER |
+| POST | `/v1/checkout/intent` | ADMIN, MANAGER — PayTR iframe token + `CK-` paymentRef |
+| POST | `/v1/checkout/confirm` | ADMIN, MANAGER — `(tenantId, paymentRef)` üzerinde idempotent |
+
+**Sepet:** `items[]` içinde yalnız `addon` | `hardware` | `service`.
+**`plan` satır tipi YOKTUR** (`checkout.types.ts`).
+
+**Yan etkiler — intent:**
+- `CheckoutIntent` satırı (sepet `cartJson` olarak saklanır, webhook geri okur)
+- 3 adet `Consent` (KVKK / Mesafeli Satış / İade) — IP + user-agent ile, **token
+  mint edilmeden ÖNCE**
+- PayTR `getIframeToken`
+
+**Yan etkiler — settlement (webhook):**
+- `TenantAddOn` satırları + `EntitlementGrant` projeksiyonu
+- `TenantInvoice` (provizyon tx'i İÇİNDE, `paymentRef` üzerinde idempotent)
+- `checkout.completed.v1` + `payment.succeeded.v1` outbox event'leri
+- Donanım varsa `HardwareOrder` + cihaz slotları
+
+**İnvariant'lar:**
+- Fiyatlar **KDV dahil (brüt)**; vergi dışarı **türetilir**, üstüne eklenmez
+- `unitCents * qty === subtotalCents` — birim başına yuvarla, sonra çarp
+- Yıl dönümüne **14 günden az** kalmışsa kalem sonraki tam döngüye taşınır
+- Hiçbir satır **100 kuruşun** altına inmez
+- `confirmAndProvision`, `(tenantId, paymentRef)` için **settled bir
+  `CheckoutIntent`** olmadan hiçbir şey provizyonlamaz — rol gate'i ödeme
+  kontrolü DEĞİLDİR
+- Reddedilen tek satır **tüm sepeti** düşürür
+- **Kiracıya açık bedava-grant endpoint'i yoktur** (`POST /v1/marketplace/addons/purchase` kaldırıldı)
+
+**Test planı:**
+
+| # | Senaryo | Coverage |
+|---|---|---|
+| I.2.1 | `/quote` karma sepeti fiyatlar; `subtotal + tax == brüt` toplamı tutar | ❌ |
+| I.2.2 | Yıl ortası modül alımı → orantılı `unitCents`, `meta.annualPriceCents` tam liste | ❌ |
+| I.2.3 | Yıl dönümüne 10 gün kala alım → `prorationMode="rollForward"` | ❌ |
+| I.2.4 | Lisanssız kiracı ücretli modül eklerse → 409 `LICENSE_REQUIRED` | ❌ |
+| I.2.5 | Lisans + modül **aynı sepette** → kabul (sibling satır ön koşulu karşılar) | ❌ |
+| I.2.6 | Sahip olunan ürün tekrar → 409 `ADDON_ALREADY_OWNED`; yenileme sepetinde muaf | ❌ |
+| I.2.7 | `extra_branch` 101 adet → 409 `ADDON_MAX_QUANTITY` | ❌ |
+| I.2.8 | `acceptedDocumentIds` eksik/3'ten farklı → 400, PayTR çağrısı YOK | ❌ |
+| I.2.9 | `/intent` WAITER ile → 403 | ⚠️ `cross-cutting/role-matrix` kapsamı doğrulanmalı |
+| I.2.10 | Uydurma `paymentRef` ile `/confirm` → settled intent yoksa provizyon YOK | ❌ |
+| I.2.11 | `POST /v1/marketplace/addons/purchase` → 404 (endpoint kaldırıldı, geri gelmesin) | ❌ |
+| I.2.12 | Sepet boş / 50'den fazla kalem → 400 | ❌ |
+| I.2.13 | `type:"plan"` gönderilirse fiyatlanmaz (plan rayı geri gelmesin) | ❌ |
+
+---
+
+### I.3  `renewal` (manuel yıllık yenileme)
+
+**Sahip olduğu modeller:** `RenewalCycle`.
+
+**Sabitler:** `RENEWAL_LEAD_DAYS=30`, `REMINDER_DAYS=[30,7,1]`, `ADDON_GRACE_DAYS=7`.
 
 **Yan etkiler:**
-- PayTR `getIframeToken` API call
-- SubscriptionPayment.create(PENDING) + paytrMerchantOid (cryptographically unique)
-- PendingPlanChange row (upgrade) veya PENDING Subscription pre-create (first-time)
-- Trial-eligible ise PayTR'a uğramadan TRIAL aktive olur (no charge)
-- Webhook callback → flip to ACTIVE / cleanup orphans
+- `renewal-generate` (06:00) → yıl dönümünden ~30 gün önce sepeti **dondurur**;
+  fiyatlar üretim anında canlı katalogdan okunur ve sabitlenir
+- `renewal-reminders` (09:00) → `renewal.reminder.v1` (30/7/1 gün kala)
+- `renewal-lapse` (00:30) → `graceEndsAt` geçmiş ve hâlâ ödenmemiş döngüleri kapatır
+- Ödeme normal checkout rayından gelir; `cart.renewalCycleId` döngüyü kapatır
+
+**İnvariant'lar:**
+- `(tenantId, anniversaryAt)` üzerinde idempotent — yılda tek döngü
+- `markReminderSent` filtreyle aynı ifade içinde `remindersSent`'e ekler → iki
+  replika aynı dakikada aynı hatırlatmayı gönderemez
+- Yenileme **tam liste fiyatından**dır (yıl dönümü anına quote edilince
+  `remainingDays == cycleDays`)
+- Hatırlatmada yazan tutar ile tahsil edilen tutar **aynıdır** (donmuş sepet)
+- Grace bittiğinde **veri silinmez**
 
 **Test planı:**
 
 | # | Senaryo | Coverage |
 |---|---|---|
-| I.2.1 | FREE plan reddedilir | ✅ |
-| I.2.2 | Unverified email reddi | ✅ |
-| I.2.3 | Trial eligible → TRIAL activated, no PayTR call | ❌ (verified email + plan setup gerekir) |
-| I.2.4 | PayTR success webhook → Subscription ACTIVE | ❌ (PayTR sandbox gerekir) |
-| I.2.5 | PayTR fail webhook → SubscriptionPayment.status=FAILED | ❌ |
-| I.2.6 | Webhook HMAC invalid → 'FAIL' response | ❌ |
-| I.2.7 | Orphan cleanup cron → eski PENDING'ler silinir | ❌ |
-
----
-
-### I.3  `invoices` (subscription tarafı)
-
-| # | Senaryo | Coverage |
-|---|---|---|
-| I.3.1 | GET /invoices/:id | ❌ |
-| I.3.2 | PDF download | ❌ |
-| I.3.3 | Generate-pdf re-create | ❌ |
+| I.3.1 | Yıl dönümüne 30 gün kala generate → `RenewalCycle` (open) + doğru toplam | ❌ |
+| I.3.2 | İkinci generate → yeni satır YOK (idempotent) | ❌ |
+| I.3.3 | Katalog fiyatı generate sonrası değişse bile döngü toplamı değişmez | ❌ |
+| I.3.4 | 30/7/1 gün → üç ayrı `renewal.reminder.v1`; aynı gün ikinci tetikleme sessiz | ❌ |
+| I.3.5 | Yıl dönümü geçti, grace içinde → entitlement HÂLÂ canlı, `status="grace"` | ❌ |
+| I.3.6 | `graceEndsAt` geçti → lapse; erişim kapanır, satırlar durur | ❌ |
+| I.3.7 | Lapse sonrası ödeme → aynı entitlement kümesi geri gelir | ❌ |
+| I.3.8 | **Otomatik çekim yok**: hiçbir cron PayTR'a charge çağrısı yapmaz | ❌ |
 
 ---
 
 ### I.4  `webhooks/paytr`
 
-**Endpoint:** `POST /webhooks/paytr` (public, HMAC SHA256 validated).
+**Endpoint:** `POST /webhooks/paytr` (public, HMAC SHA256 + IP allowlist).
 
-**Dispatch:** merchantOid prefix `SP*` → customer self-pay; diğeri → subscription.
+**Dispatch — merchantOid prefix:**
+- `SP…` → müşteri self-pay (QR menü) — `CustomerSelfPayService`
+- `CK-…` → à-la-carte checkout — `CheckoutSettlementService`
+- tanınmayan prefix → `"OK"` (v3.3.0'da üçüncü/abonelik dalı kaldırıldı)
 
 **Test planı:**
 
 | # | Senaryo | Coverage |
 |---|---|---|
-| I.4.1 | Subscription success webhook → Subscription ACTIVE | ❌ |
-| I.4.2 | Self-pay success webhook → OrderItemPayment allocations | ❌ |
-| I.4.3 | Failed webhook → status FAILED + failureReason | ❌ |
-| I.4.4 | Invalid HMAC → 'FAIL' return | ❌ |
-| I.4.5 | Unknown merchantOid → 'OK' (idempotent silent) | ❌ |
-| I.4.6 | Aynı webhook iki kez → idempotent (replay) | ❌ |
+| I.4.1 | `CK-` success → `TenantAddOn` + `EntitlementGrant` + `TenantInvoice` oluşur | ❌ |
+| I.4.2 | Self-pay (`SP`) success → OrderItemPayment allocations | ❌ |
+| I.4.3 | Failed webhook → intent FAILED, provizyon YOK | ❌ |
+| I.4.4 | Geçersiz HMAC → `'FAIL'` | ❌ |
+| I.4.5 | Bilinmeyen merchantOid → `'OK'` (sessiz, retry fırtınası olmasın) | ❌ |
+| I.4.6 | Aynı webhook iki kez → tek fatura, tek grant (replay idempotent) | ❌ |
+| I.4.7 | Settlement ortasında DB hatası → yine `'OK'`; sweeper mutabakat yapar | ❌ |
 
 ---
 
-### I.5  `accounting/sales-invoice` (per-order tax invoice)
+### I.5  `accounting/sales-invoice` (restoran siparişi vergi faturası)
+
+> **Üç ayrı "fatura" tablosunu karıştırma:**
+> `SalesInvoice` = restoranın **kendi müşterisine** kestiği sipariş faturası (bu bölüm) ·
+> `TenantInvoice` = **bizim kiracıya** kestiğimiz à-la-carte faturası (I.1/I.2) ·
+> `Invoice` = emekli plan rayının arşivi; VUK saklama yükümlülüğü nedeniyle
+> duruyor, `NOT NULL subscriptionId` taşır ve yeni kayıt almaz.
 
 **Sahip olduğu modeller:** `SalesInvoice`, `SalesInvoiceItem`, `InvoiceCounter`.
 
@@ -1340,7 +1445,7 @@ Read-only aggregations; her biri `advancedReports` feature gate'i altında.
 - Webhook success → OrderItemPayment allocations per orderId in itemsByOrder
 - Webhook fail → PendingSelfPayment.status=FAILED
 - Lazy expiry: getPayStatus PENDING'ı geçen TTL ile EXPIRED'a çevirir
-- Sweeper cron her 30dk
+- Sweeper cron (`self-pay-intent-expire`) her 5 dk; ayrıca saatlik `self-pay-inquiry-recovery` PayTR'a sorup askıda kalanları mutabık kılar
 
 **İnvariant'lar:**
 - Dine-in: customer can pay any item on their table
@@ -1446,16 +1551,36 @@ Read-only aggregations; her biri `advancedReports` feature gate'i altında.
 
 ---
 
-### L.3  `superadmin/subscriptions` + `superadmin/plans`
+### L.3  `superadmin/marketplace` (katalog + comp)
 
-**Endpoint'ler:** Plan CRUD + subscription extend/cancel.
+Plan CRUD'unun yerini alan yüzey. Operatörün fiyat/ürün yönettiği ve bedelsiz
+tahsis (comp) yaptığı yer burasıdır — kiracı tarafında bedava-grant endpoint'i
+yoktur.
+
+**Endpoint'ler:**
+| METHOD | Path |
+|---|---|
+| GET/POST/PATCH/DELETE | `/v1/superadmin/marketplace/addons[/:id]` — katalog CRUD (DELETE = arşiv) |
+| GET | `/v1/superadmin/marketplace/tenants/:tenantId/licensing` |
+| POST | `/v1/superadmin/marketplace/comp` — `{ tenantId, addOnCode, quantity?, branchId?, reason }` |
+| DELETE | `/v1/superadmin/marketplace/comp/:tenantAddOnId?tenantId=` |
+
+**Yan etkiler:**
+- `comp` → `TenantAddOn` (origin=comp) + **inline** `projectTenant` (operatör
+  paneli bayat görmesin) + `AuditLog`
+- `kind="credit"` → ownership satırı değil, kredi bakiyesi mint edilir
+- `requiresLicense` ürün lisanssız kiracıya comp'lanırsa yanıt `warning` taşır
+  (sahip ama karanlık)
 
 | # | Senaryo | Coverage |
 |---|---|---|
-| L.3.1 | Plan CRUD | ❌ |
-| L.3.2 | Subscription extend (period uzatma) | ❌ |
-| L.3.3 | Subscription cancel immediate | ❌ |
-| L.3.4 | Subscription cancel AT_PERIOD_END | ❌ |
+| L.3.1 | Katalog CRUD; DELETE arşivler, satırı silmez | ❌ |
+| L.3.2 | Fiyat PATCH → `/v1/catalog/pricing` ve checkout quote **aynı** yeni fiyatı verir | ❌ |
+| L.3.3 | `comp` modül → kiracının entitlement'ı anında açılır + audit satırı | ❌ |
+| L.3.4 | Lisanssız kiracıya modül comp → `warning` döner, feature hâlâ kapalı | ❌ |
+| L.3.5 | `comp` kredi paketi → bakiye artar, ownership satırı YOK | ❌ |
+| L.3.6 | `revokeComp` → yalnız comp satırını kaldırır, ödenmiş satıra dokunmaz | ❌ |
+| L.3.7 | Geçersiz grant anahtarı ile katalog satırı yayınlanamaz (vocabulary validation) | ❌ |
 
 ---
 
@@ -1501,9 +1626,16 @@ NEW → CONTACTED → DEMO_SCHEDULED → OFFER_SENT → WAITING → WON / LOST
 ```
 
 **Yan etkiler — WON conversion:**
-- Tenant.create + admin User.create + Trial Subscription
+- Tenant.create + admin User.create (ücretsiz çekirdekle; **trial/plan aboneliği
+  yaratılmaz** — bkz. A.1 register yan etkileri)
 - Subdomain allocation (mirror of auth.service)
-- MarketingCommission.create (signup commission 10% × planMonthlyPrice)
+- Komisyon artık lead dönüşümünden değil, **para aktığında** doğar: core
+  `payment.succeeded.v1` event'ini yayar (`kind`: `signup` | `renewal` |
+  `upsell`, `amount`, `commissionRate`, `referralCode`) ve
+  `MarketingEventRelayService` bunu kds-marketing servisine iletir. Oran ve
+  ledger davranışı **o repoda** doğrulanır; burada doğrulanacak olan event'in
+  doğru alanlarla ve idempotency anahtarıyla (`payment-succeeded:{paymentId}`)
+  yayıldığıdır.
 - Lead.tenantId set (idempotency)
 
 **Test planı:**
@@ -1512,7 +1644,7 @@ NEW → CONTACTED → DEMO_SCHEDULED → OFFER_SENT → WAITING → WON / LOST
 |---|---|---|
 | M.1.1 | Create lead | ✅ `marketing/full-flow` |
 | M.1.2 | Status transitions | ❌ |
-| M.1.3 | WON conversion → tenant + admin user + trial sub + commission | ❌ |
+| M.1.3 | WON conversion → tenant + admin user (abonelik satırı YOK); ödeme gelince `payment.succeeded.v1` relay edilir | ❌ |
 | M.1.4 | Idempotency: aynı lead iki kez convert | ❌ |
 | M.1.5 | Activity log per status change | ❌ |
 | M.1.6 | Subdomain çakışması → retry 5 + 409 | ❌ |
@@ -1545,7 +1677,7 @@ NEW → CONTACTED → DEMO_SCHEDULED → OFFER_SENT → WAITING → WON / LOST
 |---|---|---|
 | M.4.1 | Approve → status APPROVED | ❌ |
 | M.4.2 | Pay → status PAID, paidAt set | ❌ |
-| M.4.3 | Recurring commission (monthly 5%) cron'la oluşur | ❌ |
+| M.4.3 | Yenileme komisyonu — `payment.succeeded.v1` (`kind="renewal"`) ile doğar; aylık cron YOK (yenileme yıllık ve manuel) | ❌ |
 
 ---
 
@@ -1658,20 +1790,33 @@ Bkz. H.3.
 
 Her biri Postgres advisory lock ile horizontal-scale safe.
 
-| Cron name | Cadence | İş | Test |
+> **Not:** Bu tablo koddaki `@Cron` kayıtlarından tazelendi. Plan rayının
+> cron'ları (`trial-expirations`, `trial-reminders`, `subscription-renewals`,
+> `pending-cancellations`, `past-due-subscriptions`, `scheduled-downgrades`,
+> `paytr-orphan-cleanup`) **artık yok** — deneme süresi, otomatik yenileme ve
+> plan değişimi diye bir şey kalmadığı için karşılıkları da silindi. Yerlerine
+> lisans yenileme üçlüsü geçti.
+
+| Cron | Cadence | İş | Test |
 |---|---|---|---|
-| `trial-expirations` | 00:00 UTC | Trial bitenleri EXPIRED yap | ❌ |
-| `subscription-renewals` | 02:00 UTC | PayTR recurring veya PAST_DUE | ❌ |
-| `pending-cancellations` | 00:00 UTC | period-end iptaller | ❌ |
-| `past-due-subscriptions` | 03:00 UTC | PAST_DUE → EXPIRED | ❌ |
-| `trial-reminders` | 10:00 UTC | Trial bitiş öncesi email | ❌ |
-| `scheduled-downgrades` | 01:00 UTC | Plan downgrade uygula | ❌ |
-| `paytr-orphan-cleanup` | hourly | Stale PENDING subscription payments | ❌ |
-| `self-pay-orphan-cleanup` | every 30 min | Stale PENDING self-pay intents | ❌ |
+| `renewal-generate` | 06:00 | Yıl dönümünden ~30 gün önce yenileme sepetini dondur | ❌ |
+| `renewal-reminders` | 09:00 | 30 / 7 / 1 gün kala `renewal.reminder.v1` | ❌ |
+| `renewal-lapse` | 00:30 | Grace bitmiş ödenmemiş döngüleri kapat | ❌ |
+| `marketplace.addonSweeper` | 00:05 | `active → past_due → expired` yaşam döngüsü sürücüsü | ❌ |
+| `entitlements.sweepExpired` | every 5 min | Süresi geçmiş grace grant'lerini süpür | ❌ |
+| `entitlements.reconcileNightly` | 03:15 | Her kiracıyı yeniden projekte et (drift-fix) | ❌ |
+| `credits.sweepOrphanClaims` | hourly | İşe dönüşmemiş kredi claim'lerini iade et | ❌ |
+| `self-pay-intent-expire` | every 5 min | TTL'i geçmiş self-pay intent'leri EXPIRED yap | ❌ |
+| `self-pay-inquiry-recovery` | hourly | PayTR'a sorup askıda kalan self-pay'leri mutabık kıl | ❌ |
 | `stock-alerts` | hourly | Low-stock email | ❌ |
-| `delivery-platforms/order-polling` | every 5 min | Platform sipariş polling | ❌ |
-| `delivery-platforms/token-refresh` | per platform TTL | Platform auth token rotation | ❌ |
-| `email-reports` | tenant.closingTime | Günlük rapor email | ❌ |
+| `z-report-email-check` | */15 min | `tenant.closingTime` gelen kiracılara günlük rapor | ❌ |
+| `delivery-reconciliation` | 00:00 | Platform siparişleri mutabakatı | ❌ |
+| `accounting-resync` | hourly | Başarısız muhasebe senkronlarını yeniden dene | ❌ |
+| `device-mesh` | every minute | Heartbeat'i kesilen cihazları `offline` işaretle | ❌ |
+| `reservation-auto-hold` / `release-holds` | every 5 min | Rezervasyon masa tutma/bırakma | ❌ |
+| `public-stats-cache-update` | every 5 min | Landing sayfası istatistik cache'i | ❌ |
+| `webhook-delivery-worker` | every 30 s | Giden webhook kuyruğu | ❌ |
+| `analytics-insights-daily` | 03:30 | Analitik insight üretimi | ❌ |
 
 **Test stratejisi:** Cron'ları doğrudan service method invoke ederek tetiklemek (Nest test utility ile DI). Veya backend'e test-mode endpoint açıp `POST /test/cron/:name` ile manuel tetikleme.
 
@@ -1681,20 +1826,28 @@ Her biri Postgres advisory lock ile horizontal-scale safe.
 
 ### Hatırlatma: 191 test yeşil, 11 batch tamamlandı
 
+> ⚠️ **Bu sayı à-la-carte geçişinden ÖNCEsine ait.** Aşağıdaki tablo tarihsel
+> bir kayıttır; suite bu doküman güncellenirken **çalıştırılmadı**. Plan/kota
+> rayına dayanan batch'ler (5 ve 10'un kota kısmı, `extra/plan-limits-all-keys`)
+> artık kodda karşılığı olmayan davranışları doğruluyor — bkz. Bölüm C.3
+> altındaki kota uyarısı. Ayrıca `subscriptions/current-subscription` ve
+> `behavior/plan-limits` spec dosyaları **repoda yok**. Yeni bir sayı vermeden
+> önce `npm run test:e2e` çalıştırılmalıdır.
+
 | Batch | Konu | Test sayısı | Durum |
 |---|---|---|---|
 | Baseline | Smoke (login, basit CRUD) | 45 | ✅ |
 | 2 | Orders + Payments + Self-Pay gating | +18 | ✅ |
 | 3 | Stock manual + KDS sockets + Tables | +8 | ✅ |
 | 4 | Reservations + Personnel + Menu mod + Loyalty + Z-Reports | +13 | ✅ |
-| 5 | Subscriptions (read) + SuperAdmin/Marketing gating | +12 | ✅ |
+| 5 | Abonelik (read) + SuperAdmin/Marketing gating | +12 | ⚠️ plan rayı emekli — yeniden değerlendirilmeli |
 | 6 | Settings cross-module (API-level) | +11 | ✅ |
 | 7 | Cross-cutting (IDOR, role grid, refresh) | +29 | ✅ |
 | Platform | SuperAdmin 2FA + Marketing tam akış | +2 | ✅ |
 | 8 | API-level real behavior (loyalty fix vb.) | +14 | ✅ |
 | 9 | Browser-driven UI verification | +12 | ✅ |
-| 10 | Tenant susp/personnel/customer/plan-limits/KDS | +27 | ✅ |
-| **TOPLAM** | | **191** | ✅ |
+| 10 | Tenant susp/personnel/customer/plan-limits/KDS | +27 | ⚠️ kota kısmı bayat |
+| **TOPLAM** | | **191** | ⚠️ doğrulanmadı |
 
 ### Eksik kalan batch'ler (öncelik sırasına göre)
 
@@ -1704,8 +1857,9 @@ Her biri Postgres advisory lock ile horizontal-scale safe.
 | 12 | Auth full lifecycle (register, approve, verify, reset, OAuth) | ~15 | Email mock + Google sandbox |
 | 13 | Delivery platforms (Yemeksepeti/Trendyol/Getir/Migros) | ~20 | HTTP-mock servisi gerekir |
 | 14 | Accounting sales-invoice + provider sync | ~10 | External provider mock |
-| 15 | Plans behavior (FREE/BASIC/PRO real plan-driven gating) | ~15 | Tenant.currentPlanId değiştirme + reset |
-| 16 | PayTR webhook full (subscription + self-pay) | ~12 | Test-mode bypass flag backend'e eklenmeli |
+| 15 | Lisanslama davranışı (ücretsiz çekirdek / lisans / grace / lapse gating — Bölüm I.1 + I.3) | ~18 | Superadmin `comp` + saat ileri alma (yıl dönümü/grace) |
+| 15b | **Bayat kota spec'lerinin temizliği** (`extra/plan-limits-all-keys`) | — | Önce suite'i çalıştır; bkz. C.3 uyarısı |
+| 16 | PayTR webhook full (`CK-` checkout + `SP` self-pay) | ~12 | Test-mode bypass flag backend'e eklenmeli |
 | 17 | Cron job tetiklenmeleri | ~12 | Backend'e test-mode invoke endpoint'i |
 | 18 | Shift swap full + performance + audit log assertions | ~15 | — |
 | 19 | Notifications + Contact + Upload + Public-stats | ~15 | — |

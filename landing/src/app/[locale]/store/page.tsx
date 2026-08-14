@@ -31,8 +31,10 @@ interface HardwareProduct {
   brand: string | null;
   model: string | null;
   description: string | null;
+  // Outright purchase price. Hardware rental was retired in July 2026 —
+  // the API still returns rentalMonthlyCents, but it is always null and
+  // the storefront no longer reads or renders it.
   priceCents: number;
-  rentalMonthlyCents: number | null;
   currency: string;
   warrantyMonths: number;
   images: string[];
@@ -333,14 +335,6 @@ function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
           <div className="mb-1 text-xl font-medium text-slate-900">
             {formatPrice(p.priceCents, p.currency)}
           </div>
-          {p.rentalMonthlyCents ? (
-            <div className="mb-2 text-xs text-slate-500">
-              {t('rentalFrom', {
-                currency: '',
-                amount: formatPrice(p.rentalMonthlyCents, p.currency),
-              })}
-            </div>
-          ) : null}
           <div className="mb-3 text-xs text-slate-500">
             {t('warrantyMonths', { months: p.warrantyMonths })}
           </div>

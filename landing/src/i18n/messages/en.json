@@ -250,10 +250,10 @@
   "cta": {
     "title": "Ready to transform your restaurant?",
     "subtitle": "Join {count} restaurants already using HummyTummy to streamline operations and grow their business.",
-    "primaryBtn": "Start free trial",
+    "primaryBtn": "Start free",
     "secondaryBtn": "Talk to sales",
     "trustBadge1": "No credit card required",
-    "trustBadge2": "14-day free trial",
+    "trustBadge2": "Free core, forever",
     "trustBadge3": "Cancel anytime"
   },
   "mascot": {
@@ -393,7 +393,7 @@
       },
       "payment": {
         "title": "Payment Terms",
-        "content": "Paid plans are billed in advance on a monthly or annual basis. All fees are non-refundable except as expressly set forth in these terms. We reserve the right to change our prices with 30 days notice."
+        "content": "The core features are free forever and require no credit card; you pay only for the annual licence, modules, integrations and capacity items you buy, plus any one-time credits and services. Annual items are billed in advance and prorated to the days remaining until your account's anniversary, so everything lands on one invoice that renews on a single date. Renewal is manual: we do not store cards or charge them automatically. If an item goes unpaid, access to those paid features stops after a 7-day grace period, while your data is retained. Payments are collected through PayTR in Turkish Lira only. All fees are non-refundable except as expressly set forth in these terms. We reserve the right to change our prices with 30 days notice."
       },
       "intellectual": {
         "title": "Intellectual Property",
@@ -442,7 +442,6 @@
     "viewSource": "Manufacturer page",
     "from": "{currency}{amount}",
     "warrantyMonths": "{months}-month warranty",
-    "rentalFrom": "or {currency}{amount}/mo rental",
     "gibCertified": "GİB-certified YN ÖKC",
     "outOfStock": "Out of stock",
     "discontinued": "Discontinued",
@@ -497,12 +496,12 @@
     "sections": {
       "general": {
         "title": "General Contact",
-        "content": "For questions about our service, subscription plans, or partnership opportunities, drop us an email. We aim to respond within two business days."
+        "content": "For questions about our service, our pricing, or partnership opportunities, drop us an email. We aim to respond within two business days."
       },
       "support": {
         "title": "Technical Support",
         "content": "For technical issues, account questions, or billing matters, reach us at the address below.",
-        "hours": "Replies on weekdays 09:00 – 18:00 (Turkey time). Urgent issues follow the SLA terms of your subscription."
+        "hours": "Replies on weekdays 09:00 – 18:00 (Turkey time). Urgent issues follow the SLA terms of your Priority Support module."
       },
       "kvkk": {
         "title": "KVKK Requests",

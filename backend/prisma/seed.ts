@@ -7,278 +7,55 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding database...");
 
-  // Create subscription plans. The `update` branch mirrors every field
-  // that can drift after the first seed (prices/currency/displayName);
-  // otherwise re-running `prisma:seed` keeps stale numbers.
+  // ==========================================================================
+  // NO SUBSCRIPTION PLANS ARE SEEDED — deliberately.
+  // ==========================================================================
   //
-  // Onboarding-trial redesign: every new tenant starts on the dedicated,
-  // non-purchasable TRIAL plan (7-day full premium). At expiry the
-  // subscription goes to TRIAL_ENDED (locked) and the tenant must activate a
-  // paid plan. FREE is retired (no post-trial free landing) — it is simply
-  // not seeded. Paid tiers (BASIC/PRO/BUSINESS) are isPublic=true with no
-  // per-plan trial (trialDays=0); the single onboarding trial replaces them.
-  const trialPlan = await prisma.subscriptionPlan.upsert({
-    where: { name: "TRIAL" },
-    update: {
-      displayName: "Deneme",
-      description: "7 günlük tam özellikli onboarding denemesi",
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      currency: "TRY",
-      trialDays: 7,
-      isPublic: false,
-      maxBranches: -1,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: true,
-      externalDisplay: true,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      // AI studio: full feature access but a deliberately small taster quota
-      // (unlike the -1 limits above) — generations cost real money per unit.
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 3,
-      maxMonthlyAiVideos: 1,
-      maxMonthlyAi3dModels: 1,
-    },
-    create: {
-      name: "TRIAL",
-      displayName: "Deneme",
-      description: "7 günlük tam özellikli onboarding denemesi",
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      currency: "TRY",
-      trialDays: 7,
-      isPublic: false,
-      maxUsers: -1,
-      maxTables: -1,
-      maxBranches: -1,
-      maxProducts: -1,
-      maxCategories: -1,
-      maxMonthlyOrders: -1,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: true,
-      externalDisplay: true,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 3,
-      maxMonthlyAiVideos: 1,
-      maxMonthlyAi3dModels: 1,
-      isActive: true,
-    },
-  });
-
-  const basicPlan = await prisma.subscriptionPlan.upsert({
-    where: { name: "BASIC" },
-    update: {
-      isPublic: true,
-      displayName: "Başlangıç",
-      description: "Kafe ve küçük restoranlar için temel POS + stok takibi",
-      monthlyPrice: 499,
-      yearlyPrice: 4490, // 2 ay bedava (10 ay × 499 = 4990 → 4490 promosyon)
-      currency: "TRY",
-      maxBranches: 1,
-      advancedReports: false,
-      multiLocation: false,
-      customBranding: false,
-      apiAccess: false,
-      externalDisplay: false,
-      prioritySupport: false,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: false,
-      personnelManagement: false,
-      deliveryIntegration: false,
-      posAccess: true,
-      aiContentGeneration: false,
-      maxMonthlyAiPhotos: 0,
-      maxMonthlyAiVideos: 0,
-      maxMonthlyAi3dModels: 0,
-    },
-    create: {
-      name: "BASIC",
-      displayName: "Başlangıç",
-      description: "Kafe ve küçük restoranlar için temel POS + stok takibi",
-      monthlyPrice: 499,
-      yearlyPrice: 4490,
-      currency: "TRY",
-      // Onboarding-trial redesign: no per-plan trial; the single TRIAL plan
-      // is the only trial. Paid tiers are purchasable (isPublic) with trialDays 0.
-      trialDays: 0,
-      isPublic: true,
-      maxUsers: 5,
-      maxTables: 20,
-      maxBranches: 1,
-      maxProducts: 100,
-      maxCategories: 20,
-      maxMonthlyOrders: 500,
-      advancedReports: false,
-      multiLocation: false,
-      customBranding: false,
-      apiAccess: false,
-      externalDisplay: false,
-      prioritySupport: false,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: false,
-      personnelManagement: false,
-      deliveryIntegration: false,
-      posAccess: true,
-      aiContentGeneration: false,
-      maxMonthlyAiPhotos: 0,
-      maxMonthlyAiVideos: 0,
-      maxMonthlyAi3dModels: 0,
-      isActive: true,
-    },
-  });
-
-  const proPlan = await prisma.subscriptionPlan.upsert({
-    where: { name: "PRO" },
-    update: {
-      isPublic: true,
-      displayName: "Profesyonel",
-      description:
-        "Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi",
-      monthlyPrice: 1299,
-      yearlyPrice: 12990, // 2 ay bedava (10 ay × 1299 = 12990 düz)
-      currency: "TRY",
-      maxBranches: 3,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: false,
-      externalDisplay: false,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 50,
-      maxMonthlyAiVideos: 5,
-      maxMonthlyAi3dModels: 10,
-    },
-    create: {
-      name: "PRO",
-      displayName: "Profesyonel",
-      description:
-        "Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi",
-      monthlyPrice: 1299,
-      yearlyPrice: 12990,
-      currency: "TRY",
-      // Onboarding-trial redesign: no per-plan trial; the single TRIAL plan
-      // is the only trial. Paid tiers are purchasable (isPublic) with trialDays 0.
-      trialDays: 0,
-      isPublic: true,
-      maxUsers: 15,
-      maxTables: 50,
-      maxBranches: 3,
-      maxProducts: 500,
-      maxCategories: 50,
-      maxMonthlyOrders: 2000,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: false,
-      externalDisplay: false,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 50,
-      maxMonthlyAiVideos: 5,
-      maxMonthlyAi3dModels: 10,
-      isActive: true,
-    },
-  });
-
-  const businessPlan = await prisma.subscriptionPlan.upsert({
-    where: { name: "BUSINESS" },
-    update: {
-      isPublic: true,
-      displayName: "Kurumsal",
-      description:
-        "Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek",
-      monthlyPrice: 2999,
-      yearlyPrice: 29990, // 2 ay bedava (10 ay × 2999 = 29990 düz)
-      currency: "TRY",
-      maxBranches: -1,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: true,
-      externalDisplay: true,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 200,
-      maxMonthlyAiVideos: 20,
-      maxMonthlyAi3dModels: 30,
-    },
-    create: {
-      name: "BUSINESS",
-      displayName: "Kurumsal",
-      description:
-        "Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek",
-      monthlyPrice: 2999,
-      yearlyPrice: 29990,
-      currency: "TRY",
-      // Onboarding-trial redesign: no per-plan trial; the single TRIAL plan
-      // is the only trial. Paid tiers are purchasable (isPublic) with trialDays 0.
-      trialDays: 0,
-      isPublic: true,
-      maxUsers: -1,
-      maxTables: -1,
-      maxBranches: -1,
-      maxProducts: -1,
-      maxCategories: -1,
-      maxMonthlyOrders: -1,
-      advancedReports: true,
-      multiLocation: true,
-      customBranding: true,
-      apiAccess: true,
-      externalDisplay: true,
-      prioritySupport: true,
-      inventoryTracking: true,
-      kdsIntegration: true,
-      reservationSystem: true,
-      personnelManagement: true,
-      deliveryIntegration: true,
-      posAccess: true,
-      aiContentGeneration: true,
-      maxMonthlyAiPhotos: 200,
-      maxMonthlyAiVideos: 20,
-      maxMonthlyAi3dModels: 30,
-      isActive: true,
-    },
-  });
-
-  console.log("✅ Subscription plans created");
+  // This file used to recreate the retired tiered catalogue here: a TRIAL plan
+  // with a 7-day countdown plus BASIC/PRO/BUSINESS at monthly prices, all
+  // written with isActive=true and isPublic=true. None of that exists as a
+  // product any more. The core (POS/adisyon, KDS, menü, masa+kat planı, QR
+  // menü, sipariş, kasa, temel raporlar, ekip+rol, müşteriler, cihaz+şube
+  // paneli, özel marka+alan adı) is free and unlimited for every tenant, and
+  // everything paid is an individual annual product bought à la carte.
+  //
+  //   pricing      → src/modules/marketplace/alacarte-catalog.const.ts
+  //   free core    → src/modules/entitlements/free-baseline.const.ts
+  //   why it went  → src/common/constants/subscription-plans.const.ts
+  //
+  // WHY REMOVING THEM IS SAFE (the FK question).
+  //
+  // `20260811140000_retire_subscription_rail` keeps the `subscription_plans`
+  // TABLE alive because `subscriptions.planId` is a Restrict FK and the legacy
+  // `invoices` hang off `subscriptions` — those are tax records VUK requires
+  // retaining. That is an argument about databases that ALREADY hold such
+  // rows: do not DELETE what old invoices point at. It says nothing about
+  // seeding a new database. A freshly seeded DB has no subscriptions and no
+  // invoices, so no FK references a plan row and the empty table satisfies
+  // every constraint. Nothing else in the app needs one either: registration
+  // creates no plan and no subscription (AuthProvisioningService
+  // .provisionNewTenantWithAdmin), entitlements come from the free baseline,
+  // and the two fixtures that DO want a plan row mint their own —
+  // `prisma/seed-demo.ts` (e2e Sultanahmet) and `DemoService.seed` (the
+  // in-app demo tenant, which correctly marks its row isActive/isPublic false).
+  //
+  // WHY RECREATING THEM WAS ACTIVELY WRONG.
+  //
+  // `SubscriptionService.getAvailablePlans` selects on exactly
+  // `{ isActive: true, isPublic: true }` and is served by the PUBLIC route
+  // `GET /subscriptions/plans`. Seeding the paid tiers with both flags true
+  // therefore re-published the retired monthly price list on every freshly
+  // seeded environment — undoing, one `npx prisma db seed` later, the very
+  // flags `20260811120000_free_core` had just switched off. `start.sh`,
+  // `start.bat`, README and SETUP all run this seed, so that was the default
+  // state of every dev/staging stack.
+  //
+  // For the same reason the demo tenant below carries NO `currentPlanId` and
+  // NO subscription row: that is what a real tenant registered through
+  // `POST /auth/register` looks like, and it is what keeps the demo tenant
+  // honest. `UsersService.createUser` still enforces `plan.maxUsers` when a
+  // live subscription carries a plan, so a seeded subscription would give the
+  // local demo tenant a user cap that no real tenant has.
 
   // Upsert tenant and users so re-running the seed against an existing
   // DB no longer hits @@unique constraints. The previous `create` calls
@@ -291,42 +68,14 @@ async function main() {
       name: "Demo Restaurant",
       subdomain: "demo",
       status: "ACTIVE",
-      // Onboarding-trial redesign: FREE is retired, so the demo tenant runs on
-      // a real ACTIVE BUSINESS subscription (created below) instead of the old
-      // always-live FREE plan.
-      currentPlanId: businessPlan.id,
+      // No `currentPlanId` and no subscription row — see the header note.
+      // The column is null on every tenant since `20260811120000_free_core`,
+      // PlanProjectorService ignores it, and a real tenant created through
+      // `POST /auth/register` never gets one. The demo tenant matches.
     },
   });
 
   console.log("✅ Tenant created:", tenant.name);
-
-  // Demo tenant needs a live ACTIVE subscription (the new PlanFeatureGuard no
-  // longer treats any plan as live without one — FREE is gone). Idempotent:
-  // only create if the tenant has no subscription yet.
-  const existingDemoSub = await prisma.subscription.findFirst({
-    where: { tenantId: tenant.id },
-  });
-  if (!existingDemoSub) {
-    const periodEnd = new Date();
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-    await prisma.subscription.create({
-      data: {
-        tenantId: tenant.id,
-        planId: businessPlan.id,
-        status: "ACTIVE",
-        billingCycle: "MONTHLY",
-        paymentProvider: "PAYTR",
-        startDate: new Date(),
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: periodEnd,
-        isTrialPeriod: false,
-        amount: businessPlan.monthlyPrice,
-        currency: businessPlan.currency,
-        cancelAtPeriodEnd: false,
-      },
-    });
-    console.log("✅ Demo BUSINESS subscription created");
-  }
 
   // v3.0.0 — every tenant needs at least one branch. The strict
   // branch-scope schema requires Table.branchId, Order.branchId, etc.,

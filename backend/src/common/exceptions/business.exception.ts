@@ -74,12 +74,18 @@ export class InvalidCredentialsException extends BusinessException {
 }
 
 /**
- * Subscription required exception
+ * Licence required — the annual licence is the prerequisite for switching on
+ * any paid module, so a missing licence blocks the module even when the module
+ * itself was bought.
+ *
+ * Prefer `EntitlementRequiredException`: it carries the resolved offer (name,
+ * prorated price, period) so the client can render a real Buy/Renew action
+ * instead of a dead end.
  */
 export class SubscriptionRequiredException extends BusinessException {
   constructor(feature: string) {
     super(
-      `This feature requires an active subscription. Please upgrade your plan to access ${feature}`,
+      `${feature} needs an active licence. Activate or renew the annual licence in the Marketplace to switch the module on`,
       ErrorCode.SUBSCRIPTION_REQUIRED,
       HttpStatus.PAYMENT_REQUIRED,
     );
@@ -87,12 +93,16 @@ export class SubscriptionRequiredException extends BusinessException {
 }
 
 /**
- * Feature not available exception
+ * Module not active — the capability exists but this account does not hold the
+ * product that grants it. There is nothing to "upgrade to": modules are bought
+ * one at a time, annually, and adding one never disturbs the rest.
+ *
+ * Prefer `EntitlementRequiredException` for the same reason as above.
  */
 export class FeatureNotAvailableException extends BusinessException {
-  constructor(feature: string, requiredPlan: string) {
+  constructor(feature: string, requiredProduct: string) {
     super(
-      `The ${feature} feature is not available on your current plan. Please upgrade to ${requiredPlan} or higher`,
+      `${feature} is not included in the free core. It is unlocked by the ${requiredProduct} module, available annually in the Marketplace`,
       ErrorCode.FEATURE_NOT_AVAILABLE,
       HttpStatus.PAYMENT_REQUIRED,
     );
@@ -100,12 +110,12 @@ export class FeatureNotAvailableException extends BusinessException {
 }
 
 /**
- * Quota exceeded exception
+ * Capacity exceeded — a numeric entitlement (`limit.*`) is used up.
  */
 export class QuotaExceededException extends BusinessException {
   constructor(resource: string, limit: number) {
     super(
-      `You have reached the maximum limit of ${limit} ${resource} for your current plan`,
+      `You have reached your limit of ${limit} ${resource}. Add capacity from the Marketplace to raise it`,
       ErrorCode.QUOTA_EXCEEDED,
       HttpStatus.PAYMENT_REQUIRED,
     );

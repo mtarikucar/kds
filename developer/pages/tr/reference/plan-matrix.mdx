@@ -1,78 +1,248 @@
 ---
-title: Plan Matrisi
-description: Özellik × plan tablosu, plan limitleri ve fiyatlar (TRY). Onboarding TRIAL planı ve Başlangıç / Profesyonel / Kurumsal tierleri.
+title: Yetki (Entitlement) Matrisi
+description: Ücretsiz çekirdeğin verdiği haklar, katalog ürünlerinin grant'ları ve feature.* / limit.* / integration.* anahtarlarının nasıl katlandığı (fold).
 ---
 
 import { Callout } from 'nextra/components'
 
-# Plan Matrisi
+# Yetki (Entitlement) Matrisi
 
-Bu sayfa, planların hangi özellikleri ve limitleri taşıdığının kompakt bir
-özetidir. Plan ayrıntıları, fiyat değişiklikleri ve satın alma akışı için
-[Planlar](https://help.hummytummy.com/tr/plans) bölümüne bakın.
+Bu sayfa, bir işletmenin neye erişebildiğini belirleyen tek mekanizmayı
+özetler: **yetki (entitlement) anahtarları** ve bu anahtarları kimin verdiği.
+
+Plan, tier ya da paket **yoktur**. Çekirdek ürün süresiz ücretsizdir; ücretli
+yetenekler katalogdan tek tek satın alınır ve her ürün, verdiği anahtarlar
+(`grants`) üzerinden yetki setine katılır.
 
 <Callout type="info">
-  Yeni tenant'lar 7 günlük tam özellikli **TRIAL** (Deneme) planında başlar.
-  Deneme bittiğinde tenant **TRIAL_ENDED** durumuna geçer ve uygulama plan
-  seçim + ödeme akışına kilitlenir — devam etmek için bir ücretli plan
-  seçilmelidir. Eski **FREE** planı kullanımdan kaldırıldı (yalnızca enum
-  tombstone'u olarak duruyor; hiçbir tenant FREE'ye düşmez).
+  Kaynak gerçekler: ücretsiz taban
+  `backend/src/modules/entitlements/free-baseline.const.ts`, katalog ve
+  grant'ları `backend/src/modules/marketplace/alacarte-catalog.const.ts`,
+  geçerli anahtar sözlüğü
+  `backend/src/modules/entitlements/entitlement-keys.const.ts`.
 </Callout>
 
-## Fiyatlar
+## Anahtar uzayı ve katlama (fold)
 
-Tüm fiyatlar **TRY** ve **KDV dahil** (ilan edilen brüt) tutarlardır.
-Faturalandırmada KDV ayrıştırması geriye dönük hesaplanır.
+Yetki seti, birden çok kaynaktan gelen grant satırlarının tek bir kümeye
+katlanmasıyla oluşur. Katlama kuralı anahtarın önekine bağlıdır:
 
-| Plan | `name` | Aylık | Yıllık | Deneme |
-| --- | --- | --- | --- | --- |
-| Deneme | `TRIAL` | ₺0 | ₺0 | 7 gün |
-| Başlangıç | `BASIC` | ₺499 | ₺4.490 | — |
-| Profesyonel | `PRO` | ₺1.299 | ₺12.990 | — |
-| Kurumsal | `BUSINESS` | ₺2.999 | ₺29.990 | — |
+| Önek | Tip | Katlama | Not |
+| --- | --- | --- | --- |
+| `feature.*` | boolean | **OR** | Herhangi bir kaynak `true` veriyorsa özellik açıktır. |
+| `limit.*` | number | **SUM** | `-1` "sınırsız" sentinel'idir ve toplamı **domine eder**. |
+| `integration.*` | string[] | **UNION** | Sağlayıcı (vendor) kimliklerinin birleşimi. |
 
-_Ücretli tier'larda **ayrı deneme yoktur** (`trialDays = 0`); tek deneme, yukarıdaki özel **TRIAL** planıdır (7 gün) ve her yeni tenant orada başlar._
+Grant kaynakları üç tanedir: `free:baseline` (ücretsiz çekirdek),
+`addon:<kod>:<id>` (satın alınan her ürün için bir kaynak) ve `override:admin`
+(süperadmin müdahalesi; `limit.*` / `integration.*` için `{ __replace: … }`
+sarmalıyla değeri **değiştirebilir**).
 
-## Limitler
+<Callout type="info">
+  Kontörler (`credit.PHOTO`, `credit.VIDEO`, `credit.MODEL3D`, `credit.SMS`)
+  yetki **değildir**. Katalog doğrulaması `credit.*` anahtarını grant olarak
+  reddeder; kontör paketleri `kind: "credit"` + `creditKind` / `creditUnits`
+  ile satılır ve bakiye, harcama anında canlı okunur (30 sn'lik önbellek bir
+  para hatası olurdu).
+</Callout>
 
-`-1` = sınırsız.
+## Ücretsiz çekirdek (`free:baseline`)
 
-| Limit | TRIAL | BASIC | PRO | BUSINESS |
-| --- | --- | --- | --- | --- |
-| `maxUsers` | ∞ | 5 | 15 | ∞ |
-| `maxBranches` | ∞ | 1 | 3 | ∞ |
-| `maxTables` | ∞ | 20 | 50 | ∞ |
-| `maxProducts` | ∞ | 100 | 500 | ∞ |
-| `maxCategories` | ∞ | 20 | 50 | ∞ |
-| `maxMonthlyOrders` | ∞ | 500 | 2.000 | ∞ |
+Her tenant'a **koşulsuz, süresiz** ve lisans gerektirmeden projeksiyonlanır.
 
-## Özellik × plan
+| Anahtar | Değer | Anlamı |
+| --- | --- | --- |
+| `feature.posAccess` | `true` | POS / satış ekranı |
+| `feature.kdsIntegration` | `true` | Mutfak ekranı (KDS) |
+| `feature.customBranding` | `true` | Özel marka ve alan adı |
+| `feature.multiLocation` | `true` | Şube hub'ı, şube seçici, geçiş arayüzü |
+| `limit.maxUsers` | `-1` | Sınırsız |
+| `limit.maxTables` | `-1` | Sınırsız |
+| `limit.maxProducts` | `-1` | Sınırsız |
+| `limit.maxCategories` | `-1` | Sınırsız |
+| `limit.maxMonthlyOrders` | `-1` | Sınırsız |
+| `limit.maxBranches` | `1` | İlk şube ücretsiz; tek fiyatlı kapasite |
 
-| Özellik (`flag`) | TRIAL | BASIC | PRO | BUSINESS |
-| --- | --- | --- | --- | --- |
-| POS erişimi (`posAccess`) | ✅ | ✅ | ✅ | ✅ |
-| KDS entegrasyonu (`kdsIntegration`) | ✅ | ✅ | ✅ | ✅ |
-| Stok takibi (`inventoryTracking`) | ✅ | ✅ | ✅ | ✅ |
-| Gelişmiş raporlar (`advancedReports`) | ✅ | ❌ | ✅ | ✅ |
-| Çoklu lokasyon (`multiLocation`) | ✅ | ❌ | ✅ | ✅ |
-| Özel marka (`customBranding`) | ✅ | ❌ | ✅ | ✅ |
-| Rezervasyon sistemi (`reservationSystem`) | ✅ | ❌ | ✅ | ✅ |
-| Personel yönetimi (`personnelManagement`) | ✅ | ❌ | ✅ | ✅ |
-| Delivery entegrasyonu (`deliveryIntegration`) | ✅ | ❌ | ✅ | ✅ |
-| Öncelikli destek (`prioritySupport`) | ✅ | ❌ | ✅ | ✅ |
-| API erişimi (`apiAccess`) | ✅ | ❌ | ❌ | ✅ |
-| Harici ekran / Partner Display (`externalDisplay`) | ✅ | ❌ | ❌ | ✅ |
+<Callout type="info">
+  Şubedeki bölünme kasıtlıdır: **çoklu şube arayüzü ücretsizdir**
+  (`feature.multiLocation`), ücretli olan **ikinci şubenin kendisidir**
+  (`limit.maxBranches`). `extra_branch` ürünü tam olarak bu yüzden iki anahtarı
+  birden verir.
+</Callout>
+
+Ücretsiz çekirdeğin geri kalanı (menü yönetimi, masa ve kat planı, QR menü,
+sipariş yönetimi, kasa ve nakit, temel raporlar, ekip ve rol yönetimi,
+müşteriler, cihaz ve şube paneli) hiçbir yetki anahtarına bağlı değildir —
+ilgili rotalarda `@RequireEntitlement` yoktur. Yetki kapıları rota bazında
+**opt-in**'dir; dekoratörü olmayan rota kimseyi reddetmez.
+
+## Katalog ürünleri ve verdikleri grant'lar
+
+Fiyatlar **TRY** ve **KDV dahildir**; katalogda kuruş (`priceCents`) olarak
+tutulur (`299000` = ₺2.990,00). `annual` satırlar hesabın yıl dönümüne kadar
+gün bazında orantılanır (bkz. [Lisans & Ödeme API](/tr/developer/billing-api)).
+
+### Lisans
+
+| Kod | Fiyat | Grant | Lisans ön koşulu |
+| --- | --- | --- | --- |
+| `license_annual` | ₺2.990/yıl | `feature.license` | — |
+
+### Modüller
+
+| Kod | Fiyat | Grant | Lisans ön koşulu |
+| --- | --- | --- | --- |
+| `advanced_reports` | ₺1.290/yıl | `feature.advancedReports` | ✅ |
+| `module_inventory` | ₺1.490/yıl | `feature.inventoryTracking` | ✅ |
+| `module_reservations` | ₺990/yıl | `feature.reservationSystem` | ✅ |
+| `module_personnel` | ₺990/yıl | `feature.personnelManagement` | ✅ |
+| `module_ai_studio` | ₺1.990/yıl | `feature.aiContentGeneration` | ✅ |
+| `api_access` | ₺2.490/yıl | `feature.apiAccess` | ✅ |
+| `module_external_display` | ₺1.990/yıl | `feature.externalDisplay` | ✅ |
+| `priority_support` | ₺1.990/yıl | `feature.prioritySupport` | ✅ |
+
+### Entegrasyonlar
+
+| Kod | Fiyat | Grant | Lisans ön koşulu |
+| --- | --- | --- | --- |
+| `delivery_yemeksepeti` | ₺2.490/yıl | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ |
+| `delivery_getir` | ₺2.490/yıl | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ |
+| `delivery_trendyol_yemek` | ₺2.490/yıl | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ |
+| `fiscal_efatura` | ₺1.990/yıl | `integration.fiscal` += `efatura` | ✅ |
+| `fiscal_hugin` | ₺2.990/yıl | `integration.fiscal` += `hugin` | ✅ |
+| `caller_id_integration` | ₺1.490/yıl | `integration.caller` += `generic` | ✅ |
+| `sms_integration` | ₺990/yıl | `integration.sms` += `*` | ✅ |
+
+<Callout type="info">
+  Üç `delivery_*` ürünü aynı `integration.delivery` anahtarına yazar ve UNION
+  edilir; yanına aldıkları `feature.deliveryIntegration` bayrağı OR ile
+  katlandığı için ikinci platformu almak bu bayrak açısından idempotenttir.
+  `fiscal_hugin`'in eski `plan:PRO` bağımlılığı **kaldırıldı** — planlar
+  emekliye ayrıldığı için katalog doğrulaması artık `plan:` önekli her
+  bağımlılığı yazma anında reddediyor.
+</Callout>
+
+### Kapasite
+
+| Kod | Fiyat | Grant | Lisans ön koşulu |
+| --- | --- | --- | --- |
+| `extra_branch` | ₺3.990/yıl/adet | `limit.maxBranches` +1, `feature.multiLocation` | ✅ |
+
+`maxQuantity: 100`. Adet olarak alınır; projektör `limit.*` değerini satırın
+`quantity`'siyle çarpar, motor da bunu ücretsiz tabandaki `1` ile toplar.
+
+### Kontörler (tek seferlik, süresiz)
+
+| Kod | Fiyat | Bakiye | Bağımlılık |
+| --- | --- | --- | --- |
+| `credit_ai_photo_100` | ₺690 | 100 `PHOTO` | `module_ai_studio` |
+| `credit_ai_video_20` | ₺890 | 20 `VIDEO` | `module_ai_studio` |
+| `credit_ai_3d_10` | ₺790 | 10 `MODEL3D` | `module_ai_studio` |
+| `credit_sms_500` | ₺490 | 500 `SMS` | `sms_integration` |
+
+Kontör paketleri **hiçbir yetki vermez** (`grants: {}`); bakiye açar ve
+tükenene kadar geçerlidir. Bağımlılık, satın alma anında sahip olunan aktif bir
+ürünle **ya da aynı sepetteki bir kardeş satırla** karşılanabilir.
+
+### Hizmet
+
+| Kod | Fiyat | Grant | Lisans ön koşulu |
+| --- | --- | --- | --- |
+| `onsite_install_full` | ₺7.500 (tek seferlik) | — (`grants: {}`) | — |
 
 <Callout type="warning">
-  **Partner Display API** (harici ekran, üçüncü taraf tabletler) `externalDisplay`
-  özelliğine bağlıdır ve yalnızca **BUSINESS** planda (ve onboarding TRIAL'ında)
-  açıktır. Bu özellik partner API anahtarı verilmesini ve ekran token'ı
-  üretimini kapısında tutar. Aynı şekilde `apiAccess` da yalnızca BUSINESS'ta
-  vardır.
+  `onsite_install_full` bir **hizmet** kalemidir: ödenir ve faturalanır ama
+  hiçbir entitlement vermez. Tek seferliktir ve dönem sonu penceresi almaz
+  (`currentPeriodEnd: null`).
 </Callout>
 
-<Callout type="info">
-  TRIAL planı 7 gün boyunca **tüm** premium özellikleri ve sınırsız limitleri
-  açar; amacı tenant'ın ürünü tam olarak değerlendirebilmesidir. Bu, kalıcı bir
-  tier değildir — süresi dolunca ücretli bir plan seçilmelidir.
+## Lisans karartması (suppression)
+
+`requiresLicense: true` olan her ürünün grant'ları, **lisans canlı değilken
+verilmez**. Projektör sahiplik satırını yine yazar (sahip olunanlar listesi
+eksilmez) ama grant dizisi boştur.
+
+- Hiçbir iş verisi silinmez: stok, rezervasyon, personel, üretilmiş AI
+  medyası ve `chargedCents` yerinde kalır. Lisans yeniden ödendiğinde bir
+  sonraki projeksiyonda her şey aynen geri yanar.
+- Sepet seviyesindeki `LICENSE_REQUIRED` kontrolü **satışı** durdurur; asıl
+  erişim kapısı budur — bir işletme yıl dönümü faturasının bazı satırlarını
+  ödeyip lisansı ödemezse fark burada ortaya çıkar.
+- Ödeme süresi geçmiş (`past_due`) satırlar **7 gün** boyunca grant vermeye
+  devam eder (`ADDON_GRACE_DAYS`); süpürücü satırı `expired`'a çevirince hak
+  düşer. `active` satırlar da aynı 7 günlük ufku alır, böylece yıl dönümü
+  gecesi motorun 5 dakikalık taraması ile günlük süpürücü arasındaki saatlerde
+  kimse kilitlenmez.
+
+## Yetkileri okuma
+
+| Yöntem | Yol | Döndürdüğü |
+| --- | --- | --- |
+| `GET` | `/api/v1/entitlements/me` | Katlanmış set: `features`, `limits`, `integrations`, `computedAt` |
+| `GET` | `/api/v1/me/licensing` | Lisans durumu, sahip olunan ürünler, kontör bakiyeleri, yenileme, teklifler ve satın alınabilirlik |
+| `GET` | `/api/v1/catalog/pricing` | Public fiyat listesi (yayınlanmış katalog) |
+
+`/v1/entitlements/me` ve `/v1/me/licensing` tenant seviyesindedir ve
+`X-Branch-Id` beklemez.
+
+<Callout type="warning">
+  Eski `GET /api/subscriptions/effective-features` ucu hâlâ yönlendirmede
+  duruyor ama plan raylarına bağlıdır: `Tenant.currentPlan` yoksa `404` atar.
+  v3.3.0 migrasyonu `currentPlanId`'yi her tenant için `NULL`'ladı ve kayıt
+  akışı artık plan damgalamıyor — yani normal bir işletme için bu uç `404`
+  döner. Yeni entegrasyonlar `/v1/entitlements/me` (veya tek çağrıda her şeyi
+  veren `/v1/me/licensing`) kullanmalıdır.
 </Callout>
+
+## Yetki reddi (403)
+
+Kapılı bir rota, eksik yetkiyi **ve onu açan ürünü** taşıyan bir `403` döner:
+
+```json
+{
+  "statusCode": 403,
+  "message": "Bu özellik hesabınızda etkin değil.",
+  "error": "Entitlement Required",
+  "errorCode": "ENTITLEMENT_REQUIRED",
+  "timestamp": "2026-08-13T08:14:05.123Z",
+  "path": "/api/reports/advanced",
+  "requestId": "1786…-a1b2c3d4e",
+  "actionable": {
+    "requirement": { "type": "feature", "key": "feature.advancedReports" },
+    "offer": {
+      "code": "advanced_reports",
+      "name": "Gelişmiş Rapor & Analitik",
+      "kind": "module",
+      "annualPriceCents": 129000,
+      "proratedCents": 74123,
+      "currency": "TRY",
+      "periodEnd": "2027-03-10T00:00:00.000Z"
+    },
+    "licenseRequired": false,
+    "reason": "not_owned"
+  }
+}
+```
+
+Remediation yükü, global hata filtresinin **allowlist**'inden geçerek
+`actionable` altında taşınır (yalnızca `requirement`, `offer`,
+`licenseRequired`, `reason` alanları):
+
+- `requirement.type`: `feature` | `limit` | `integration`. `limit` reddinde
+  ayrıca `usage` ve `cap` gelir.
+- `offer`: anahtarı açan **en ucuz** ürün, bu tenant için **bugün**
+  fiyatlanmış hâliyle. Gösterilen fiyat ile checkout'ta tahsil edilecek fiyat
+  aynı katalog okumasından gelir.
+- `licenseRequired: true` ise asıl engel ürünün kendisi değil, **eksik
+  lisanstır**; teklif de lisansa döner.
+- `reason`: `not_owned` (hiç alınmamış) veya `lapsed` (süresi dolmuş) —
+  istemcinin "Satın al" ile "Yenile" arasında seçim yapmasını sağlar.
+
+## İlgili
+
+- [Lisans & Ödeme API](/tr/developer/billing-api) — checkout rayı, orantılı
+  fiyatlama, yıl dönümü ve yenileme.
+- [Marketplace API](/tr/developer/marketplace-api) — katalog, satın alma ve
+  iptal uçları.
+- [Hata Kodları](/tr/reference/error-codes) — standart hata zarfı ve kararlı
+  `errorCode` değerleri.

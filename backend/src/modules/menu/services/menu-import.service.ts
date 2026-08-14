@@ -352,10 +352,14 @@ export class MenuImportService {
         ? await this.prisma.product.count({ where: { tenantId } })
         : await this.prisma.category.count({ where: { tenantId } });
     if (current + toCreate > limit) {
+      // The free baseline sets maxProducts/maxCategories to -1, so this is
+      // unreachable unless a capability has been suppressed for one tenant.
+      // There is no plan to upgrade to; the answer is support, not checkout.
       throw new BadRequestException(
-        `This import would exceed your plan's ${resource} limit ` +
+        `This import would exceed the ${resource} limit on your account ` +
           `(${current}/${limit} used, importing ${toCreate}). ` +
-          `Remove some items or upgrade your plan.`,
+          `Remove some items, or contact support — ${resource}s are ` +
+          `normally unlimited on the free core.`,
       );
     }
   }

@@ -229,7 +229,7 @@
     "tabVariance": "Kullanım Varyansı",
     "tabRecipes": "Reçete Maliyetleri",
     "menuTitle": "Menü kârlılığı",
-    "upgradeRequired": "Menü mühendisliği için Gelişmiş Raporlar özelliği gerekli — planınızı yükseltin.",
+    "upgradeRequired": "Menü mühendisliği için Gelişmiş Rapor & Analitik modülü gerekir (yıllık 1.290 ₺, lisans ön koşuluyla).",
     "uncosted": "{{count}} satılan ürünün maliyeti tanımlı değil — sınıflandırılamadıkları için tabloda görünmüyorlar. Reçete/maliyet girin.",
     "headProduct": "Ürün",
     "headUnits": "Adet",

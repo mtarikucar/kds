@@ -5,7 +5,7 @@
 
 # Executive Summary
 
-**HummyTummy** is a comprehensive cloud-based management system that increases operational efficiency, improves customer experience, and maximizes revenue for restaurant businesses.
+**HummyTummy** is a cloud-based restaurant management system. The operational core — POS, kitchen display, menu, tables, QR menu, orders, cash, customers and loyalty — is free and unlimited, indefinitely. Heavier capabilities such as inventory, reservations, staff management, deep analytics and delivery-platform integrations are bought individually, per year, from a published catalogue.
 
 ## Who Is It For?
 
@@ -17,12 +17,15 @@
 
 ## Core Value Proposition
 
+> **The core is free. You only pay for what you use.**
+> No packages, no tiers, no plans.
+
 ✓ **Zero Hardware Cost** - Fully cloud-based, accessible from any device
 ✓ **Quick Setup** - 1-hour setup, start using the same day
-✓ **Affordable Pricing** - Scalable pricing starting from free plan
-✓ **Full Integration** - POS + KDS + CRM + Loyalty Program in one system
+✓ **Free, Unlimited Core** - POS, KDS, menu, tables and floor plan, QR menu, order management, cash, basic reports, team and roles, customers, device and branch panel, custom branding and domain — free indefinitely, with **no limit** on users, tables, products, categories or monthly orders. First branch free.
+✓ **Full Integration** - POS + KDS + CRM + loyalty in one system, all inside the free core
 ✓ **Real-Time** - Instant updates and synchronization
-✓ **14-Day Free Trial** - Test without credit card information
+✓ **No Credit Card, No Trial Clock** - The free core is not a trial and nothing expires. A shared demo restaurant is also available without signing up.
 
 ---
 
@@ -32,18 +35,18 @@
 
 ### Problem
 Traditional POS systems:
-- $2,000 - $8,000 hardware costs
-- Additional software license fees
+- Terminal hardware you have to buy up front
+- Additional software licence fees on top
 - Require expert technical support
 - Reinvestment needed when relocating
 
 ### HummyTummy Solution
 ✓ **Zero hardware cost** - Use your existing computers, tablets, or phones
-✓ **Monthly subscription model** - Predictable costs
+✓ **Free core** - Running the venue costs ₺0, indefinitely; no licence required to start
 ✓ **Self-service setup** - Easy setup requiring no technical knowledge
 ✓ **Cloud-based** - Location independent, access from anywhere
 
-**ROI Example**: A medium-sized restaurant saves $20,000+ in the first year.
+**What this means**: POS, kitchen display, menu, tables, QR menu, cash and basic reports cost nothing. You only pay when you add a heavy module (inventory, reservations, staff, a delivery-platform integration) — priced per item, per year, and shown in full in the catalogue below.
 
 ## 2. Customer Loyalty and Retention
 
@@ -56,10 +59,10 @@ Traditional POS systems:
 ### HummyTummy Solution
 ✓ **Automated Loyalty Program** - Tiered reward system (Bronze → Silver → Gold → Platinum)
 ✓ **Digital Point Tracking** - Automatic point accumulation with phone number
-✓ **Referral System** - Your customers bring new customers for you
-✓ **Customer Analytics** - Detailed customer behavior reports
+✓ **Referral System** - Phone-verified referral codes with a bonus for both sides
+✓ **Customer Analytics** - Customer records, spending history and segmentation
 
-**ROI Example**: Average 15-25% increase in customer retention, $40,000+ additional annual revenue.
+**Included in the free core** - CRM, loyalty and referral are not paid modules. They are part of the free core and are not metered.
 
 ## 3. Order and Kitchen Communication
 
@@ -75,7 +78,7 @@ Traditional POS systems:
 ✓ **Error-Free Communication** - Digital order transfer
 ✓ **Item-Level Tracking** - Separate status tracking for each item
 
-**ROI Example**: 30% faster service, 40% fewer order errors, 15-20 more customers per hour.
+**Included in the free core** - The kitchen display is free and unlimited, on as many screens as you need.
 
 ## 4. Contactless Service and QR Menu
 
@@ -92,7 +95,7 @@ Traditional POS systems:
 ✓ **Waiter and Bill Request** - Call waiter with one touch
 ✓ **Customizable Design** - Brand-specific colors, logo, layout
 
-**ROI Example**: $2,000+ annual menu printing savings, 20% faster order taking.
+**Included in the free core** - QR menu, direct ordering and custom branding cost nothing, on any number of tables.
 
 ## 5. Stock and Inventory Control
 
@@ -108,7 +111,7 @@ Traditional POS systems:
 ✓ **Movement History** - Detailed records of all stock movements
 ✓ **Waste Tracking** - Loss and waste analysis
 
-**ROI Example**: 15% stock cost reduction, $12,000+ annual savings.
+**Paid module** - Inventory & Cost Management is ₺1.490/year, and requires the ₺2.990/year licence. Recipes, stock counts, purchase orders, suppliers and inter-branch transfers are included in that module.
 
 ## 6. Reporting and Decision Support
 
@@ -123,9 +126,9 @@ Traditional POS systems:
 ✓ **Sales Analytics** - Best-selling products, categories
 ✓ **Staff Performance** - Person-based sales tracking
 ✓ **Payment Method Analysis** - Cash, card, digital payment breakdown
-✓ **Excel/PDF Export** - Reports ready for accounting
+✓ **PDF and CSV Export** - Z-Report as PDF, cashier-session history as CSV, ready for accounting
 
-**ROI Example**: 30-45 minutes saved per day, 15+ hours per month.
+**What is free, what is paid** - The Z-Report, the mid-shift X-report and the cashier-session CSV export are in the free core. The deeper analytics — sales summaries, top products, payment and hourly breakdowns, staff performance, menu engineering, P&L and the sales CSV — are the Advanced Reports & Analytics module (₺1.290/year + licence).
 
 ---
 
@@ -197,6 +200,8 @@ Traditional POS systems:
 
 ## 4. CRM and Customer Loyalty Program
 
+> Included in the free core.
+
 ### Customer Profile
 - **Automatic Registration**: Automatic customer registration on first order
 - **Contact Information**: Name, phone, email
@@ -204,19 +209,20 @@ Traditional POS systems:
 - **Spending Analysis**: Total spending, average basket, last visit
 
 ### Loyalty Program
-- **Automatic Point Earning**: 1 point per $1 spent
-- **Tiered System**:
+- **Automatic Point Earning**: 1 point per ₺1 spent, multiplied by the tier
+- **Tiered System** (by lifetime points):
   - 🥉 **Bronze** (0-499 points): 1.0x multiplier
-  - 🥈 **Silver** (500-1999 points): 1.2x multiplier
-  - 🥇 **Gold** (2000-4999 points): 1.5x multiplier
-  - 💎 **Platinum** (5000+ points): 2.0x multiplier
-- **Point Redemption**: 100 points = $10 discount
+  - 🥈 **Silver** (500-1,999 points): 1.25x multiplier
+  - 🥇 **Gold** (2,000-4,999 points): 1.5x multiplier
+  - 💎 **Platinum** (5,000+ points): 2.0x multiplier
+- **Point Redemption**: 1 point = ₺0.10, minimum 100 points per redemption
 - **Welcome Bonus**: 50 points on first registration
 - **Birthday Bonus**: 100 points on birthday
 
 ### Referral System
 - **Unique Referral Code**: Unique code for each customer
-- **Dual Rewards**: Both referrer and new customer benefit
+- **Dual Rewards**: 100 points for the referrer, 50 for the new customer
+- **Abuse Controls**: Payout requires phone verification, with a daily per-venue cap
 - **Status Tracking**: Pending, Completed, Expired
 - **Reward Monitoring**: Referral history and earned rewards
 
@@ -227,6 +233,8 @@ Traditional POS systems:
 - **Campaign Targeting**: Campaigns for specific segments
 
 ## 5. Inventory and Stock Management
+
+> Paid module: Inventory & Cost Management, ₺1.490/year, requires the ₺2.990/year licence.
 
 ### Stock Tracking
 - **Product-Based Inventory**: Stock level for each product
@@ -253,6 +261,8 @@ Traditional POS systems:
 
 ## 6. Reporting and Analytics
 
+> The Z-Report, the mid-shift X-report and the cashier-session CSV export are in the free core. Everything else in this section — daily sales summaries, product and staff reports, payment and hourly breakdowns, the sales CSV, menu engineering and P&L — belongs to the Advanced Reports & Analytics module (₺1.290/year + licence). Product profitability additionally needs cost data from the Inventory module.
+
 ### Daily Reports
 - **Sales Summary**: Daily total sales, transaction count, average basket
 - **Payment Method Distribution**: Cash, card, digital payment ratios
@@ -272,37 +282,47 @@ Traditional POS systems:
 - **Performance Comparison**: Top-selling staff member
 
 ### Z-Report (End of Day)
-- **Comprehensive Summary**: Complete summary of the day
+- **Comprehensive Summary**: Complete summary of the day, per branch
 - **Cash Reconciliation**: Cash counting and discrepancy check
-- **All Transactions**: Sales, returns, cancellations
+- **All Transactions**: Sales, refunds and cancelled orders
 - **Category Breakdown**: Sales breakdown by category
-- **PDF and Excel Export**: Formats ready for accounting
-- **Signature Area**: Area for shift supervisor signature
+- **Staff Breakdown**: Sales and refunds per staff member
+- **PDF Export**: Ready to hand to accounting; cashier-session history also exports as CSV
+- **Scheduled**: Can be generated and emailed automatically at end of day
+- **Free**: Z-Report, X-report and the session CSV need no licence and no module
 
-## 7. Subscription and Invoice Management
+## 7. Licence, Catalogue and Billing
 
-### Subscription Plans
-- **FREE**: Free starter plan (2 users, 5 tables, 25 products)
-- **BASIC**: $29.99/month (5 users, 20 tables, 100 products)
-- **PRO**: $79.99/month (15 users, 50 tables, 500 products, advanced reports)
-- **BUSINESS**: $199.99/month (Unlimited, API access, priority support)
+### There Are No Plans
+The free core is granted to every account unconditionally and does not expire. On top of it you buy individual products from a catalogue. Nothing is bundled, nothing is tiered, and buying one module never changes the price of another.
+
+- **Licence** (₺2.990/year): the prerequisite for buying and using any paid module
+- **Modules, integrations, capacity**: annual, bought one at a time
+- **Credits**: one-time purchases with no expiry, valid until consumed
+- **Services**: one-time (on-site installation and training)
 
 ### Payment Integration
-- **Stripe**: International credit card payments
-- **PayTR**: Turkey-specific payment system
-- **Automatic Routing**: Automatic provider selection based on customer location
+- **PayTR**: our payment provider for licence, module and credit purchases
+- **No stored card, no automatic charge**: renewal is manual by design
+- (Stripe appears in the product only as a third-party integration a venue can connect for its own customer payments — it is not how HummyTummy bills you.)
 
 ### Invoice System
-- **Automatic Invoice**: Automatic PDF invoice for each payment
-- **Email Sending**: Invoice automatically sent via email
-- **Invoice Archive**: Storage of all invoices in the system
-- **Tax Calculation**: VAT included/excluded options
+- **Itemized Invoice**: one invoice per purchase, listing every product bought
+- **Single Renewal Date**: all annual items share one anniversary and one invoice
+- **Invoice Archive**: all invoices retained in the system
+- **VAT Included**: every catalogue price is VAT-inclusive in Turkish lira
 
-### Trial and Upgrade
-- **14-Day Free Trial**: Once for each paid plan
-- **Easy Upgrade**: Plan upgrade with one click
-- **Prorated Pricing**: Fair pricing for mid-month changes
-- **Cancellation Guarantee**: Cancel anytime
+### Anniversary and Proration
+- **Anniversary**: the day you buy the licence becomes your account's fixed anniversary
+- **Proration**: any annual item bought mid-year is charged pro-rata for the days remaining to the anniversary
+- **Roll-forward**: if fewer than 14 days remain to the anniversary, the item is carried into the next full cycle instead
+- **Floor**: no invoice line falls below ₺1
+
+### Renewal, Reminders and Grace
+- **Manual renewal**: there is no automatic card charge
+- **Reminders**: 30, 7 and 1 day before the anniversary
+- **Grace**: 7 days after the anniversary if unpaid
+- **After grace, access dims — data is never deleted.** Inventory, reservations, staff records and generated media all come back exactly as they were once you pay.
 
 ## 8. User and Permission Management
 
@@ -314,7 +334,7 @@ Traditional POS systems:
 - **COURIER**: Courier (Takeaway orders)
 
 ### User Accounts
-- **Multi-User**: Plan-based user limits
+- **Unlimited Users**: no per-seat charge and no user cap
 - **Email Verification**: 6-digit verification code
 - **Password Reset**: Token-based secure reset
 - **Last Login Tracking**: Login history for security
@@ -330,23 +350,21 @@ Traditional POS systems:
 ## 9. Desktop Application (Tauri)
 
 ### Platform Support
+Built with Tauri's default bundle targets for each host platform:
 - **Windows**: MSI and NSIS installers
 - **macOS**: DMG image file
-- **Linux**: AppImage package
+- **Linux**: AppImage and .deb packages
 
 ### Features
-- **Small Size**: ~10MB (10% of Electron size)
-- **Fast Performance**: Rust-based native speed
-- **Auto-Update**: Secure update with signature verification
-- **Offline Support**: Local data caching
-- **Printer Integration**: Native printer support
-- **System Tray**: Background operation support
+- **Small Footprint**: Tauri uses the OS webview instead of shipping a browser, so the installer is a fraction of an equivalent Electron build
+- **Rust Core**: Native-speed hardware layer
+- **Bluetooth Printing**: ESC/POS thermal printing over Bluetooth LE
+- **Device Management**: Thermal printer, cash drawer and scale as configured devices, with live connection status
 
-### Advantages
-- Faster startup
-- Lower memory usage
-- Native OS integration
-- More secure update mechanism
+### Purpose
+The desktop app exists for the hardware that a browser cannot reach — Bluetooth printers, the cash drawer and the scale. Everything else runs in the browser; the desktop build is optional, not a separate product.
+
+> Scope note: the Bluetooth transport is what is wired up today. Serial, network and USB-HID connection types are modelled in the device config but not yet the shipping path.
 
 ## 10. Real-Time Communication
 
@@ -371,18 +389,18 @@ Traditional POS systems:
 
 # How We Differ from Competitors
 
-## 1. Global Payment Coverage
+## 1. A Free Core Instead of a Plan Ladder
 
 ### Traditional Systems
-- Single payment provider
-- Regional restrictions
-- High international transaction fees
+- A monthly seat- or tier-based subscription before anything runs
+- Limits on users, tables, products or orders that force an upgrade
+- A trial clock, then a card charged automatically every month
 
 ### HummyTummy Difference
-✓ **Dual Payment Processing**: Stripe (international) + PayTR (Turkey)
-✓ **Automatic Routing**: Most suitable provider based on customer location
-✓ **Single Codebase**: Unified system supporting both providers
-✓ **Optimal Costs**: Benefit from regional advantages
+✓ **Free, Unlimited Core**: POS, KDS, menu, tables, QR, orders, cash, basic reports, CRM and loyalty — ₺0, indefinitely
+✓ **No Numeric Limits**: users, tables, products, categories and monthly orders are all unlimited
+✓ **Buy One Thing at a Time**: modules and integrations are individually priced and annual, never bundled
+✓ **Manual Renewal**: no stored card and no automatic charge; you decide each year
 
 ## 2. Advanced QR Menu with Direct Ordering
 
@@ -396,8 +414,7 @@ Traditional POS systems:
 ✓ **Customizable Design**: Colors, logo, layout aligned with brand identity
 ✓ **Session-Based Security**: Secure sessions with phone verification
 ✓ **Loyalty Integration**: Points visible and redeemable in real-time
-
-**Competitor Comparison**: Toast, Square, Lightspeed - basic QR menu, no ordering
+✓ **3D and AR Preview**: products with a generated 3D model can be viewed in AR from the QR menu
 
 ## 3. Comprehensive Loyalty and Referral System
 
@@ -407,24 +424,21 @@ Traditional POS systems:
 - No automatic reward management
 
 ### HummyTummy Difference
-✓ **Tiered Rewards**: Bronze, Silver, Gold, Platinum with multipliers
-✓ **Referral Program**: Viral growth mechanism built-in
+✓ **Tiered Rewards**: Bronze, Silver, Gold, Platinum with 1.0x-2.0x multipliers
+✓ **Referral Program**: Phone-verified codes, both sides rewarded, daily cap against farming
 ✓ **Automatic Calculation**: Points, tiers, and rewards managed automatically
-✓ **Customer Analytics**: Deep insights into customer behavior
+✓ **Free**: Loyalty and referral are in the free core, not a paid add-on
 
-**Competitor Comparison**: Loyverse (basic loyalty), Square (extra fee), Toast (plugin required)
-
-## 4. Modern Desktop Application (Tauri)
+## 4. Optional Desktop App for Hardware (Tauri)
 
 ### Traditional Systems
-- Web-only or heavy Electron applications
-- 100MB+ application size
-- Slow startup and high memory usage
+- A heavy Electron shell, or no desktop path to peripherals at all
+- Vendor-locked printers and cash drawers
 
 ### HummyTummy Difference
-✓ **10x Smaller**: ~10MB vs 100+MB Electron apps
-✓ **Auto-Updates**: Secure with signature verification
-✓ **Native Performance**: High speed with Rust backend
+✓ **Optional, Not Required**: the whole product runs in a browser; the desktop build only adds hardware reach
+✓ **Bluetooth ESC/POS**: thermal printing, cash drawer and scale from the desktop app
+✓ **Native Performance**: Rust hardware layer, OS webview instead of a bundled browser
 ✓ **Cross-Platform**: Single codebase for Windows, macOS, Linux
 
 ## 5. Professional Z-Report System
@@ -435,10 +449,10 @@ Traditional POS systems:
 - Formats not suitable for accounting
 
 ### HummyTummy Difference
-✓ **Comprehensive EOD**: Complete end-of-day reporting
+✓ **Comprehensive EOD**: Complete end-of-day reporting, per branch
 ✓ **Cash Reconciliation**: Integrated cash drawer management
-✓ **Staff Performance**: Individual staff sales tracking
-✓ **Compliance Ready**: Structured reports for accounting
+✓ **Staff Breakdown**: Sales and refunds per staff member on the report
+✓ **Free**: The Z-Report is in the free core, not behind a paid reporting module
 
 ## 6. Real-Time Everything
 
@@ -466,18 +480,18 @@ Traditional POS systems:
 ✓ **Price Adjustments**: Per-modifier pricing
 ✓ **Nested Display**: Grouped modifiers with display names
 
-## 8. Plan-Based Feature Access
+## 8. À-la-Carte Entitlements
 
 ### Traditional Systems
-- All-or-nothing access
-- No tiered planning
-- No usage limit tracking
+- Features locked behind a tier you must buy whole
+- An upgrade to reach one feature drags along five you will never use
+- Cancelling a plan takes the data with it
 
 ### HummyTummy Difference
-✓ **Granular Control**: Feature flags per subscription plan
-✓ **Usage Limits**: Automatic enforcement (users, tables, products, orders)
-✓ **Decorators & Guards**: @RequiresPlan, @RequiresFeature, @CheckLimit
-✓ **Graceful Degradation**: Clear messages when limits reached
+✓ **One Product, One Grant**: each catalogue item grants exactly the capability it names
+✓ **Composable**: grants fold together, so buying a second delivery platform is idempotent and never downgrades anything
+✓ **Free Baseline in Data**: the free core is granted to every account as data, not as a special case in the code
+✓ **Lapse Dims Access, Never Deletes Data**: an unpaid module goes dark; the records behind it are untouched and return on payment
 
 ## 9. Enterprise-Grade Error Tracking
 
@@ -500,318 +514,199 @@ Traditional POS systems:
 - Scalability issues
 
 ### HummyTummy Difference
-✓ **Latest Frameworks**: React 18, NestJS 10, Prisma 6
+✓ **Current Frameworks**: React 18 + Vite in the app, NestJS 10 + Prisma 6 on the backend, Next.js 16 + React 19 on the marketing site
 ✓ **TypeScript Throughout**: Type safety on frontend and backend
-✓ **Modern Tooling**: Vite, TanStack Query, Tailwind CSS
-✓ **3D Landing Page**: Three.js for engaging marketing page
+✓ **Modern Tooling**: Vite, TanStack Query, Tailwind CSS, Socket.IO
+✓ **3D in the Menu**: Three.js renders generated 3D product models in the product panel and the QR menu's AR view
 
 ---
 
-# Subscription Plans and Pricing
+# Pricing
 
-## Plan Comparison Table
+> **The core is free. You only pay for what you use.**
+> No packages, no tiers, no plans, no trial period. All prices are in Turkish lira and **include VAT**.
 
-| Feature | FREE | BASIC | PRO | BUSINESS |
-|---------|:----:|:-----:|:---:|:--------:|
-| **Monthly Price** | $0 | $29.99 | $79.99 | $199.99 |
-| **Yearly Price** | $0 | $299.99 | $799.99 | $1,999.99 |
-| **Yearly Savings** | - | **$60** | **$160** | **$400** |
-| **Trial Period** | - | 14 days | 14 days | 14 days |
-| | | | | |
-| **USER LIMITS** | | | | |
-| Number of Users | 2 | 5 | 15 | ∞ |
-| Number of Tables | 5 | 20 | 50 | ∞ |
-| Number of Products | 25 | 100 | 500 | ∞ |
-| Number of Categories | 10 | 20 | 50 | ∞ |
-| Monthly Orders | 100 | 500 | 2,000 | ∞ |
-| | | | | |
-| **BASIC FEATURES** | | | | |
-| POS System | ✓ | ✓ | ✓ | ✓ |
-| Kitchen Display (KDS) | ✓ | ✓ | ✓ | ✓ |
-| QR Menu | ✓ | ✓ | ✓ | ✓ |
-| Table Management | ✓ | ✓ | ✓ | ✓ |
-| Order Management | ✓ | ✓ | ✓ | ✓ |
-| Payment Processing | ✓ | ✓ | ✓ | ✓ |
-| Basic Reports | ✓ | ✓ | ✓ | ✓ |
-| Mobile Access | ✓ | ✓ | ✓ | ✓ |
-| | | | | |
-| **ADVANCED FEATURES** | | | | |
-| Inventory Tracking | ✗ | ✓ | ✓ | ✓ |
-| Stock Alerts | ✗ | ✓ | ✓ | ✓ |
-| Customer CRM | ✗ | ✓ | ✓ | ✓ |
-| Loyalty Program | ✗ | ✓ | ✓ | ✓ |
-| Referral System | ✗ | ✓ | ✓ | ✓ |
-| Z-Report (EOD) | ✗ | ✓ | ✓ | ✓ |
-| | | | | |
-| **PROFESSIONAL** | | | | |
-| Advanced Reports | ✗ | ✗ | ✓ | ✓ |
-| Staff Performance | ✗ | ✗ | ✓ | ✓ |
-| Multi-Location | ✗ | ✗ | ✓ | ✓ |
-| Custom Branding | ✗ | ✗ | ✓ | ✓ |
-| Export (Excel/PDF) | ✗ | ✗ | ✓ | ✓ |
-| | | | | |
-| **ENTERPRISE** | | | | |
-| API Access | ✗ | ✗ | ✗ | ✓ |
-| Webhook Integrations | ✗ | ✗ | ✗ | ✓ |
-| Priority Support | ✗ | ✗ | ✗ | ✓ |
-| Custom Training | ✗ | ✗ | ✗ | ✓ |
-| Account Manager | ✗ | ✗ | ✗ | ✓ |
+## What Is Free, Forever
 
-## Which Plan Is Right for You?
+| Free core | |
+|---|---|
+| POS and tabs | ✓ |
+| Kitchen display (KDS) | ✓ |
+| Menu management | ✓ |
+| Tables and floor plan | ✓ |
+| QR menu | ✓ |
+| Order management | ✓ |
+| Cash and till | ✓ |
+| Basic reports (Z-Report, X-report, session CSV) | ✓ |
+| Team and role management | ✓ |
+| Customers, loyalty and referral | ✓ |
+| Device and branch panel | ✓ |
+| Custom branding and domain | ✓ |
+| **Users / tables / products / categories / monthly orders** | **Unlimited** |
+| **First branch** | **Free** |
 
-### 🆓 FREE - For Small Businesses
-**Ideal Users:**
-- Small single-location cafes
-- 1-5 table establishments
-- Venues with 10-15 orders per day
-- Those wanting to test the system
+No credit card. No licence. Nothing expires. There is also a shared demo restaurant you can try without registering at all.
 
-**Key Features:**
-- Full POS and KDS system
-- QR menu with digital menu
-- Unlimited free duration
-- No credit card required
+## The Paid Catalogue
 
-### 💼 BASIC - For Medium-Sized Restaurants
-**Ideal Users:**
-- Restaurants with 6-20 tables
-- Businesses with 3-5 staff members
-- Venues with 30-50 orders per day
-- Those wanting to build customer loyalty
+Every paid item is annual unless marked otherwise, and every module requires the licence.
 
-**Key Features:**
-- Inventory and stock tracking
-- CRM and loyalty program
-- Referral system for new customer acquisition
-- Z-Report for professional end-of-day
+### Licence
 
-**Monthly Cost Comparison:**
-- Traditional system: $100-$160/month
-- HummyTummy BASIC: $29.99/month
-- **Savings: $70-$130/month**
+| Item | Price |
+|---|---:|
+| **HummyTummy Licence** — prerequisite for buying and using any paid module | **₺2.990/year** |
 
-### 🏆 PRO - For Large Restaurants and Chains
-**Ideal Users:**
-- Large restaurants with 21-50 tables
-- Multi-location businesses (2-5 branches)
-- Businesses with 10+ staff members
-- Managers wanting detailed analytics
+### Modules
 
-**Key Features:**
-- Advanced reporting and analytics
-- Staff performance tracking
-- Multi-location support
-- Custom branding
-- Excel and PDF export
+| Module | Price |
+|---|---:|
+| Advanced Reports & Analytics | ₺1.290/year |
+| Inventory & Cost Management | ₺1.490/year |
+| Reservations | ₺990/year |
+| Staff Management | ₺990/year |
+| AI Menu Studio | ₺1.990/year |
+| API & Webhooks | ₺2.490/year |
+| Partner Display API | ₺1.990/year |
+| Priority Support | ₺1.990/year |
 
-**ROI Calculation:**
-```
-Annual Cost: $799.99 (monthly $66.67)
+### Integrations
 
-Savings:
-- Menu printing cost: $2,400/year
-- Stock loss reduction (15%): $12,000/year
-- Time savings (30 min/day): $18,000/year
-- Revenue increase with loyalty (20%): $48,000/year
+| Integration | Price |
+|---|---:|
+| Yemeksepeti | ₺2.490/year |
+| Getir | ₺2.490/year |
+| Trendyol Yemek | ₺2.490/year |
+| e-Invoice (Nilvera) | ₺1.990/year |
+| Fiscal printer / ÖKC (Hugin) | ₺2.990/year |
+| Caller-ID | ₺1.490/year |
+| SMS | ₺990/year |
 
-Total Annual Benefit: $80,400
-Net ROI: $79,600 (9,950% return)
-```
+### Capacity
 
-### 🎯 BUSINESS - For Enterprise Solutions
-**Ideal Users:**
-- 50+ tables or multi-location (5+ branches)
-- Franchise restaurant chains
-- Businesses requiring custom integrations
-- Those wanting API integration with their own systems
+| Item | Price |
+|---|---:|
+| Extra branch — first branch is free, up to 100 extra | ₺3.990/year each |
 
-**Key Features:**
-- Unlimited everything
-- Full API access
-- Webhook integrations
-- Priority 24/7 support
-- Custom training and onboarding
-- Dedicated account manager
+### Credits — one-time, no expiry, valid until consumed
 
-**Enterprise Advantages:**
-- Custom SLA (Service Level Agreement)
-- Monthly business review meetings
-- Priority on new feature requests
-- Custom integration development
+| Pack | Price |
+|---|---:|
+| 100 AI images | ₺690 |
+| 20 AI videos | ₺890 |
+| 10 AI 3D models | ₺790 |
+| 500 SMS | ₺490 |
 
----
+### Services — one-time
 
-# ROI (Return on Investment) Examples
+| Service | Price |
+|---|---:|
+| On-site installation & training (full day) | ₺7.500 |
 
-## Scenario 1: Small Cafe (10 Tables)
+## How Billing Works
 
-**Profile:**
-- 10 tables
-- 3 staff members
-- 40 customers per day
-- Average bill: $5
-- Monthly revenue: $6,000
+- **Anniversary**: the day you buy the licence becomes your account's fixed anniversary.
+- **Proration**: any annual item bought later in the year is charged pro-rata for the days remaining to that anniversary. If fewer than 14 days remain, the item rolls into the next full cycle instead. No line falls below ₺1.
+- **One invoice, one renewal date** for everything you own.
+- **Renewal is manual.** There is no stored card and no automatic charge. Reminders go out 30, 7 and 1 day before the anniversary.
+- **If it is not paid**: 7 days of grace, then access dims. **Data is never deleted.** Inventory, reservations, staff records and generated media all return exactly as they were when you pay.
+- **Payments** are processed by PayTR.
 
-**Recommended Plan:** BASIC ($29.99/month)
+## What It Actually Costs
 
-**Annual Savings:**
-- **Menu Printing**: $1,200 (previous cost $2,000/year)
-- **Stock Loss Reduction** (10%): $720
-- **Time Savings**: $800 (EOD closing 30 min → 5 min)
-- **Revenue Increase with Loyalty** (15%): $9,000 → $10,350 = **$1,350**
+These are catalogue arithmetic, not projections — add up only what you choose to own.
 
-**Total Annual Benefit:** $4,070
-**Annual Cost:** $359.88
-**Net Gain:** $3,710
-**ROI:** **1,031%**
+### A cafe that stays on the free core
 
-## Scenario 2: Medium-Sized Restaurant (25 Tables)
+Nothing to buy. POS, kitchen display, QR menu, tables, cash, basic reports, customers and loyalty, unlimited users and orders, one branch.
 
-**Profile:**
-- 25 tables
-- 8 staff members
-- 100 customers per day
-- Average bill: $6.67
-- Monthly revenue: $20,000
+**Annual cost: ₺0.**
 
-**Recommended Plan:** PRO ($79.99/month)
+### A restaurant that wants stock control and reservations
 
-**Annual Savings:**
-- **Menu Printing**: $2,400
-- **Stock Loss Reduction** (15%): $3,600
-- **Time Savings**: $1,800 (1 hour saved per day)
-- **Order Error Reduction** (40%): $1,440
-- **Revenue Increase with Loyalty** (20%): $20,000 → $24,000 = **$4,000**
-- **Fast Service with QR Menu** (25% more customers): **$5,000**
+| Item | Price |
+|---|---:|
+| Licence | ₺2.990 |
+| Inventory & Cost Management | ₺1.490 |
+| Reservations | ₺990 |
+| **Total, first full year** | **₺5.470** |
 
-**Total Annual Benefit:** $18,240
-**Annual Cost:** $959.88
-**Net Gain:** $17,280
-**ROI:** **1,800%**
+Bought mid-year, each module is prorated to the anniversary, so the first invoice is lower than this.
 
-## Scenario 3: Restaurant Chain (5 Branches, 150 Tables)
+### A restaurant that also sells on delivery platforms
 
-**Profile:**
-- 5 locations, 150 total tables
-- 40 staff members
-- 500 customers per day
-- Average bill: $6
-- Monthly revenue: $90,000
+| Item | Price |
+|---|---:|
+| Licence | ₺2.990 |
+| Inventory & Cost Management | ₺1.490 |
+| Yemeksepeti | ₺2.490 |
+| Getir | ₺2.490 |
+| Advanced Reports & Analytics | ₺1.290 |
+| **Total, first full year** | **₺10.750** |
 
-**Recommended Plan:** BUSINESS ($199.99/month)
+### A three-branch operation
 
-**Annual Savings:**
-- **Menu Printing**: $12,000 (5 locations × $2,400)
-- **Stock Loss Reduction** (15%): $18,000
-- **Centralized Management Savings**: $4,800
-- **Staff Efficiency** (20% increase): $8,000
-- **Time Savings**: $7,200
-- **Revenue Increase with Loyalty** (20%): **$18,000/month = $216,000/year**
-- **New Customers via Referral** (10% increase): **$9,000/month = $108,000/year**
+| Item | Price |
+|---|---:|
+| Licence | ₺2.990 |
+| 2 extra branches (first is free) | ₺7.980 |
+| Inventory & Cost Management | ₺1.490 |
+| Advanced Reports & Analytics | ₺1.290 |
+| Staff Management | ₺990 |
+| **Total, first full year** | **₺14.740** |
 
-**Total Annual Benefit:** $374,000
-**Annual Cost:** $2,399.88
-**Net Gain:** $371,600
-**ROI:** **15,483%**
+Everything not listed above — POS, KDS, QR menu, orders, cash, loyalty, unlimited users and orders — is still ₺0 in each of these cases.
 
 ---
 
-# Success Stories and Use Cases
+# Typical Setups
 
-## Use Case 1: Boutique Cafe - "Coffee Stop"
+The configurations below describe what different kinds of venue actually switch on, and what that costs. They are not customer case studies and contain no projected revenue.
 
-**Before:**
-- 8 tables, 2 baristas
-- Paper orders, frequent errors
-- No stock control, excessive waste
-- No customer tracking
-- Monthly revenue: $4,000
+## Setup 1: Boutique Cafe — 8 tables, 2 baristas
 
-**Transformation with HummyTummy (BASIC Plan):**
-- ✓ Order errors reduced by 90%
-- ✓ Waste reduced by 15% with stock tracking ($60/month savings)
-- ✓ Waiter workload reduced by 30% with QR menu
-- ✓ Customer retention increased by 35% with loyalty program
-- ✓ Average bill increased by 12% (with product recommendations)
+**What they turn on:** the free core only.
 
-**Result:**
-- Monthly revenue: $4,000 → $5,333 (33% increase)
-- Net monthly gain: +$1,300
-- ROI: System paid for itself in the first month
+- POS and tabs on an existing tablet
+- Kitchen display on a spare screen
+- QR menu on the tables, with direct ordering
+- Customers, loyalty tiers and referral codes
+- Cash management and the Z-Report at end of day
 
-**Owner's Comment:**
-> "With HummyTummy, we saved both time and money. I love the loyalty program most - customers constantly ask about their point status and this brings them back!"
+**Annual cost: ₺0.** Unlimited users, tables, products and orders. No credit card on file.
 
-## Use Case 2: Family Restaurant - "Taste Table"
+## Setup 2: Family Restaurant — 20 tables, kitchen and floor staff
 
-**Before:**
-- 20 tables, 5 waiters, 3 chefs
-- Manual kitchen communication, long wait times
-- End-of-day closing takes 1.5 hours
-- Unknown which products sell how much
-- Monthly revenue: $13,333
+**What they turn on:** free core + licence + Inventory + Advanced Reports.
 
-**Transformation with HummyTummy (PRO Plan):**
-- ✓ Order preparation time reduced by 35% with real-time KDS
-- ✓ Table turnover increased (12 → 18 customers per hour)
-- ✓ End-of-day closing reduced to 15 minutes (1.25 hours saved per day)
-- ✓ Best/worst selling products identified with Z-Report
-- ✓ Stock costs reduced by 18% with inventory
-- ✓ Customer ordering speed increased by 40% with QR menu
+- Everything in the free core
+- Recipes, stock counts, purchase orders, waste tracking and supplier records
+- Deep sales/product/staff/customer analytics and the accounting back-office
+- Daily sales exported as CSV for the accountant (part of the Advanced Reports module); Z-Report PDF is free
 
-**Result:**
-- Monthly revenue: $13,333 → $18,000 (35% increase)
-- Operational cost reduced by 15%
-- Net monthly gain: +$3,933
-- Annual ROI: 5,920%
+**Annual cost:** ₺2.990 licence + ₺1.490 inventory + ₺1.290 advanced reports = **₺5.770/year**, on one invoice, one renewal date.
 
-**Owner's Comment:**
-> "Communication between kitchen and waiters was a complete revolution. Orders are no longer lost, customers are much happier. With reports, we optimized our menu and profitability increased by 25%."
+## Setup 3: Multi-Branch Operation — 4 branches
 
-## Use Case 3: Restaurant Chain - "Burger House"
+**What they turn on:** free core + licence + 3 extra branches + Inventory + Advanced Reports + Staff.
 
-**Before:**
-- 4 branches, 80 total tables
-- Different system at each branch, no central tracking
-- Complex stock management
-- Low customer loyalty, high churn
-- Total monthly revenue: $53,333
+- Branch panel and branch switching (free in the core)
+- 3 extra branches beyond the free first one
+- Inter-branch stock transfer inside the Inventory module
+- Attendance, shift planning and shift swaps in the Staff module
+- Optional: API & Webhooks (₺2.490/year) to push data into an existing accounting system
 
-**Transformation with HummyTummy (BUSINESS Plan):**
-- ✓ Track all branches from a single screen with centralized management
-- ✓ Performance comparison between branches
-- ✓ Multi-location loyalty program (valid at all branches)
-- ✓ Accounting system integration via API
-- ✓ Training needs identified with staff performance tracking
-- ✓ Inter-branch stock transfer with inventory optimization
+**Annual cost:** ₺2.990 + ₺11.970 (3 × ₺3.990) + ₺1.490 + ₺1.290 + ₺990 = **₺18.730/year**.
 
-**Result:**
-- Total monthly revenue: $53,333 → $74,667 (40% increase)
-- Operational efficiency increased by 30%
-- Customer retention rate increased by 45%
-- Ready infrastructure for franchise
-- Net monthly gain: +$21,133
+## Setup 4: Delivery-Heavy Kitchen
 
-**Owner's Comment:**
-> "Chain management became much easier with HummyTummy. I instantly see what's happening at which branch. The loyalty program created brand loyalty - customers now identify themselves as 'Burger House customers'."
+**What they turn on:** free core + licence + the delivery platforms actually used.
 
-## Real User Feedback
+- Yemeksepeti, Getir and/or Trendyol Yemek orders land straight in the POS and the kitchen
+- Each platform is a separate ₺2.490/year integration — buy only the ones you sell on
+- Caller-ID (₺1.490/year) recognises a phone customer and opens the order in one click
 
-### ⭐⭐⭐⭐⭐ "Setup was so easy!"
-> "I have no technical knowledge but I set it up and started using it in 2 hours. The interface is very intuitive, staff training only took 15 minutes."
-> - *Michael K., Cafe Owner*
-
-### ⭐⭐⭐⭐⭐ "QR menu is our customers' favorite"
-> "Customers order without waiting for a waiter, and we serve faster. Both customer satisfaction and revenue increased."
-> - *Sarah Y., Restaurant Manager*
-
-### ⭐⭐⭐⭐⭐ "Reports are incredibly detailed"
-> "For the first time, I saw which of our products actually make a profit. We optimized our menu and profitability increased by 20%."
-> - *John D., Business Owner*
-
-### ⭐⭐⭐⭐⭐ "Loyalty program really works"
-> "Our customers come more often to collect points. In 3 months, we had 30% more regular customers thanks to loyalty."
-> - *Emily S., Cafe Operator*
+**Annual cost:** ₺2.990 licence + ₺2.490 per platform.
 
 ---
 
@@ -835,10 +730,9 @@ Net ROI: $79,600 (9,950% return)
 ✓ **Session Management**: 30-day refresh, 7-day access token
 
 ### Data Backup
-✓ **Automatic Backup**: Daily automatic database backup
-✓ **Pre-Production Backup**: Automatic backup before deployment
-✓ **Multi-Region**: Backup copies in different locations
-✓ **Easy Restore**: One-click restore option
+✓ **Scheduled Database Backup**: Compressed dumps taken on a schedule
+✓ **Pre-Deployment Backup**: A backup can be taken as a deployment step
+✓ **Retention**: 14 days on production, 3 days on staging, with older copies pruned automatically
 
 ## Performance and Scalability
 
@@ -856,11 +750,10 @@ Net ROI: $79,600 (9,950% return)
 ✓ **Multi-Tenant**: Data isolation per tenant
 ✓ **Load Balancing**: Ready for load balancing
 
-### Uptime
-✓ **99.9% Uptime Guarantee**: Only 8.7 hours downtime per year
-✓ **Health Checks**: Automatic CI/CD pipeline health check
-✓ **Automatic Failover**: Automatic switchover on failure
-✓ **Monitoring**: 24/7 system monitoring and alert system
+### Availability
+✓ **Blue/Green Deployment**: New versions go live behind a colour switch, so a bad release is rolled back rather than repaired in place
+✓ **Health Checks**: Automated health checks in the deployment pipeline
+✓ **Monitoring**: Prometheus, Alertmanager, Grafana, Loki and blackbox probes, plus Sentry error and performance tracking
 
 ## Cloud-Based Advantages
 
@@ -878,7 +771,7 @@ Net ROI: $79,600 (9,950% return)
 
 ### Hardware Independent
 ✓ No expensive server required
-✓ Simple USB printer sufficient for printer integration
+✓ A standard 58 mm or 80 mm thermal printer is enough
 ✓ You can use your existing devices
 ✓ No system relocation needed when moving
 
@@ -903,7 +796,7 @@ HummyTummy is a cloud-based, modern restaurant management system where restauran
 No. HummyTummy doesn't require technical knowledge with its intuitive interface. Setup and use are very easy. Average learning time is 15-30 minutes.
 
 ### Does it work without internet connection?
-The desktop application offers limited offline support. However, internet connection is recommended for full performance. Even if internet is cut off, data is stored on the device and synchronized when connection is restored.
+No. HummyTummy is a cloud system and needs a connection to take and serve orders. The desktop app talks to local hardware (Bluetooth printer, cash drawer, scale) but is not an offline POS.
 
 ## Setup and Getting Started
 
@@ -922,26 +815,30 @@ Average setup time is 1-2 hours. This includes:
 - **Kitchen Display**: Any screen + computer/tablet
 
 ### Can data be transferred from my current system?
-Yes. BUSINESS plan has data import/export support. Our support team helps you transfer your existing data.
+The menu can be imported rather than retyped — including OCR import from an existing menu with the AI Menu Studio module. On the way out, cashier-session history exports as CSV from the free core, and the daily sales CSV comes with the Advanced Reports module. For anything beyond that, talk to us before you switch.
 
 ## Pricing and Payment
 
-### Is the free plan unlimited?
-Yes. FREE plan is unlimited and free. No credit card information required.
+### Is the free core really free?
+Yes, and it is not a trial. POS, kitchen display, menu, tables and floor plan, QR menu, order management, cash, basic reports, team and roles, customers with loyalty and referral, the device and branch panel, and custom branding and domain are all free indefinitely. Users, tables, products, categories and monthly orders are unlimited. The first branch is free. No credit card is requested.
 
-### How does the trial period work?
-Paid plans (BASIC, PRO, BUSINESS) start with a 14-day free trial. The plan starts automatically after the trial period. You can cancel during the trial period if you wish, no charge is made.
+### Is there a trial period?
+There is no trial period, because there is nothing to trial into. The core does not expire. If you want to look before registering, there is a shared demo restaurant you can open without an account.
+
+### How much do the paid parts cost?
+The licence is ₺2.990/year and is the prerequisite for any paid module. Modules run from ₺990 to ₺2.490/year, delivery-platform integrations are ₺2.490/year each, an extra branch is ₺3.990/year, credit packs are one-time from ₺490, and on-site installation and training is a one-time ₺7.500. Every price includes VAT. The full catalogue is in the Pricing section above.
 
 ### What are the payment methods?
-- Credit card (Visa, Mastercard, American Express)
-- Debit card
-- Monthly or annual payment option
+Card payment through PayTR. No card is stored and nothing is charged automatically.
 
-### What happens if I cancel?
-You can cancel anytime. When you cancel, you continue to use the system until the end of the current period. No refund is made, but all your features remain active for the remaining time.
+### Does it renew automatically?
+No. Renewal is manual by design. Reminders are sent 30, 7 and 1 day before your anniversary, and you choose whether to renew.
 
-### How do I upgrade the plan?
-You can upgrade the plan with one click. The fee you pay is calculated proportionally (unused old plan fee is deducted).
+### What happens if I do not renew?
+You get 7 days of grace after the anniversary. After that, access to the paid modules dims — but **your data is not deleted**. Inventory, reservations, staff records and generated media all come back exactly as they were as soon as you pay. The free core keeps running throughout.
+
+### I bought a module mid-year. Do I pay a full year?
+No. It is prorated to the days remaining until your anniversary, so everything lands on one invoice and one renewal date. If fewer than 14 days remain, the item rolls into the next full cycle instead. No line is charged below ₺1.
 
 ## Features and Usage
 
@@ -954,56 +851,46 @@ You can upgrade the plan with one click. The fee you pay is calculated proportio
 
 ### How does the loyalty program work?
 - Customer orders with phone number
-- Automatically earns points on every $1 spent (1.0x - 2.0x depending on tier)
-- Points are automatically added to account
-- 100 points = $10 discount can be used
-- Tiers: Bronze (1.0x) → Silver (1.2x) → Gold (1.5x) → Platinum (2.0x)
+- Earns 1 point per ₺1 spent, multiplied by the tier (1.0x - 2.0x)
+- Points are automatically added to the account
+- 1 point is worth ₺0.10; the minimum redemption is 100 points (₺10)
+- Tiers by lifetime points: Bronze 1.0x → Silver 1.25x (500) → Gold 1.5x (2,000) → Platinum 2.0x (5,000)
+- It is part of the free core — there is no extra charge for it
 
 ### How is order sequence determined on kitchen screen?
 Orders are listed by entry order. Orders waiting long are automatically highlighted. Kitchen staff marks orders as "Preparing" and "Ready".
 
 ### How can I track staff performance?
-Staff reports are available in PRO and BUSINESS plans:
-- Total sales per person
-- Order counts
-- Average basket value
-- Top-selling staff ranking
+Per-person sales, order counts, average basket and a top-seller ranking come with the Advanced Reports & Analytics module (₺1.290/year + licence). Attendance, shift planning and shift swaps are the separate Staff Management module (₺990/year + licence).
 
 ### Is there printer support?
-Yes. Works with any USB thermal printer (58mm or 80mm). Desktop application offers native printer support.
+Yes, with 58 mm and 80 mm thermal printers. The desktop app adds Bluetooth ESC/POS printing plus cash-drawer and scale support.
 
 ## Security and Privacy
 
 ### Is my data safe?
-Yes. Your data:
+Your data:
 - Is transferred encrypted with SSL/TLS
-- Is stored on secure servers
-- Is backed up daily automatically
-- Is GDPR and KVKK compliant
+- Is isolated per tenant in the database
+- Is covered by scheduled database backups (14-day retention on production)
+- Is handled in line with GDPR and KVKK obligations
 
 ### Who can access the data?
 Only your restaurant authorities (according to user role). Your data is completely isolated from other restaurants. HummyTummy team can only access during your support requests.
 
 ### Is payment information stored?
-No. Payment information is stored by Stripe and PayTR. Credit card information is not stored in HummyTummy.
+No. Card details are handled by PayTR, our payment provider. HummyTummy does not store card numbers, and there is no stored card to charge automatically — renewal is manual.
 
 ## Technical Support
 
 ### How do I get support?
 - **Email**: support@hummytummy.com
-- **Live Chat**: From website (PRO and BUSINESS plans)
-- **Phone**: Dedicated support line in BUSINESS plan
-- **Documentation**: Comprehensive user manual and video tutorials
-
-### What are support hours?
-- **FREE and BASIC**: Weekdays 09:00-18:00 (email)
-- **PRO**: Weekdays 09:00-20:00 + Saturday 10:00-16:00 (email + chat)
-- **BUSINESS**: 24/7 priority support (email + chat + phone)
+- **Documentation**: User manual and video tutorials
+- **Priority Support module** (₺1.990/year + licence): front-of-queue handling with a guaranteed response time
 
 ### Is training provided?
-- All plans: Online documentation and video tutorials
-- PRO and BUSINESS: Live online training (1 hour)
-- BUSINESS: On-site training option (for additional fee)
+- Online documentation and video tutorials for everyone, free
+- **On-site Installation & Training** is a one-time ₺7.500 service: a full day of installation, device commissioning and staff training at your venue
 
 ---
 
@@ -1013,33 +900,33 @@ No. Payment information is stored by Stripe and PayTR. Credit card information i
 
 ### 1. Quick Start
 ✓ 1-hour setup
-✓ 14-day free trial
-✓ No credit card required (FREE plan)
+✓ No credit card, no trial clock — the free core does not expire
+✓ A shared demo restaurant you can open without registering
 ✓ Easy staff training (15-30 minutes)
 
 ### 2. Comprehensive Solution
-✓ POS + KDS + CRM + Loyalty + Inventory + Reports
+✓ POS + KDS + QR menu + CRM + loyalty + Z-Report, all in the free core
+✓ Inventory, reservations, staff, deep analytics and integrations added one at a time
 ✓ Everything in one system
-✓ No integration issues
 ✓ Single support point
 
 ### 3. Modern Technology
-✓ Real-time updates
+✓ Real-time updates over WebSocket
 ✓ Cloud-based access
 ✓ Mobile compatible
 ✓ Automatic updates
 
-### 4. Scalable Pricing
-✓ Start for free
-✓ Grow according to your needs
-✓ Predictable costs
-✓ No hidden fees
+### 4. Honest Pricing
+✓ The core is free and unlimited, indefinitely
+✓ You only pay for what you switch on
+✓ VAT-inclusive lira prices, one invoice, one renewal date
+✓ Manual renewal, no stored card, no hidden fees
 
-### 5. Proven ROI
-✓ Average 25% revenue increase in first 3 months
-✓ 15-20% operational cost reduction
-✓ 1+ hour time savings per day
-✓ 40% increase in customer satisfaction
+### 5. No Lock-In
+✓ Data is never deleted when a module lapses
+✓ Z-Report PDF and cashier-session CSV export with no licence at all
+✓ Unlimited users, tables, products and orders — growth never triggers an upgrade
+✓ First branch free; extra branches priced one by one
 
 ## Get Started Now
 
@@ -1068,15 +955,17 @@ No. Payment information is stored by Stripe and PayTR. Credit card information i
 → Introduce QR menu to customers
 → Monitor results
 
-## Request a Demo
+## Try It Without Registering
 
-Would you like to see a live demo?
+There is a shared demo restaurant, pre-seeded with data, that you can open without an account — no form, no card, no email.
+
+Prefer a walkthrough?
 → 30-minute online demo
-→ Let's see all features
+→ Let's go through the features you care about
 → Let's answer your questions
 
 **Demo Request:** [demo@hummytummy.com](mailto:demo@hummytummy.com)
-**Phone:** +1 XXX XXX XXXX
+**Phone:** [Phone number]
 
 ## Contact
 
@@ -1093,33 +982,20 @@ Web: www.hummytummy.com
 
 ---
 
-## Special Offer!
-
-**Special for restaurants reading this presentation:**
-
-🎁 **20% Off First 3 Months**
-🎁 **Free On-Site Training** (PRO and BUSINESS)
-🎁 **Extra 500 Loyalty Points for First 100 Customers**
-
-**Promo Code:** PRESENTATION2024
-**Valid Until:** [Date]
-
----
-
-# Take Your Restaurant to the Future!
+# Take Your Restaurant Forward
 
 **With HummyTummy:**
-- ✅ Automate operations
-- ✅ Increase customer satisfaction
-- ✅ Maximize your revenue
-- ✅ Get ahead of your competitors
+- ✅ Run the whole venue on a free, unlimited core
+- ✅ Add only the modules you actually need
+- ✅ Keep one invoice, one renewal date, and no stored card
+- ✅ Keep your data, whatever you decide to pay for
 
-**Start today, see the difference tomorrow!**
+**The core is free. You only pay for what you use.**
 
-[**TRY FOR FREE NOW →**](https://hummytummy.com/signup)
+[**START FREE →**](https://hummytummy.com/signup)
 
 ---
 
-*This document contains general information about the HummyTummy system. Features and prices are subject to change without notice. Please visit www.hummytummy.com for the most current information.*
+*This document contains general information about the HummyTummy system. Catalogue prices are VAT-inclusive Turkish lira and are set in the product; they are subject to change. Please visit www.hummytummy.com for the most current information.*
 
-*Last Updated: 2025 | Version: 1.0 | © 2025 HummyTummy Technology Inc. All rights reserved.*
+*Last Updated: August 2026 | © HummyTummy Technology Inc. All rights reserved.*

@@ -968,16 +968,21 @@ export interface TableStatusChangedEvent {
   updatedAt: string;
 }
 
-// Subscription Types
-export enum SubscriptionPlanType {
-  /** Dedicated non-purchasable onboarding plan (7-day full premium). */
-  TRIAL = 'TRIAL',
-  BASIC = 'BASIC',
-  PRO = 'PRO',
-  BUSINESS = 'BUSINESS',
-  /** Retired (onboarding-trial redesign) — tombstone for legacy references. */
-  FREE = 'FREE',
-}
+// Licensing types
+//
+// The product model is "free core + individually purchased annual products":
+// no packages, no tiers, no plans to pick and no trial period. What a tenant
+// can actually do is decided by the folded entitlement set (see
+// `EffectiveFeatures` below), NOT by a plan name.
+//
+// The enums and shapes here mirror LEGACY billing rows that still exist in the
+// database and on the /subscriptions endpoints. Read them; do not build new
+// gating on them.
+//
+// The `SubscriptionPlanType` enum (TRIAL/BASIC/PRO/BUSINESS/FREE) that used to
+// live here was deleted: nothing imported it, and its only in-file use was
+// typing `Plan.name`, which the backend already serves as a plain string
+// (`SubscriptionResponseDto.plan.name`).
 
 export enum SubscriptionStatus {
   ACTIVE = 'ACTIVE',
@@ -985,13 +990,17 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
-  /** Onboarding trial ended without payment — tenant is LOCKED to the
-   *  plan-selection + checkout flow until a paid plan is activated. */
+  /** Legacy terminal state of the retired onboarding trial. Nothing enters it
+   *  any more and nothing locks on it — the old SubscriptionStatusGuard was
+   *  removed when the core became free. Kept because historical rows carry
+   *  the value. */
   TRIAL_ENDED = 'TRIAL_ENDED',
   /** Pre-activation state between PayTR intent and webhook confirmation. */
   PENDING = 'PENDING',
 }
 
+/** Legacy DB enum. The à-la-carte catalogue is annual-only (`annual` /
+ *  `oneTime` on the product row); MONTHLY survives only on historical rows. */
 export enum BillingCycle {
   MONTHLY = 'MONTHLY',
   YEARLY = 'YEARLY',
@@ -1009,63 +1018,101 @@ export enum InvoiceStatus {
   UNCOLLECTIBLE = 'UNCOLLECTIBLE',
 }
 
+/** Numeric `limit.*` keys as folded by the entitlement engine. `-1` means
+ *  unlimited and DOMINATES the SUM fold. */
 export interface PlanLimits {
+  /** Unlimited (-1) in the free core. */
   maxUsers: number;
+  /** Unlimited (-1) in the free core. */
   maxTables: number;
-  /** v3.0.0 — branch cap. FREE/BASIC=1, PRO=3, BUSINESS=-1 (unlimited).
-   *  Mirrors `SubscriptionPlan.maxBranches`; the engine SUMs the
-   *  `extra_branch` add-on grant onto this. */
+  /** The one surviving numeric cap: the free core grants 1 branch, and each
+   *  purchased `extra_branch` capacity unit SUMs +1 on top. */
   maxBranches: number;
+  /** Unlimited (-1) in the free core. */
   maxProducts: number;
+  /** Unlimited (-1) in the free core. */
   maxCategories: number;
+  /** Unlimited (-1) in the free core. */
   maxMonthlyOrders: number;
-  /** AI menu-studio monthly generation caps (calendar month). PHOTO+FRAME
-   *  draw from the photo cap, VIDEO from the video cap. 0 = none (BASIC),
-   *  -1 = unlimited. PRO 50/5, BUSINESS 200/20, TRIAL taster 3/1. */
+  /** Legacy AI quota columns, still mirrored onto this payload from the plan
+   *  row. They no longer decide anything: the AI menu studio now runs on
+   *  PREPAID CREDITS (one-time credit packs, lifetime balance, read inside the
+   *  locked claim transaction — never from the entitlement cache). Read the
+   *  credit balance, not these. */
   maxMonthlyAiPhotos: number;
   maxMonthlyAiVideos: number;
-  /** Meshy 3D models / month — own pool (a model is ~9× a photo's cost).
-   *  TRIAL 1, PRO 10, BUSINESS 30. */
   maxMonthlyAi3dModels: number;
 }
 
+/**
+ * The `feature.*` capability flags as folded by the entitlement engine (OR
+ * across every source), NOT a per-plan feature list — there are no plans.
+ *
+ * A flag is `true` because the free core grants it unconditionally, or because
+ * the tenant holds the annual product that grants it. Every paid product also
+ * needs the annual HummyTummy licence to be active.
+ */
 export interface PlanFeatures {
+  /** Paid — "Gelişmiş Rapor" module (`advanced_reports`). */
   advancedReports: boolean;
+  /** FREE core — the branch hub, picker and switcher. Multi-branch is not the
+   *  paid thing; the SECOND branch is (`extra_branch` capacity, which grants
+   *  this flag too). */
   multiLocation: boolean;
+  /** FREE core — custom brand + own domain. */
   customBranding: boolean;
+  /** Paid — "API & Webhook" module (`api_access`). */
   apiAccess: boolean;
+  /** Paid — "Öncelikli Destek" module (`priority_support`). */
   prioritySupport: boolean;
+  /** Paid — "Stok & Maliyet" module (`module_inventory`). */
   inventoryTracking: boolean;
+  /** FREE core — the kitchen display. */
   kdsIntegration: boolean;
+  /** Paid — "Rezervasyon" module (`module_reservations`). */
   reservationSystem: boolean;
+  /** Paid — "Personel" module (`module_personnel`). */
   personnelManagement: boolean;
-  /** Delivery-platform (Yemeksepeti, Getir, etc.) integration — added
-   *  to backend SubscriptionPlan schema; the frontend type was lagging. */
+  /** Paid — set by any delivery-platform integration product (Yemeksepeti,
+   *  Getir, Trendyol Yemek). Which vendors are actually connected lives in
+   *  `EffectiveFeatures.integrations.delivery`, not here. */
   deliveryIntegration: boolean;
-  /** v3.0.0 — POS access. Tier-gated BASIC+; FREE post-trial loses POS.
-   *  `<FeatureGate feature="posAccess">` wraps the /pos route and the
-   *  sidebar item; pos-settings endpoints also gate server-side. */
+  /** FREE core — the POS / tab screen. `<FeatureGate feature="posAccess">`
+   *  still wraps the /pos route, but the free baseline grants this to every
+   *  tenant unconditionally, so it passes for everyone. */
   posAccess: boolean;
-  /** Partner Display API — lets third-party apps/screens (a partner's table
-   *  tablet) browse the menu, order, self-pay and watch order status live via
-   *  a tenant-issued API key. Gates the /admin/settings/partner-keys page and
-   *  the /v1/partner/* + /v1/display/* backend surface. */
+  /** Paid — "Partner Ekran API" module (`module_external_display`). Lets
+   *  third-party apps/screens browse the menu, order, self-pay and watch order
+   *  status live via a tenant-issued API key. Gates the
+   *  /admin/settings/partner-keys page and the /v1/partner/* + /v1/display/*
+   *  backend surface. */
   externalDisplay: boolean;
-  /** AI menu studio (photo/frame/video generation, Meshy 3D, OCR menu
-   *  import). PRO+ only; monthly caps live in PlanLimits.maxMonthlyAiPhotos /
-   *  maxMonthlyAiVideos / maxMonthlyAi3dModels. Gates the AI Studio panel +
-   *  the generate endpoints server-side. */
+  /** Paid — "AI Menü Stüdyosu" module (`module_ai_studio`). Opens the panel
+   *  and the generate endpoints; what you can actually spend is the prepaid
+   *  credit balance, not a monthly quota. */
   aiContentGeneration: boolean;
 }
 
+/**
+ * A legacy `SubscriptionPlan` row as served by `GET /subscriptions/plans`.
+ *
+ * RETIRED as a product concept: nothing is sold as a plan any more and no UI
+ * offers one. Kept as the response shape for the endpoints that still read
+ * these rows. To decide what a tenant may do, read `EffectiveFeatures`.
+ */
 export interface Plan {
   id: string;
-  name: SubscriptionPlanType;
+  /** Legacy row identifier (historically TRIAL/BASIC/PRO/BUSINESS/FREE).
+   *  A plain string, exactly as the backend serves it — do not branch on it. */
+  name: string;
   displayName: string;
   description?: string;
+  /** Legacy row pricing. Live pricing is the à-la-carte catalogue: annual
+   *  products + one-time items, VAT-inclusive kuruş, TRY only. */
   monthlyPrice: number;
   yearlyPrice: number;
   currency: string;
+  /** Legacy column. There is no trial period in the product. */
   trialDays: number;
   limits: PlanLimits;
   features: PlanFeatures;
@@ -1093,21 +1140,27 @@ export interface EffectiveFeatures {
   /**
    * v2.8.88 — integration grants from the entitlement engine. Keys are
    * the domain (delivery, fiscal, caller, …); values are the vendor
-   * lists granted by plan + add-ons (e.g. `['yemeksepeti', 'getir']`
-   * after the Yemeksepeti add-on lands). The frontend reads this map
-   * via `useSubscription().hasIntegration(domain, vendor?)`.
+   * lists granted by the integration products the tenant holds (e.g.
+   * `['yemeksepeti', 'getir']` once both are bought). The frontend reads
+   * this map via `useSubscription().hasIntegration(domain, vendor?)`.
    *
    * Optional because brand-new tenants whose projector hasn't run yet
    * may not have any integration row. Treat missing as "no vendors".
    */
   integrations?: Record<string, string[]>;
   /**
-   * Plan IDs the tenant hasn't yet trialed and can still claim a free
-   * 14-day trial on. UI uses this to badge plan cards.
+   * Legacy field, still computed by the endpoint over the retired plan rows.
+   * There is no trial period in the product, so nothing here is claimable —
+   * ignore it and never render a badge or offer from it.
    */
   trialEligiblePlanIds?: string[];
 }
 
+/**
+ * A legacy `Subscription` row. Nothing new lands here: purchases go through
+ * the Marketplace checkout rail and are held as products with a single shared
+ * anniversary, renewed manually.
+ */
 export interface Subscription {
   id: string;
   tenantId: string;
@@ -1120,6 +1173,8 @@ export interface Subscription {
   currentPeriodEnd: string;
   cancelledAt?: string;
   endedAt?: string;
+  /** Legacy columns from the retired trial. Always false / absent on
+   *  anything created today. */
   isTrialPeriod: boolean;
   trialStart?: string;
   trialEnd?: string;
@@ -1158,7 +1213,9 @@ export interface Invoice {
 export interface CreateSubscriptionDto {
   planId: string;
   billingCycle: BillingCycle;
-  paymentMethodId?: string; // Optional: For Stripe payment method
+  /** Legacy field. Collection is PayTR-only and card details never reach this
+   *  API, so the backend DTO has no such property and ignores it. */
+  paymentMethodId?: string;
 }
 
 export interface UpdateSubscriptionDto {

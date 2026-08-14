@@ -1,6 +1,6 @@
 ---
 title: Marketplace
-description: HummyTummy Marketplace add-on catalogue — capacity packs, integrations, software features, and services.
+description: The HummyTummy Marketplace catalogue — licence, modules, integrations, capacity, credits, and services.
 ---
 
 import { Callout, Cards } from 'nextra/components'
@@ -8,68 +8,87 @@ import { Callout, Cards } from 'nextra/components'
 # Marketplace
 
 **Menu path:** Side menu → Marketplace &nbsp;•&nbsp; **URL:** `/admin/marketplace`
-**Access:** ADMIN, MANAGER (purchase confirmation is ADMIN-only) • **Plan:** All plans
+**Access:** ADMIN, MANAGER (purchase confirmation is ADMIN-only) • **Module required:** None — the Marketplace is part of the free core
 
-The Marketplace is the catalogue of add-ons you can buy **individually** on top
-of your plan. A plan gives you a feature and limit baseline; add-ons **raise**
-that baseline: an extra KDS screen, an extra branch, an e-Fatura integration,
-advanced reports, and so on.
+The Marketplace is the catalogue of items you can buy **individually** on top of
+the free core. The core (POS, KDS, menu, tables, QR menu, cash, basic reports,
+team management) is free forever; here you buy only the **module**,
+**integration**, **capacity**, **credit pack**, or **service** you actually need.
 
-The Marketplace screen is open on every plan. Each card shows what the add-on
-does, its price (₺), and whether it's recurring or a one-time service. When you
-buy an add-on, the entitlement it grants (for example one extra KDS screen or a
-new integration) is **added to your account automatically** — the related
-limit/feature becomes usable in the panel right away.
+Each card shows what the item does, its price (₺), and whether it is annual or
+one-time. When you buy, the entitlement it grants (for example one extra branch
+or a new integration) is **added to your account automatically** — the related
+feature becomes usable in the panel right away.
 
-<Callout type="info">
-  All prices are in **TRY** and add-on prices are shown **KDV-inclusive**.
-  Payments are collected through PayTR.
+<Callout type="warning">
+  The **HummyTummy Licence** is the prerequisite for every paid module: you need
+  it both to buy one and to use it. Add a module to your cart without a licence
+  and the screen asks you to add the licence first (`LICENSE_REQUIRED`). Credit
+  packs and on-site setup need no licence; AI credits do depend on **AI Menu
+  Studio** and SMS credits on **SMS Notifications**.
 </Callout>
 
-## Browse the add-ons
+<Callout type="info">
+  All prices are in **TRY** and shown **KDV-inclusive**. Payments are collected
+  through PayTR. Annual items are priced pro rata for the days left until your
+  anniversary — see [Purchase Flow](/en/marketplace/purchase-flow).
+</Callout>
+
+## Browse the catalogue
 
 <Cards>
   <Cards.Card title="Purchase Flow" href="/en/marketplace/purchase-flow" arrow>
-    Add to cart → pay → entitlements activate. Cancellation and period-end behaviour.
+    Add to cart → pay → entitlements activate. Renewal and cancellation behaviour.
   </Cards.Card>
-  <Cards.Card title="Products (Add-on Details)" href="/en/marketplace/products" arrow>
-    Per add-on: what it does, price, what it grants, recurring vs one-time, dependency.
+  <Cards.Card title="Products (Catalogue Details)" href="/en/marketplace/products" arrow>
+    Per item: what it does, price, what it grants, annual vs one-time, dependency.
   </Cards.Card>
-  <Cards.Card title="Plans" href="/en/plans" arrow>
-    The base plans add-ons stack on top of (BASIC / PRO / BUSINESS).
+  <Cards.Card title="Licence & Pricing" href="/en/plans" arrow>
+    What the free core covers, plus the licence and billing rules.
   </Cards.Card>
 </Cards>
 
 ## Catalogue summary
 
-Every add-on you can buy at a glance. For each add-on's details, what it grants,
+Every item you can buy at a glance. Prices are **TRY, KDV-inclusive**; annual
+items cover one licence cycle (a year). For each item's details, what it grants,
 and how to buy it, see the [Products](/en/marketplace/products) page.
 
 | Name | Kind | Billing | Price | What it does |
 | --- | --- | --- | --- | --- |
-| Extra KDS screen | Capacity | Recurring | ₺99.00 | One extra kitchen display slot for your branch |
-| Extra KDS station | Capacity | Recurring | ₺149.00 | One extra routing station (bar / grill / dessert) |
-| Extra waiter tablet | Capacity | Recurring | ₺79.00 | Raises your waiter-tablet limit by one |
-| Extra branch | Capacity | Recurring | ₺399.00 | One extra branch + the multi-location feature |
-| e-Fatura / e-Arşiv | Integration | Recurring | ₺199.00 | Tax-compliant electronic invoicing |
-| Hugin yazarkasa | Integration | Recurring | ₺299.00 | Hugin fiscal-device integration (requires PRO plan) |
-| Yemeksepeti | Integration | Recurring | ₺249.00 | Yemeksepeti orders straight into your KDS |
-| Getir Yemek | Integration | Recurring | ₺249.00 | Getir Yemek orders straight into your KDS |
-| Trendyol Yemek | Integration | Recurring | ₺249.00 | Trendyol Yemek orders straight into your KDS |
-| Caller ID / phone-order | Integration | Recurring | ₺149.00 | Auto-opens a customer card on inbound calls |
-| Advanced reports | Software | Recurring | ₺129.00 | Cohort analysis, custom & scheduled reports |
-| API access | Software | Recurring | ₺249.00 | Public API key + outbound webhooks |
-| Priority support | Support | Recurring | ₺199.00 | 24-hour SLA on critical tickets |
-| On-site setup | Support | **One-time** | ₺7,500.00 | A technician visits, installs, and trains your staff |
+| HummyTummy Licence | Licence | Annual | ₺2,990.00 | The prerequisite for paid modules; sets your anniversary |
+| Advanced Reports & Analytics | Module | Annual | ₺1,290.00 | Detailed sales/product/staff/customer analytics and the accounting back-office |
+| Inventory & Cost Management | Module | Annual | ₺1,490.00 | Recipes, stock counts, purchase orders, waste, suppliers, inter-branch transfers |
+| Reservation System | Module | Annual | ₺990.00 | Booking calendar, availability engine and an online reservation page |
+| Staff Management | Module | Annual | ₺990.00 | Attendance, shift planning and performance tracking |
+| AI Menu Studio | Module | Annual | ₺1,990.00 | AI image/video/3D generation and OCR menu import (generations use credits) |
+| API & Webhook Access | Module | Annual | ₺2,490.00 | REST API keys + outbound webhooks |
+| Partner Display API | Module | Annual | ₺1,990.00 | Per-screen API so third-party displays can show your menu |
+| Priority Support | Module | Annual | ₺1,990.00 | Front-of-queue support with a guaranteed response time |
+| Yemeksepeti Integration | Integration | Annual | ₺2,490.00 | Yemeksepeti orders flow automatically into the POS and kitchen |
+| Getir Integration | Integration | Annual | ₺2,490.00 | Getir orders flow automatically into the POS and kitchen |
+| Trendyol Yemek Integration | Integration | Annual | ₺2,490.00 | Trendyol Yemek orders flow automatically into the POS and kitchen |
+| e-Invoice (Nilvera) | Integration | Annual | ₺1,990.00 | Sales invoices filed as e-Fatura / e-Arşiv through Nilvera |
+| Fiscal Printer (Hugin) | Integration | Annual | ₺2,990.00 | Integrated receipt printing and fiscal report sync with a Hugin device |
+| Caller-ID Integration | Integration | Annual | ₺1,490.00 | Recognise the caller and open an order in one click |
+| SMS Notifications | Integration | Annual | ₺990.00 | Order/reservation/campaign SMS (sends use credits) |
+| Extra Branch | Capacity | Annual / unit | ₺3,990.00 | One extra branch (the first branch is free, up to 100 branches) |
+| 100 AI Image Credits | Credits | **One-time** | ₺690.00 | 100 AI image generations — no expiry, valid until consumed |
+| 20 AI Video Credits | Credits | **One-time** | ₺890.00 | 20 AI video generations — no expiry, valid until consumed |
+| 10 AI 3D Model Credits | Credits | **One-time** | ₺790.00 | 10 AI 3D model generations — no expiry, valid until consumed |
+| 500 SMS Credits | Credits | **One-time** | ₺490.00 | 500 SMS sends — no expiry, valid until consumed |
+| On-site Installation & Training | Service | **One-time** | ₺7,500.00 | A technician visits, installs, and trains your staff |
 
 <Callout type="warning">
-  **On-site setup** is a service line: it is paid and invoiced but does not add an
-  entitlement (a limit or feature) to your account. It is one-time, not recurring.
+  **On-site Installation & Training** is a service line: it is paid and invoiced
+  but does not add an entitlement (a limit or feature) to your account. It is
+  one-time, not annual.
 </Callout>
 
 <Callout type="info">
-  The **Hugin yazarkasa** add-on requires the **PRO** plan. If you are not on PRO,
-  the screen routes you to upgrade your plan first when you try to buy it.
+  **Credits** are bought once, never expire, and stay valid until consumed. AI
+  credits depend on **AI Menu Studio** and SMS credits on **SMS Notifications** —
+  you need that item first (or in the same cart).
 </Callout>
 
 ---

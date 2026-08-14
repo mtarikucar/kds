@@ -148,7 +148,7 @@ export default function BranchesPage() {
                 <p className="text-sm text-amber-800">
                   {t('hummytummy.branches.atLimitHint', {
                     defaultValue:
-                      'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
+                      'İlk şube ücretsizdir. Yeni şube açmak için Ek Şube kalemini alın (3.990₺/yıl, lisans ön koşuluyla).',
                   })}
                 </p>
               </div>
@@ -207,7 +207,7 @@ export default function BranchesPage() {
               atLimit
                 ? t('hummytummy.branches.atLimitHint', {
                     defaultValue:
-                      'Branch limit reached. Upgrade your plan or buy the extra-branch add-on to add more.',
+                      'İlk şube ücretsizdir. Yeni şube açmak için Ek Şube kalemini alın (3.990₺/yıl, lisans ön koşuluyla).',
                   })
                 : undefined
             }

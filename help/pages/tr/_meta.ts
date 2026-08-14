@@ -2,7 +2,7 @@ export default {
   "index": "Ana Sayfa",
   "getting-started": "Başlangıç",
   "admin-guide": "Yönetici Rehberi",
-  "plans": "Planlar",
+  "plans": "Lisans ve Modüller",
   "marketplace": "Marketplace",
   "desktop": "Desktop Uygulaması",
   "developer-portal": {

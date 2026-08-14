@@ -83,7 +83,7 @@ const OBJECTIONS = [
   "Teslimat platformlarıyla kopuk entegrasyon",
 ];
 const ANSWERS = [
-  "7 gün ücretsiz, kredi kartı gerekmez",
+  "Çekirdek süresiz ücretsiz, kredi kartı gerekmez",
   "Dakikalar içinde kurulum, sezgisel arayüz",
   "Her cihazın tarayıcısında, bulutta çalışır",
   "Yemeksepeti/Getir/Trendyol/Migros tek panelde",
@@ -150,6 +150,7 @@ export default function LandingPage() {
               </strong>{" "}
               bulutta birleştiren restoran yönetim sistemidir. Kurulum yok, her
               cihazda çalışır, dakikalar içinde sipariş almaya başlarsınız.
+              Çekirdek özellikler süresiz ücretsizdir.
             </p>
             <div
               data-rise
@@ -160,7 +161,7 @@ export default function LandingPage() {
                 to="/register"
                 className="group inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-[#ea580c]"
               >
-                7 Gün Ücretsiz Başla
+                Ücretsiz Başla
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
               <Link
@@ -216,7 +217,7 @@ export default function LandingPage() {
                 className="text-[13px] font-extrabold leading-tight"
                 style={display}
               >
-                7 GÜN
+                SÜRESİZ
                 <br />
                 ÜCRETSİZ
               </span>
@@ -493,15 +494,16 @@ export default function LandingPage() {
       <Section
         id="fiyatlar"
         eyebrow="Fiyatlandırma"
-        title="Şeffaf ve esnek planlar"
-        subtitle="7 gün ücretsiz deneyin; sonra işletmenize uygun planı seçin. Fiyatlar TRY ve KDV dahildir."
+        title="Çekirdek ücretsiz. Sadece kullandığınızı ödeyin."
+        subtitle="Restoranı çalıştıran her şey süresiz ücretsiz ve sınırsız; ihtiyaç duyduğunuz modülleri tek tek, yıllık olarak eklersiniz. Fiyatlar TRY ve KDV dahildir."
       >
         <div className="mt-8 text-center">
           <Link
             to="/fiyatlandirma"
             className="inline-flex items-center gap-2 text-sm font-semibold text-[#f97316] hover:text-[#ea580c]"
           >
-            Tüm plan karşılaştırmasını gör <ArrowRight className="h-4 w-4" />
+            Ücretsiz çekirdeği ve modül fiyatlarını gör{" "}
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </Section>

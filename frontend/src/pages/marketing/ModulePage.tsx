@@ -69,7 +69,7 @@ export default function ModulePage() {
                 to="/register"
                 className="group inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-[#ea580c]"
               >
-                7 Gün Ücretsiz Başla
+                Ücretsiz Başla
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </Link>
               <Link

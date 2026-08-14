@@ -1,6 +1,6 @@
 ---
 title: Webhooks
-description: Receive order, payment, and subscription events as HMAC-SHA256–signed POSTs to your endpoint.
+description: Receive order, payment, and product/renewal events as HMAC-SHA256–signed POSTs to your endpoint.
 ---
 
 import { Callout, Steps, Tabs } from 'nextra/components'
@@ -9,14 +9,18 @@ import { Callout, Steps, Tabs } from 'nextra/components'
 
 When an event happens in your tenant, HummyTummy POSTs an HMAC-SHA256–signed
 HTTP request to your registered endpoint. This lets you react instantly to
-order, payment, and subscription events without polling.
+order, payment, and product/renewal events without polling.
 
 All paths are under the `/api` global prefix.
 
 <Callout type="warning">
-  Webhook subscriptions require the **API access** feature: the BUSINESS plan or
-  the `api_access` (apiAccess) add-on. Subscription endpoints expect a staff JWT
-  with the **ADMIN role**; if the feature is disabled they return `403`.
+  Webhook subscriptions require the **API access** entitlement
+  (`feature.apiAccess`), which is unlocked by the **API & Webhook Access**
+  module (`api_access`, annual, licence prerequisite). The subscription
+  endpoints expect a staff JWT with the **ADMIN role**; without the entitlement
+  they return `403` `ENTITLEMENT_REQUIRED`, and the envelope carries the product
+  that unlocks it along with its price — see the
+  [Entitlement Matrix](/en/reference/plan-matrix).
 </Callout>
 
 ## Subscribe
@@ -219,11 +223,18 @@ Example publishable types:
 | `payment.succeeded.v1` | A payment succeeded |
 | `payment.intent_created.v1` | A payment intent was created |
 | `payment.refund_completed.v1` | A refund completed |
-| `checkout.completed.v1` | A checkout completed |
-| `subscription.activated.v1` | A subscription activated |
-| `subscription.upgraded.v1` | A subscription was upgraded |
-| `subscription.cancelled.v1` | A subscription was cancelled |
-| `feature.entitlement.changed.v1` | A feature entitlement changed |
+| `checkout.completed.v1` | A checkout completed (mixed cart provisioned) |
+| `addon.purchased.v1` | A catalog product was bought or renewed |
+| `addon.cancelled.v1` | A product was cancelled |
+| `addon.past_due.v1` | A product's paid period ended; the 7-day grace window started |
+| `renewal.reminder.v1` | 30 / 7 / 1 days left to the anniversary |
+| `feature.entitlement.changed.v1` | The entitlement set changed |
+
+<Callout type="info">
+  The `subscription.*` types remain in the event vocabulary, but with the plan
+  rail retired no paid lifecycle produces them any more. New integrations should
+  listen for `addon.*`, `renewal.*` and `checkout.completed.v1`.
+</Callout>
 
 ### Blocked events
 

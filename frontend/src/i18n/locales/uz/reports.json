@@ -229,7 +229,7 @@
     "tabVariance": "Sarf farqi",
     "tabRecipes": "Retsept xarajatlari",
     "menuTitle": "Menyu foydaliligi",
-    "upgradeRequired": "Menyu muhandisligi uchun Kengaytirilgan hisobotlar funksiyasi kerak — tarifingizni yangilang.",
+    "upgradeRequired": "Menyu muhandisligi uchun Kengaytirilgan hisobot va tahlil moduli kerak (yiliga 1290 ₺, litsenziya sharti bilan).",
     "uncosted": "{{count}} sotilgan mahsulotning tannarxi belgilanmagan — tasniflab bo‘lmagani uchun jadvalda ko‘rinmaydi. Retsept/tannarx kiriting.",
     "headProduct": "Mahsulot",
     "headUnits": "Soni",

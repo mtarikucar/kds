@@ -198,7 +198,7 @@ export default function CorporatePage() {
 
       <CtaBand
         title="Bizimle çalışmak ister misiniz?"
-        subtitle="İşletmeniz için HummyTummy’yi 7 gün ücretsiz deneyin; sorunuz olursa Türkçe destek ekibimiz yanınızda."
+        subtitle="HummyTummy’nin çekirdeği süresiz ücretsiz: hesabınızı bugün açın, ücretli modülleri isterseniz sonra ekleyin. Sorunuz olursa Türkçe destek ekibimiz yanınızda."
       />
     </MarketingLayout>
   );

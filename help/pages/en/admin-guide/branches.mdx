@@ -9,31 +9,33 @@ import { Callout } from 'nextra/components'
 
 **Menu path:** Multi-Branch → Branches &nbsp;•&nbsp; **URL:** `/admin/branches`
 **Access:** ADMIN, MANAGER
-**Plan:** `multiLocation` — **Professional (PRO)** and above (or the `extra_branch` add-on)
+**Requires:** The branch hub (`multiLocation`) is included in the free core; **the second branch onwards** needs the **Extra Branch** item (₺3,990/year each, with the licence as a prerequisite)
 
 ## Purpose
 
 The Branches screen manages **all the branches in your restaurant chain** from one panel. Each branch has its own tables, menu, orders and reports; the manager switches between branches and sees the consolidated picture.
 
 <Callout type="info">
-  Multi-branch is unlocked on **Professional (PRO)** and higher plans. PRO gives **3
-  branches**, Enterprise (BUSINESS) gives **unlimited**. To add an extra branch without
-  moving up to PRO, you can buy the **`extra_branch`** marketplace add-on (each one raises
-  the branch limit). Full limits: **[Plans](/en/plans)**.
+  The branch hub, the branch picker and per-branch reporting are **included in the free
+  core** — what you pay for is not the multi-branch UI but **the second branch itself**.
+  The **first branch is free**; every additional branch is an **Extra Branch** item
+  (₺3,990/year each, up to 100), and each one raises your branch limit by one. Like every
+  paid item it unlocks with the **HummyTummy Licence (₺2,990/year)** as a prerequisite.
+  Price list: **[Plans](/en/plans)**.
 </Callout>
 
 ## What's on the screen
 
-- **Usage badge:** "X / Y branches" — how many branches you use and your limit. Unlimited shows as **∞**.
+- **Usage badge:** "X / Y branches" — how many branches you use and your limit (1 in the free core; +1 per Extra Branch unit).
 - **Branch list:** each branch's name, code, timezone and **status** (active / suspended / archived).
-- **Add branch:** create a new branch with a name, code and timezone (default `Europe/Istanbul`). At the limit, adding is **locked** and an add-on prompt appears.
+- **Add branch:** create a new branch with a name, code and timezone (default `Europe/Istanbul`). At the limit, adding is **locked** and an Extra Branch purchase prompt appears.
 
 ## Branch scope
 
 HummyTummy filters every branch-scoped request by the active branch. Use the **branch picker (BranchPicker)** in the top bar to change the branch you're working on; screens like POS, tables, orders and stock then show that branch's data. Switching branches clears the cache — the previous branch's data can't bleed through.
 
 <Callout type="warning">
-  Some screens are **tenant-wide** (not tied to a branch): profile, subscription/plan,
+  Some screens are **tenant-wide** (not tied to a branch): profile, licence & modules,
   billing, and so on. These screens are unaffected by the branch selection.
 </Callout>
 
@@ -41,9 +43,9 @@ HummyTummy filters every branch-scoped request by the active branch. Use the **b
 
 The "Multi-Branch" menu also contains:
 
-- **Devices** (`/admin/devices`) — branch-bound POS/printer/screen devices. (Accessible on all plans.)
-- **Bridges** (`/admin/bridges`) — local hardware bridges. (Shown/hidden by `multiLocation`.)
-- **Health** (`/admin/health`) — system/branch health status. (On all plans.)
+- **Devices** (`/admin/devices`) — branch-bound POS/printer/screen devices. (Included in the free core.)
+- **Bridges** (`/admin/bridges`) — local hardware bridges. (Included in the free core.)
+- **Health** (`/admin/health`) — system/branch health status. (Included in the free core.)
 
 ## Tips
 
@@ -54,5 +56,5 @@ The "Multi-Branch" menu also contains:
 ## Related screens
 
 - **[Reports & Analytics](/en/admin-guide/reports)** — comparison via the branch filter.
-- **[Plans](/en/plans)** — branch limits and the `extra_branch` add-on.
-- **[Marketplace](/en/marketplace)** — extra branches and other add-ons.
+- **[Plans](/en/plans)** — branch limits and the Extra Branch price.
+- **[Marketplace](/en/marketplace)** — extra branches, modules and integrations.

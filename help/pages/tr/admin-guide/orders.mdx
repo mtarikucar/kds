@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components'
 
 **Nerede yönetilir:** **[POS](/tr/admin-guide/pos)** (`/pos`) ve **[Mutfak Ekranı](/tr/admin-guide/kitchen)** (`/kitchen`)
 **Erişim:** ADMIN, MANAGER, WAITER, KITCHEN (role göre)
-**Plan:** Sipariş alma POS gerektirir (`posAccess`, BASIC+); mutfak akışı tüm planlarda
+**Gereksinim:** Ücretsiz çekirdeğe dahildir — POS (`posAccess`), mutfak akışı ve aylık sipariş sayısı sınırsızdır
 
 ## Amacı
 
@@ -41,7 +41,7 @@ Bir sipariş şu durumlardan geçer:
 | --- | --- |
 | `DINE_IN` | Masada (içeride) servis |
 | `TAKEAWAY` | Gel-al |
-| `DELIVERY` | Adrese teslim (delivery entegrasyonu) |
+| `DELIVERY` | Adrese teslim (teslimat platformu entegrasyonu — ayrı satın alınır) |
 | `COUNTER` | Masasız self-pay / tezgah siparişi (Z-raporda ayrı gruplanır) |
 
 ## QR menü onay kuyruğu ve istekler
