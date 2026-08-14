@@ -84,18 +84,19 @@ describe('TenantsService.updateSettings', () => {
     expect(prisma.tenant.update as any).not.toHaveBeenCalled();
   });
 
-  it('falls back to the plan column when the engine has no boolean grant', async () => {
-    (prisma.tenant.findUnique as any)
-      // 1st: load tenant
-      .mockResolvedValueOnce(activeTenant())
-      // 2nd: plan-fallback lookup inside validateSubdomainChangePermission
-      .mockResolvedValueOnce({ currentPlan: { customBranding: false } });
-    // engine returns a non-boolean (projector race) => fall through to plan
+  it('falls back to the free baseline when the engine has no boolean grant', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue(activeTenant());
+    // Engine returns a non-boolean (projector race). The fallback used to read
+    // `currentPlan.customBranding`, which 20260811120000_free_core turned into
+    // a guaranteed false by nulling every currentPlanId — so covering for a
+    // race meant denying a FREE feature. customBranding is in
+    // FREE_BASELINE_GRANTS, so the race must resolve to "allowed".
     entitlements.getForTenant.mockResolvedValue({ features: {} });
 
     await expect(
       svc.updateSettings(tenantId, { subdomain: 'newsub' } as any),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).resolves.not.toThrow();
+    expect(prisma.tenant.update as any).toHaveBeenCalled();
   });
 
   it('rejects a subdomain change to a quarantined subdomain with Conflict', async () => {
