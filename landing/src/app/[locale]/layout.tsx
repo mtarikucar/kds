@@ -5,6 +5,7 @@ import { getMessages, setRequestLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
 import { locales, localeConfig, type Locale } from '@/i18n/config';
 import { FloatingMascot } from '@/components/FloatingMascot';
+import { WebChatWidget } from '@/components/WebChatWidget';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
@@ -146,6 +147,7 @@ export default async function LocaleLayout({ children, params }: Props) {
           {children}
           <FloatingMascot />
         </NextIntlClientProvider>
+        <WebChatWidget />
       </body>
     </html>
   );
