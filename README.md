@@ -593,6 +593,18 @@ VITE_API_URL=https://api.yourdomain.com
 VITE_WS_URL=https://api.yourdomain.com
 ```
 
+**Landing (.env):**
+```env
+NEXT_PUBLIC_BASE_URL=https://hummytummy.com
+NEXT_PUBLIC_API_URL=https://api.hummytummy.com
+
+# Web-chat launcher. Both have working defaults, so production needs no
+# wiring. Set the key to an EMPTY string on staging/preview so test traffic
+# does not open real conversations in the shared inbox.
+NEXT_PUBLIC_WEBCHAT_WIDGET_KEY=wc_...
+NEXT_PUBLIC_WEBCHAT_HOST=https://jeetagrowth.com
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
