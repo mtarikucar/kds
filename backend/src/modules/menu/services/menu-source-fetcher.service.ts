@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios from "axios";
+import * as http from "node:http";
+import * as https from "node:https";
 import {
   assertPublicHttpUrl,
   UnsafeUrlError,
@@ -19,16 +21,31 @@ export interface FetchedSource {
  *
  * This is the one place in the menu module that makes the SERVER talk to an
  * address a USER chose, so it is the whole SSRF surface of the feature.
- * assertPublicHttpUrl runs THREE times, not once:
- *   1. on entry, against the (possibly Sheets-normalised) target,
- *   2. again immediately before the axios.get call,
- *   3. and once more on the final URL, when a redirect actually moved us.
- * Checks 1 and 2 both look safe today, but a malicious DNS server can answer
- * public at validation time and private at connect time — the second check
- * narrows that rebind window rather than trusting the first result to still
- * hold a moment later. Check 3 exists because a redirect can walk us
- * somewhere neither of the first two ever saw. That shape is copied from the
- * outbound-webhook worker, which solved the same problem first.
+ *
+ * axios is never allowed to follow a redirect itself (`maxRedirects: 0`).
+ * If it did, all hops would be resolved and connected to before `fetch()`
+ * ever saw a URL to validate — the guard would only ever see where the
+ * chain ended, after the damage (a live request to whatever the chain
+ * pointed at, including any private intermediate hop) was already done.
+ * Instead this method walks the chain itself: on every hop it validates
+ * the URL with `assertPublicHttpUrl`, pins the connection to the IP that
+ * call just resolved, and only then makes the request for that hop. A
+ * redirect Location header is read, resolved, and fed back through the
+ * same guard-then-connect step before it is ever requested — so a chain
+ * like `evil.test → internal-host → evil.test/done` is caught at its
+ * middle hop instead of looking clean because its last hop is public.
+ *
+ * Pinning matters because validating a hostname and connecting to it are
+ * two different DNS resolutions unless we force them to be the same one:
+ * a malicious DNS server can hand back a public IP to `assertPublicHttpUrl`
+ * and a private one to whatever resolves the connection a moment later
+ * (DNS rebinding). `assertPublicHttpUrl` already resolves the hostname to
+ * decide it's safe, so its `resolvedIp` is threaded into a per-request
+ * `http.Agent`/`https.Agent` whose `lookup` hands that same IP back —
+ * there is no second, unvalidated resolution left to rebind. The request
+ * still carries the real hostname (Host header / TLS SNI), only the
+ * low-level socket target is overridden, so vhosts and certificate
+ * matching keep working normally.
  */
 @Injectable()
 export class MenuSourceFetcher {
@@ -50,57 +67,81 @@ export class MenuSourceFetcher {
   }
 
   async fetch(rawUrl: string): Promise<FetchedSource> {
-    const target = normaliseGoogleSheets(rawUrl);
-
-    // Check 1 — validate on entry.
-    await this.guard(target);
-
-    // Check 2 — validate again immediately before the socket opens. Nothing
-    // observable happens between checks 1 and 2 today, but the point is to
-    // keep the gap between "we validated this hostname" and "we connected to
-    // it" as small as possible, not to prove the gap is non-empty.
-    await this.guard(target);
-
+    let currentUrl = normaliseGoogleSheets(rawUrl);
+    let redirectHops = 0;
     let res: any;
-    try {
-      res = await axios.get(target, {
-        responseType: "arraybuffer",
-        timeout: this.timeoutMs,
-        maxRedirects: this.maxRedirects,
-        maxContentLength: this.maxBytes,
-        maxBodyLength: this.maxBytes,
-        decompress: true,
-        validateStatus: (s: number) => s >= 200 && s < 300,
-        headers: {
-          // Some sites serve a stub to unknown agents. Be honest about who we
-          // are rather than impersonating a browser.
-          "user-agent": "HummyTummy-MenuImport/1.0 (+https://hummytummy.com)",
-          accept: "*/*",
-        },
-      });
-    } catch (err: any) {
-      if (
-        err?.code === "ERR_FR_MAX_BODY_LENGTH_EXCEEDED" ||
-        err?.message?.includes("maxContentLength")
-      ) {
-        throw new BadRequestException("source is too large to import");
+
+    for (;;) {
+      // Guard THIS hop before requesting it, and pin the socket to the IP
+      // that same check just resolved (see class doc comment).
+      const { resolvedIp } = await this.guard(currentUrl);
+      const protocol = new URL(currentUrl).protocol;
+      const agent = pinnedAgent(protocol, resolvedIp);
+
+      try {
+        res = await axios.get(currentUrl, {
+          responseType: "arraybuffer",
+          timeout: this.timeoutMs,
+          // We walk redirects ourselves so every hop gets guarded before
+          // it is requested — see class doc comment.
+          maxRedirects: 0,
+          maxContentLength: this.maxBytes,
+          maxBodyLength: this.maxBytes,
+          decompress: true,
+          // 2xx is success; 3xx is a redirect we handle below. Anything
+          // else falls through to axios's default rejection.
+          validateStatus: (s: number) => s >= 200 && s < 400,
+          httpAgent: protocol === "http:" ? agent : undefined,
+          httpsAgent: protocol === "https:" ? agent : undefined,
+          headers: {
+            // Some sites serve a stub to unknown agents. Be honest about who
+            // we are rather than impersonating a browser.
+            "user-agent": "HummyTummy-MenuImport/1.0 (+https://hummytummy.com)",
+            accept: "*/*",
+          },
+        });
+      } catch (err: any) {
+        if (
+          err?.code === "ERR_FR_MAX_BODY_LENGTH_EXCEEDED" ||
+          err?.message?.includes("maxContentLength")
+        ) {
+          throw new BadRequestException("source is too large to import");
+        }
+        this.logger.warn(`menu source fetch failed: ${err?.message}`);
+        throw new BadRequestException("could not fetch that link");
       }
-      this.logger.warn(`menu source fetch failed: ${err?.message}`);
-      throw new BadRequestException("could not fetch that link");
+
+      if (res.status >= 300 && res.status < 400) {
+        redirectHops += 1;
+        if (redirectHops > this.maxRedirects) {
+          throw new BadRequestException("too many redirects");
+        }
+        const location = res.headers?.location;
+        if (!location) {
+          throw new BadRequestException("could not fetch that link");
+        }
+        // Resolve relative Location headers against the hop we just left,
+        // then loop — the NEXT iteration guards this new URL before it is
+        // requested. Nothing is fetched from an unguarded hop.
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      break; // 2xx — this is the response we keep.
     }
 
-    // Where we actually ended up after redirects — re-validate it.
-    const finalUrl: string = res?.request?.res?.responseUrl ?? target;
-    // Check 3 — a redirect can land us somewhere neither entry check saw.
-    if (finalUrl !== target) await this.guard(finalUrl);
-
+    const finalUrl = currentUrl;
     const bytes = Buffer.from(res.data);
     if (bytes.length > this.maxBytes) {
       throw new BadRequestException("source is too large to import");
     }
 
     const contentType: string | undefined = res.headers?.["content-type"];
-    assertSheetIsPublic(target, bytes, contentType);
+    // Keyed on finalUrl, not the originally requested URL: a shortened or
+    // third-party link that redirects to a private Sheet must still be
+    // caught, even though the request the operator pasted was never itself
+    // a docs.google.com URL.
+    assertSheetIsPublic(finalUrl, bytes, contentType);
 
     return {
       bytes,
@@ -110,10 +151,15 @@ export class MenuSourceFetcher {
     };
   }
 
-  /** Validate, translating the guard's error into a client-safe 400. */
-  private async guard(url: string): Promise<void> {
+  /**
+   * Validate one hop, translating the guard's error into a client-safe 400,
+   * and return the IP `assertPublicHttpUrl` resolved so the caller can pin
+   * the connection to it.
+   */
+  private async guard(url: string): Promise<{ resolvedIp: string }> {
     try {
-      await assertPublicHttpUrl(url);
+      const { resolvedIp } = await assertPublicHttpUrl(url);
+      return { resolvedIp };
     } catch (e) {
       throw new BadRequestException(
         e instanceof UnsafeUrlError ? e.message : "invalid URL",
@@ -123,16 +169,68 @@ export class MenuSourceFetcher {
 }
 
 /**
- * A Google Sheets share link points at the editor, not the data. Rewrite it
- * to the CSV export so the operator can paste the link they actually have.
+ * Pin the outbound connection to the IP `assertPublicHttpUrl` already
+ * validated, so no second, unvalidated DNS resolution is left to pick a
+ * different peer (DNS rebinding). Only the low-level connect target is
+ * overridden — the request keeps the real hostname for Host/SNI.
+ */
+function pinnedAgent(
+  protocol: string,
+  resolvedIp: string,
+): http.Agent | https.Agent {
+  const family = resolvedIp.includes(":") ? 6 : 4;
+  const options = {
+    lookup: (
+      _hostname: string,
+      _opts: unknown,
+      cb: (
+        err: NodeJS.ErrnoException | null,
+        address: string,
+        family: number,
+      ) => void,
+    ) => cb(null, resolvedIp, family),
+  };
+  return protocol === "https:"
+    ? new https.Agent(options)
+    : new http.Agent(options);
+}
+
+/**
+ * A Google Sheets link comes in several shapes an operator might paste:
+ *   - a share/edit link, optionally carrying a `/u/<n>` multi-account
+ *     segment: rewritten to the CSV export, carrying the selected tab
+ *     (`gid`, from the URL fragment or query) along if present;
+ *   - a File → Share → Publish-to-web link (`/d/e/<token>/pub...`): left
+ *     completely alone, since it already serves the requested format
+ *     directly and does not share the `/d/<id>` document-id shape at all;
+ *   - an export link already: left alone.
+ * Anything that isn't a docs.google.com URL passes through unchanged.
  */
 export function normaliseGoogleSheets(raw: string): string {
-  const m = raw.match(
-    /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/,
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return raw;
+  }
+  if (url.hostname !== "docs.google.com") return raw;
+
+  // Publish-to-web links already serve the export directly; the segment
+  // right after /d/ is the literal marker "e", not a document id.
+  if (/^\/spreadsheets\/d\/e\/[^/]+\/pub/.test(url.pathname)) {
+    return raw;
+  }
+
+  // Share/edit links, with or without a /u/<n> multi-account segment.
+  const m = url.pathname.match(
+    /^\/spreadsheets\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/,
   );
   if (!m) return raw;
-  if (raw.includes("/export")) return raw;
-  return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`;
+  if (url.pathname.includes("/export")) return raw;
+
+  const gid = url.searchParams.get("gid") ?? url.hash.match(/gid=(\d+)/)?.[1];
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv`;
+  return gid ? `${exportUrl}&gid=${gid}` : exportUrl;
 }
 
 /**
@@ -140,11 +238,11 @@ export function normaliseGoogleSheets(raw: string): string {
  * sign-in page. Status codes cannot catch that, so look at what came back.
  */
 export function assertSheetIsPublic(
-  requestedUrl: string,
+  finalUrl: string,
   bytes: Buffer,
   contentType?: string,
 ): void {
-  if (!requestedUrl.includes("docs.google.com/spreadsheets")) return;
+  if (!finalUrl.includes("docs.google.com/spreadsheets")) return;
   const looksHtml =
     (contentType ?? "").includes("text/html") ||
     bytes.subarray(0, 200).toString("utf8").toLowerCase().includes("<html");
