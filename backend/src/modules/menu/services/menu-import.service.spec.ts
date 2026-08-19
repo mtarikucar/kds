@@ -261,4 +261,95 @@ describe("MenuImportService", () => {
     expect(opts.headers["anthropic-version"]).toBe("2023-06-01");
     expect(opts.timeout).toBe(120_000);
   });
+
+  describe("public seams for MenuSourceService (parseTextToDraft / parseDocumentToDraft / parseColumnMap)", () => {
+    beforeEach(() => {
+      config.get.mockImplementation((k: string) =>
+        k === "ANTHROPIC_API_KEY" ? "sk-test" : undefined,
+      );
+    });
+
+    it("parseTextToDraft sends a text block and normalises the answer, without touching quota", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                categories: [{ name: "İçecekler", products: [{ name: "Ayran", price: 25 }] }],
+              }),
+            },
+          ],
+        },
+      });
+
+      const draft = await svc.parseTextToDraft("Ayran 25 TL");
+
+      expect(draft.categories[0].name).toBe("İçecekler");
+      const [, body] = (axios.post as jest.Mock).mock.calls[0];
+      expect(body.messages[0].content[0]).toEqual({ type: "text", text: "Ayran 25 TL" });
+      expect((svc as any).quota.claim).not.toHaveBeenCalled();
+      expect((svc as any).quota.voidUsage).not.toHaveBeenCalled();
+    });
+
+    it("parseDocumentToDraft sends a base64 document block with the given media type", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                categories: [{ name: "PDF", products: [{ name: "Kebap", price: 180 }] }],
+              }),
+            },
+          ],
+        },
+      });
+
+      const draft = await svc.parseDocumentToDraft(Buffer.from("%PDF-1.7"), "application/pdf");
+
+      expect(draft.categories[0].products[0]).toMatchObject({ name: "Kebap", price: 180 });
+      const [, body] = (axios.post as jest.Mock).mock.calls[0];
+      expect(body.messages[0].content[0]).toEqual({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: Buffer.from("%PDF-1.7").toString("base64"),
+        },
+      });
+    });
+
+    it("parseColumnMap returns the parsed JSON mapping without routing through normaliseDraft", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: {
+          content: [
+            {
+              type: "text",
+              text: '```json\n{"name":"Ürün Kodu","price":"Bedel","category":null}\n```',
+            },
+          ],
+        },
+      });
+
+      const map = await svc.parseColumnMap("Ürün Kodu | Bedel\nAyran | 25", "PROMPT");
+
+      expect(map).toEqual({ name: "Ürün Kodu", price: "Bedel", category: null });
+      const [, body] = (axios.post as jest.Mock).mock.calls[0];
+      expect(body.messages[0].content).toEqual([
+        { type: "text", text: "Ürün Kodu | Bedel\nAyran | 25" },
+        { type: "text", text: "PROMPT" },
+      ]);
+    });
+
+    it("parseColumnMap throws a clear error when the model returns no JSON object", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { content: [{ type: "text", text: "sorry, I cannot help" }] },
+      });
+
+      await expect(svc.parseColumnMap("sample", "PROMPT")).rejects.toThrow(
+        /column mapping/i,
+      );
+    });
+  });
 });

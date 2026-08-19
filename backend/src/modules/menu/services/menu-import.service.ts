@@ -137,6 +137,54 @@ export class MenuImportService {
     }
   }
 
+  /** Text (a page, a chunk of one) → draft. Not metered — the caller meters. */
+  async parseTextToDraft(text: string): Promise<CommitMenuImportDto> {
+    const answer = await this.askClaude(
+      [{ type: "text", text }],
+      EXTRACTION_PROMPT,
+    );
+    return this.normaliseDraft(answer);
+  }
+
+  /** A PDF (or any Claude-supported document) → draft. Not metered. */
+  async parseDocumentToDraft(
+    bytes: Buffer,
+    mediaType: string,
+  ): Promise<CommitMenuImportDto> {
+    const answer = await this.askClaude(
+      [
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: bytes.toString("base64"),
+          },
+        },
+      ],
+      EXTRACTION_PROMPT,
+    );
+    return this.normaliseDraft(answer);
+  }
+
+  /** Header + sample rows → which column is which. Not metered. */
+  async parseColumnMap(
+    sample: string,
+    prompt: string,
+  ): Promise<Record<string, string | null>> {
+    const answer = await this.askClaude(
+      [{ type: "text", text: sample }],
+      prompt,
+    );
+    const cleaned = answer.replace(/```json\s*|\s*```/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      throw new BadRequestException("could not read the column mapping");
+    }
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
+
   /**
    * Single Claude transport for every menu source. Content blocks differ per
    * source (image / document / text); everything else — model, headers,
@@ -163,7 +211,10 @@ export class MenuImportService {
           model,
           max_tokens: 8000,
           messages: [
-            { role: "user", content: [...blocks, { type: "text", text: prompt }] },
+            {
+              role: "user",
+              content: [...blocks, { type: "text", text: prompt }],
+            },
           ],
         },
         {
