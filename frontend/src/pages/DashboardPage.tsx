@@ -120,7 +120,13 @@ const DashboardPage = () => {
   const secondaryActions = filteredQuickActions.filter((a) => !a.isPrimary);
 
   return (
-    <div className="h-[calc(100vh-10rem)] flex flex-col" data-tour="dashboard-container">
+    // min-h-full, not a calc(100vh - guess): the shell's content area is
+    // 100dvh minus the header minus whichever banners are up, and only
+    // <main> knows that number (see Layout.tsx). "min-" rather than plain
+    // "h-" because the checklist + KPI strip + hero can legitimately need
+    // more room than one screen — then the page grows and <main> scrolls,
+    // instead of squeezing the quick-action tiles until their labels clip.
+    <div className="min-h-full flex flex-col" data-tour="dashboard-container">
       {/* Setup checklist — only admins/managers, only when items remain. The
           component renders nothing once every item is checked, so mature
           tenants never see it. */}
@@ -169,7 +175,17 @@ const DashboardPage = () => {
       )}
 
       {/* Secondary Actions Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-h-0" data-tour="quick-actions">
+      {/* Fills the leftover height, but never below one readable tile row:
+          flex-1 WITHOUT min-h-0, so the grid's automatic minimum size (its
+          own min-content height, floored by auto-rows) protects it. With
+          min-h-0 the checklist and KPI strip could squeeze these tiles until
+          their labels clipped — measured at 768px, where four columns across
+          a 464px content area left ~107px per tile. Four columns is a
+          desktop count; the tablet band gets three. */}
+      <div
+        className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 auto-rows-[minmax(6.5rem,1fr)]"
+        data-tour="quick-actions"
+      >
         {secondaryActions.map((action) => {
           const Icon = action.icon;
           return (

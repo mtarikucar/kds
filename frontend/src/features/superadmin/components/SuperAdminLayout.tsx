@@ -19,7 +19,7 @@ export default function SuperAdminLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-zinc-50">
+    <div className="flex h-dvh bg-zinc-50">
       <SuperAdminSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -45,7 +45,7 @@ export default function SuperAdminLayout() {
             </span>
           </div>
         </header>
-        <main className="flex-1 overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
               <Outlet />

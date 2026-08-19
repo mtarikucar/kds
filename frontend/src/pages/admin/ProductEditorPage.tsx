@@ -408,7 +408,7 @@ export default function ProductEditorPage({
         </div>
       )}
 
-      <form onSubmit={productForm.handleSubmit(onSubmit)} className="pb-24">
+      <form onSubmit={productForm.handleSubmit(onSubmit)} className="pb-4">
         {/* Two columns on desktop so the editor isn't one very tall scroll. */}
         <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
           <div className="space-y-4">
@@ -691,8 +691,20 @@ export default function ProductEditorPage({
         </div>
       </form>
 
-      {/* Sticky action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur">
+      {/* Action bar — sticky to the editor's own scroll box, not fixed to the
+          viewport. Fixed put it across the whole screen: below lg it ran under
+          the docked 256px sidebar (at 768px the Cancel button sat entirely
+          behind it and every click landed on the sidebar), and from lg up,
+          now that the menu workspace's panes fill <main> exactly, it floated
+          over the bottom row of the category tree. The negative margins undo
+          the padding of whichever box wraps this — p-4 in the embedded pane,
+          px-4 py-6 standalone — so the bar still spans edge to edge, and the
+          safe-area padding keeps it clear of the iPhone home indicator. */}
+      <div
+        className={`sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur ${
+          embedded ? "-mb-4" : "-mb-6"
+        }`}
+      >
         <div className="mx-auto flex max-w-3xl gap-3 px-4 py-3">
           <Button
             variant="outline"

@@ -346,9 +346,19 @@ export default function FloorPlanEditorPage({
   return (
     <div
       className={
+        // Both variants fill whatever box the parent gives them rather than
+        // guessing the viewport: embedded, that box is the Tables page's
+        // editor column; standalone, it is <main> itself (see the
+        // page-height contract in Layout.tsx). The old calc(100vh-15rem) /
+        // calc(100vh-7rem) pair double-counted the header, ignored the demo
+        // and renewal banners, and on mobile measured a viewport taller
+        // than the one the user can actually see.
         embedded
-          ? 'flex flex-col h-[calc(100vh-15rem)] min-h-[28rem] rounded-2xl border border-slate-200/60 bg-white overflow-hidden'
-          : 'flex flex-col h-[calc(100vh-7rem)] -m-4 md:-m-6'
+          ? 'relative flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200/60 bg-white overflow-hidden'
+          : // Standalone the canvas bleeds over <main>'s padding, so its height
+            // is that padding back on top of the content box — the negative
+            // margins then pull it flush to all four edges.
+            'relative flex min-h-0 flex-col h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)] -m-4 md:-m-6 lg:-m-8'
       }
     >
       {/* header — hidden when embedded in the Tables page (which supplies its
@@ -445,7 +455,14 @@ export default function FloorPlanEditorPage({
       {/* Below lg the sidebar is hidden — surface the inspector as a bottom
           sheet whenever something is selected so it stays reachable on tablets. */}
       {store.selection.length > 0 && (
-        <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.18)] max-h-[45vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+        // absolute, not fixed: fixed measured against the viewport, and from
+        // 768px up the sidebar is already docked at 256px and paints over the
+        // sheet's left third — at exactly 768px that left ~99% of the
+        // round-table button, so a tablet user could not set a table round.
+        // Anchoring to the editor box instead keeps the sheet inside the
+        // content column, and works in RTL where a md:left-64 offset would
+        // have pushed it the wrong way.
+        <div className="lg:hidden absolute inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.18)] max-h-[45%] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
           <div className="sticky top-0 z-10 flex items-center bg-white px-4 pt-2 pb-1">
             <span className="w-8 h-1 rounded-full bg-slate-200 mx-auto" aria-hidden="true" />
             <button

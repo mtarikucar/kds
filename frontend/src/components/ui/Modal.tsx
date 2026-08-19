@@ -58,7 +58,7 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-3 sm:p-4">
+      <div className="flex min-h-dvh items-center justify-center p-3 sm:p-4">
         {/* Backdrop */}
         <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
@@ -72,7 +72,7 @@ const Modal: React.FC<ModalProps> = ({
           aria-labelledby={title ? titleId : undefined}
           className={cn(
             'relative w-full bg-white rounded-xl shadow-2xl',
-            'max-h-[90vh] flex flex-col',
+            'max-h-[90dvh] flex flex-col',
             'animate-in fade-in-0 zoom-in-95 duration-200',
             sizes[size]
           )}

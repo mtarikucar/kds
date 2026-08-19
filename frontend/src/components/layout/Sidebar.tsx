@@ -337,7 +337,7 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0 md:order-2' : 'left-0'} bg-slate-900 text-white h-screen md:h-auto md:min-h-screen flex flex-col transform transition-all duration-300 ease-in-out ${
+      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0 md:order-2' : 'left-0'} bg-slate-900 text-white h-dvh md:h-auto md:min-h-full flex flex-col transform transition-all duration-300 ease-in-out ${
         isOpen
           ? 'translate-x-0'
           : isRTL

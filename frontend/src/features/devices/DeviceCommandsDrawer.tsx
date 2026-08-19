@@ -37,7 +37,7 @@ export default function DeviceCommandsDrawer({ deviceId, onClose }: Props) {
   }
 
   return (
-    <aside className="fixed right-0 top-0 z-50 h-screen w-full max-w-xl overflow-y-auto border-l bg-white shadow-xl">
+    <aside className="fixed right-0 top-0 z-50 h-dvh w-full max-w-xl overflow-y-auto border-l bg-white shadow-xl">
       <header className="flex items-center justify-between border-b p-4">
         <div>
           <h2 className="text-lg font-semibold">Device commands</h2>
