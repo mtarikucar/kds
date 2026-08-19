@@ -170,7 +170,9 @@
     "pickProductHint": "Fotoğraf, seçenekler, koleksiyonlar ve fiyat — hepsi bu panelde, aynı yerde düzenlenir.",
     "groupHasNoOptions": "Henüz seçenek yok — ekleyin",
     "noPhoto": "Fotoğraf yok",
-    "closed": "kapalı"
+    "closed": "kapalı",
+    "importFromSource": "Kaynak ver (link / PDF / Excel)",
+    "bulkAddManual": "Manuel toplu ekle"
   },
   "media": {
     "title": "Yapay zeka stüdyo",
@@ -215,6 +217,45 @@
     "quotaExhausted": "AI 3D model kontörünüz kalmadı. Mağaza'dan 10 modellik kontör paketi alabilirsiniz (790 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir."
   },
   "import": {
-    "invalidRows": "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin"
+    "invalidRows": "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin",
+    "reviewHint": "{{cats}} kategori · {{items}} ürün — düzenleyip onaylayın",
+    "categoryName": "Kategori adı",
+    "itemName": "Ürün adı",
+    "itemDesc": "Açıklama",
+    "addItem": "Ürün ekle",
+    "creating": "Oluşturuluyor…",
+    "commit": "{{n}} ürünü oluştur",
+    "title": "Fotoğraftan menü oluştur",
+    "subtitle": "Menünüzün fotoğraflarını çekin — yapay zeka içeriği okuyup düzenlenebilir bir taslağa çevirir, siz onaylayınca ürünler oluşturulur.",
+    "takePhoto": "Fotoğraf çek",
+    "chooseFiles": "Dosya seç",
+    "reading": "Menü okunuyor…",
+    "digitize": "Dijitalleştir ({{n}} foto)",
+    "summaryTitle": "İçe aktarma tamamlandı",
+    "summary": "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori",
+    "withheld": "{{s}} atlandı · {{a}} belirsiz, aktarılmadı",
+    "someFailed": "{{n}} ürün oluşturulamadı",
+    "importMore": "Yeni menü ekle",
+    "nothingToImport": "İçe aktarılacak ürün yok",
+    "done": "{{count}} ürün oluşturuldu",
+    "partial": "{{ok}} ürün eklendi, {{fail}} başarısız.",
+    "conflict": {
+      "count": "{{n}} ürün menünüzde zaten var",
+      "skip": "Atla",
+      "updatePrice": "Fiyatı güncelle",
+      "create": "Yine de ekle",
+      "ambiguousCount": "{{n}} ürün menünüzde birden fazla ürünle eşleşiyor — hiçbiri değiştirilmeyecek. Yine de eklemek isterseniz o satırda \"Yine de ekle\"yi seçin.",
+      "ambiguous": "birden çok eşleşme",
+      "willCreate": "Yine de eklenecek ✓",
+      "was": "şu an {{p}}",
+      "priceOnlyHint": "Bu satırda yalnızca fiyat güncellenecek — açıklama ve KDV değişmeyecek"
+    }
+  },
+  "source": {
+    "hint": "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin (en fazla 10 MB). Tüm ürünler çıkarılıp önünüze gelir.",
+    "parse": "Ürünleri çıkar",
+    "reading": "Okunuyor…",
+    "summary": "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori",
+    "fileTooLarge": "Dosya çok büyük — en fazla {{mb}} MB olmalı."
   }
 }

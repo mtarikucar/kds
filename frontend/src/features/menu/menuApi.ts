@@ -380,12 +380,32 @@ export const useReorderProducts = () => {
   });
 };
 
-// ── Menu import (AI photo → menu digitization, Phase 1) ────────────────────
+// ── Menu import (AI photo/link/file → menu digitization) ───────────────────
+export type ConflictPolicy = "SKIP" | "UPDATE_PRICE" | "CREATE";
+
 export interface MenuImportProductDraft {
   name: string;
   description?: string;
   price: number;
   taxRate?: number;
+  /**
+   * Set by the server when this row's (category, name) matches exactly one
+   * product the tenant already has. The row also arrives with
+   * `onConflict: "SKIP"` — the operator must opt in to CREATE/UPDATE_PRICE.
+   */
+  existingProductId?: string;
+  /** The matched product's current price, so the grid can show "was ₺X". */
+  existingPrice?: number;
+  /** What to do about a conflicting row. Absent (or missing existingProductId) means CREATE. */
+  onConflict?: ConflictPolicy;
+  /**
+   * Set by the server when this row's (category, name) matches MORE than
+   * one existing product (an already-doubled menu) — it deliberately did
+   * not pick a winner, so `existingProductId` is absent. The commit
+   * endpoint refuses the row unless the operator explicitly sets
+   * `onConflict: "CREATE"`.
+   */
+  ambiguous?: boolean;
 }
 export interface MenuImportCategoryDraft {
   name: string;
@@ -398,6 +418,8 @@ export interface MenuImportCommitSummary {
   categoriesCreated: number;
   categoriesMatched: number;
   productsCreated: number;
+  productsUpdated: number;
+  productsSkipped: number;
   failures: { category: string; product: string; reason: string }[];
 }
 
@@ -435,6 +457,27 @@ export const useParseMenuPhotos = () =>
           error,
           i18n.t("common:notifications.operationFailed"),
         ),
+      );
+    },
+  });
+
+/** Import a menu from a link or an uploaded PDF/CSV/XLSX → editable draft. */
+export const useParseMenuSource = () =>
+  useMutation({
+    mutationFn: async (input: { url?: string; file?: File }) => {
+      const formData = new FormData();
+      if (input.url) formData.append("url", input.url);
+      if (input.file) formData.append("file", input.file);
+      const response = await api.post<MenuImportDraft>(
+        "/menu/import/parse-source",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      return response.data;
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(error, i18n.t("common:notifications.operationFailed")),
       );
     },
   });

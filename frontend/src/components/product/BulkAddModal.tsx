@@ -1,18 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2 } from "lucide-react";
-import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import {
   useCategories,
   useCommitMenuImport,
 } from "../../features/menu/menuApi";
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 interface Row {
   name: string;
@@ -30,8 +24,24 @@ const emptyRow = (categoryId = ""): Row => ({
  * Bulk-add many products at once: a small grid of name / price / category rows.
  * Rows are grouped by category and committed via the (non-AI-gated) menu-import
  * commit endpoint, which matches categories by name and batch-creates products.
+ *
+ * Body only — no `<Modal>` of its own, so the menu page can host it inside
+ * the ONE page-owned modal that also hosts the link/PDF and photo import
+ * tabs, under the same `importDirty` Escape/backdrop guard. This is the
+ * only caller (grep-verified) — there used to be a thin standalone
+ * `BulkAddModal` wrapper for a self-contained modal, but nothing used it.
  */
-export default function BulkAddModal({ isOpen, onClose }: Props) {
+export function BulkAddModalBody({
+  onDone,
+  onDirtyChange,
+}: {
+  /** Called after a clean full-success commit, and by the Cancel button —
+      exactly what `onClose` used to mean when this owned its own Modal. */
+  onDone?: () => void;
+  /** Reports whether any row has user input worth losing, so the hosting
+      modal can confirm before an Escape/backdrop close discards it. */
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const { t } = useTranslation(["menu", "common"]);
   const { data: categories } = useCategories();
   const commit = useCommitMenuImport();
@@ -60,6 +70,21 @@ export default function BulkAddModal({ isOpen, onClose }: Props) {
     !!r.categoryId &&
     r.price !== "" &&
     Number(r.price) >= 0;
+
+  // Whether any row has something the operator actually TYPED — name or
+  // price. Deliberately NOT isFilled: addRow() pre-seeds a new row's
+  // categoryId with the first category as a convenience default, so a bare
+  // "Satır ekle" click with zero typing would otherwise make isFilled true
+  // and arm the close-confirmation over a default the operator never
+  // chose. isValid/isFilled (below) stay as they are for submit()'s own
+  // partial-row validation — this is a separate, stricter predicate only
+  // for "is there something worth losing".
+  const hasTypedInput = (r: Row) => r.name.trim() !== "" || r.price !== "";
+  const dirty = rows.some(hasTypedInput) || commit.isPending;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty]);
 
   const submit = async () => {
     setFailures([]);
@@ -121,7 +146,7 @@ export default function BulkAddModal({ isOpen, onClose }: Props) {
           }),
         );
         reset();
-        onClose();
+        onDone?.();
         return;
       }
       // Partial or nothing: keep the modal open, surface each failure's reason,
@@ -152,116 +177,109 @@ export default function BulkAddModal({ isOpen, onClose }: Props) {
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={t("menu.bulk.title", "Toplu ürün ekle")}
-      size="xl"
-    >
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">
-          {t(
-            "menu.bulk.subtitle",
-            "Birden çok ürünü tek seferde ekleyin. Her satır için ad, fiyat ve kategori girin.",
-          )}
-        </p>
-
-        {/* Header row */}
-        <div className="hidden grid-cols-[1fr_100px_150px_32px] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
-          <span>{t("menu.itemName", "Ürün adı")}</span>
-          <span>{t("menu.price", "Fiyat")}</span>
-          <span>{t("menu.category", "Kategori")}</span>
-          <span />
-        </div>
-
-        <div className="max-h-[50vh] space-y-2 overflow-y-auto">
-          {rows.map((row, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_150px_32px] sm:items-center"
-            >
-              <input
-                value={row.name}
-                onChange={(e) => update(i, { name: e.target.value })}
-                placeholder={t("menu.itemName", "Ürün adı") as string}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-              <input
-                value={row.price}
-                onChange={(e) => update(i, { price: e.target.value })}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="₺"
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-              <select
-                value={row.categoryId}
-                onChange={(e) => update(i, { categoryId: e.target.value })}
-                className="rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              >
-                <option value="">
-                  {t("menu.selectCategory", "Kategori seçin")}
-                </option>
-                {categories?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => removeRow(i)}
-                className="justify-self-end rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
-                aria-label={t("common:app.delete", "Sil") as string}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <Button variant="ghost" size="sm" onClick={addRow}>
-          <Plus className="mr-1 h-4 w-4" />
-          {t("menu.bulk.addRow", "Satır ekle")}
-        </Button>
-
-        {failures.length > 0 && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-            <p className="mb-1 font-medium">
-              {t("menu.bulk.failedTitle", "Eklenemeyen ürünler")}
-            </p>
-            <ul className="space-y-0.5">
-              {failures.map((f, i) => (
-                <li key={i}>
-                  • {f.product}: {f.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
+    <div className="space-y-3">
+      <p className="text-sm text-slate-500">
+        {t(
+          "menu.bulk.subtitle",
+          "Birden çok ürünü tek seferde ekleyin. Her satır için ad, fiyat ve kategori girin.",
         )}
+      </p>
 
-        <div className="flex gap-3 border-t border-slate-100 pt-3">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={onClose}
-            disabled={commit.isPending}
-          >
-            {t("common:app.cancel", "İptal")}
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={submit}
-            disabled={commit.isPending}
-          >
-            {commit.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            {t("menu.bulk.submit", "Tümünü ekle")}
-          </Button>
-        </div>
+      {/* Header row */}
+      <div className="hidden grid-cols-[1fr_100px_150px_32px] gap-2 px-1 text-xs font-medium text-slate-500 sm:grid">
+        <span>{t("menu.itemName", "Ürün adı")}</span>
+        <span>{t("menu.price", "Fiyat")}</span>
+        <span>{t("menu.category", "Kategori")}</span>
+        <span />
       </div>
-    </Modal>
+
+      <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+        {rows.map((row, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_150px_32px] sm:items-center"
+          >
+            <input
+              value={row.name}
+              onChange={(e) => update(i, { name: e.target.value })}
+              placeholder={t("menu.itemName", "Ürün adı") as string}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            <input
+              value={row.price}
+              onChange={(e) => update(i, { price: e.target.value })}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="₺"
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            <select
+              value={row.categoryId}
+              onChange={(e) => update(i, { categoryId: e.target.value })}
+              className="rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+              <option value="">
+                {t("menu.selectCategory", "Kategori seçin")}
+              </option>
+              {categories?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              className="justify-self-end rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+              aria-label={t("common:app.delete", "Sil") as string}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <Button variant="ghost" size="sm" onClick={addRow}>
+        <Plus className="mr-1 h-4 w-4" />
+        {t("menu.bulk.addRow", "Satır ekle")}
+      </Button>
+
+      {failures.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+          <p className="mb-1 font-medium">
+            {t("menu.bulk.failedTitle", "Eklenemeyen ürünler")}
+          </p>
+          <ul className="space-y-0.5">
+            {failures.map((f, i) => (
+              <li key={i}>
+                • {f.product}: {f.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex gap-3 border-t border-slate-100 pt-3">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => onDone?.()}
+          disabled={commit.isPending}
+        >
+          {t("common:app.cancel", "İptal")}
+        </Button>
+        <Button
+          className="flex-1"
+          onClick={submit}
+          disabled={commit.isPending}
+        >
+          {commit.isPending && (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          )}
+          {t("menu.bulk.submit", "Tümünü ekle")}
+        </Button>
+      </div>
+    </div>
   );
 }

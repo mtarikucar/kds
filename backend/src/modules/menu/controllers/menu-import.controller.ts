@@ -11,7 +11,9 @@ import {
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { MenuImportService } from "../services/menu-import.service";
+import { MenuSourceService } from "../services/menu-source.service";
 import { CommitMenuImportDto } from "../dto/menu-import.dto";
+import { ParseMenuSourceDto } from "../dto/parse-menu-source.dto";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -24,7 +26,10 @@ import { UserRole } from "../../../common/constants/roles.enum";
 @Controller("menu/import")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class MenuImportController {
-  constructor(private readonly menuImport: MenuImportService) {}
+  constructor(
+    private readonly menuImport: MenuImportService,
+    private readonly menuSource: MenuSourceService,
+  ) {}
 
   /** Lets the admin UI show/hide the "digitise from photo" feature. */
   @Get("status")
@@ -58,7 +63,59 @@ export class MenuImportController {
       buffer: f.buffer,
       mimetype: f.mimetype,
     }));
-    return this.menuImport.parseMenuPhotos(req.tenantId, images);
+    const draft = await this.menuImport.parseMenuPhotos(req.tenantId, images);
+    // Same annotation parse-source gets: without it, re-photographing a menu
+    // that was already imported has no way to recognise the duplicates and
+    // silently doubles it — the review grid already renders the conflict UI
+    // this produces, it just never appeared on this path before.
+    return this.menuImport.annotateConflicts(draft, req.tenantId);
+  }
+
+  // NOT gated with @RequiresFeature here, unlike photo parse: a
+  // recognised-header CSV/XLSX never calls the model at all (same free
+  // bulk-entry capability BulkAddModal already gets ungated), so gating the
+  // whole endpoint would block that path along with the AI ones. The three
+  // paths that actually spend a model call — PDF, HTML/text, and the
+  // unrecognised-header column-map fallback — assert the entitlement
+  // themselves inside MenuSourceService, before any credit is claimed.
+  @Post("parse-source")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiConsumes("multipart/form-data", "application/json")
+  @ApiOperation({
+    summary:
+      "Import a menu from a link or an uploaded PDF/CSV/XLSX (no persistence)",
+  })
+  @UseInterceptors(
+    FilesInterceptor("file", 1, {
+      limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    }),
+  )
+  async parseSource(
+    @Body() dto: ParseMenuSourceDto,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Request() req,
+  ) {
+    const f = (files ?? [])[0];
+    // Same read EntitlementGuard uses (entitlement.guard.ts) — a grant can
+    // be branch-scoped, so this must reach MenuSourceService's entitlement
+    // check or it 403s a branch the guard-gated photo endpoint would allow.
+    const branchId: string | null = req.scope?.branchId ?? null;
+    const draft = await this.menuSource.parseSource(
+      req.tenantId,
+      {
+        url: dto.url,
+        file: f
+          ? {
+              buffer: f.buffer,
+              mimetype: f.mimetype,
+              originalname: f.originalname,
+            }
+          : undefined,
+      },
+      branchId,
+    );
+    // Mark what already exists so the grid can offer a choice.
+    return this.menuImport.annotateConflicts(draft, req.tenantId);
   }
 
   @Post("commit")

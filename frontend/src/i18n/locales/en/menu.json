@@ -170,7 +170,9 @@
     "pickProductHint": "Photo, options, collections and price — all edited here, in one place.",
     "groupHasNoOptions": "No options yet — add some",
     "noPhoto": "No photo",
-    "closed": "off"
+    "closed": "off",
+    "importFromSource": "Give a source (link / PDF / Excel)",
+    "bulkAddManual": "Manual bulk add"
   },
   "media": {
     "title": "AI Studio",
@@ -215,6 +217,45 @@
     "quotaExhausted": "You are out of AI 3D-model credits. Buy a 10-model credit pack in the Store (790 TRY, one-time, VAT included) — credits never expire and stay valid until consumed."
   },
   "import": {
-    "invalidRows": "{{n}} rows are incomplete or invalid (empty name or negative price) — fix or remove them"
+    "invalidRows": "{{n}} rows are incomplete or invalid (empty name or negative price) — fix or remove them",
+    "reviewHint": "{{cats}} categories · {{items}} products — edit and confirm",
+    "categoryName": "Category name",
+    "itemName": "Product name",
+    "itemDesc": "Description",
+    "addItem": "Add product",
+    "creating": "Creating…",
+    "commit": "Create {{n}} products",
+    "title": "Create a menu from photos",
+    "subtitle": "Photograph your menu — AI reads the content into an editable draft, and the products are created once you approve it.",
+    "takePhoto": "Take photo",
+    "chooseFiles": "Choose files",
+    "reading": "Reading the menu…",
+    "digitize": "Digitize ({{n}} photos)",
+    "summaryTitle": "Import complete",
+    "summary": "{{p}} products · {{u}} updated · {{cc}} new + {{cm}} existing categories",
+    "withheld": "{{s}} skipped · {{a}} ambiguous, not imported",
+    "someFailed": "{{n}} products could not be created",
+    "importMore": "Import another menu",
+    "nothingToImport": "No products to import",
+    "done": "{{count}} products created",
+    "partial": "{{ok}} products added, {{fail}} failed.",
+    "conflict": {
+      "count": "{{n}} products already exist on your menu",
+      "skip": "Skip",
+      "updatePrice": "Update price",
+      "create": "Add anyway",
+      "ambiguousCount": "{{n}} products match more than one existing product — none will be changed. To add one anyway, choose \"Add anyway\" on that row.",
+      "ambiguous": "multiple matches",
+      "willCreate": "Will be added ✓",
+      "was": "currently {{p}}",
+      "priceOnlyHint": "Only the price will be updated on this row — description and VAT stay unchanged"
+    }
+  },
+  "source": {
+    "hint": "Paste the address of the page your menu is on, or upload your PDF / Excel / CSV file (up to 10 MB). Every product is extracted and lands in front of you for review.",
+    "parse": "Extract products",
+    "reading": "Reading…",
+    "summary": "{{p}} products · {{u}} updated · {{cc}} new + {{cm}} existing categories",
+    "fileTooLarge": "File is too large — must be at most {{mb}} MB."
   }
 }

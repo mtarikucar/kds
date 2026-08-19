@@ -170,7 +170,9 @@
     "pickProductHint": "Rasm, variantlar, to‘plamlar va narx — hammasi shu yerda, bitta joyda tahrirlanadi.",
     "groupHasNoOptions": "Hali variant yo‘q — qo‘shing",
     "noPhoto": "Rasm yo‘q",
-    "closed": "yopiq"
+    "closed": "yopiq",
+    "importFromSource": "Manba bering (havola / PDF / Excel)",
+    "bulkAddManual": "Qo‘lda ommaviy qo‘shish"
   },
   "media": {
     "title": "AI-studiya",
@@ -215,6 +217,45 @@
     "quotaExhausted": "AI 3D model krediti tugadi. Do'kondan 10 ta modellik kredit paketini sotib olishingiz mumkin (790 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi."
   },
   "import": {
-    "invalidRows": "{{n}} ta qator to‘liq emas yoki xato (bo‘sh nom yoki manfiy narx) — to‘g‘rilang yoki o‘chiring"
+    "invalidRows": "{{n}} ta qator to‘liq emas yoki xato (bo‘sh nom yoki manfiy narx) — to‘g‘rilang yoki o‘chiring",
+    "reviewHint": "{{cats}} ta kategoriya · {{items}} ta mahsulot — tahrirlab tasdiqlang",
+    "categoryName": "Kategoriya nomi",
+    "itemName": "Mahsulot nomi",
+    "itemDesc": "Tavsif",
+    "addItem": "Mahsulot qo‘shish",
+    "creating": "Yaratilmoqda…",
+    "commit": "{{n}} ta mahsulot yaratish",
+    "title": "Rasmdan menyu yaratish",
+    "subtitle": "Menyungiz fotosuratlarini oling — sun‘iy intellekt mazmunini o‘qib, tahrirlanadigan qoralamaga aylantiradi, siz tasdiqlagach mahsulotlar yaratiladi.",
+    "takePhoto": "Rasmga olish",
+    "chooseFiles": "Fayl tanlash",
+    "reading": "Menyu o‘qilmoqda…",
+    "digitize": "Raqamlashtirish ({{n}} ta rasm)",
+    "summaryTitle": "Import yakunlandi",
+    "summary": "{{p}} ta mahsulot · {{u}} ta yangilandi · {{cc}} ta yangi + {{cm}} ta mavjud kategoriya",
+    "withheld": "{{s}} ta o‘tkazib yuborildi · {{a}} ta noaniq, import qilinmadi",
+    "someFailed": "{{n}} ta mahsulot yaratilmadi",
+    "importMore": "Yana menyu import qilish",
+    "nothingToImport": "Import qilinadigan mahsulot yo‘q",
+    "done": "{{count}} ta mahsulot yaratildi",
+    "partial": "{{ok}} ta mahsulot qo‘shildi, {{fail}} ta muvaffaqiyatsiz.",
+    "conflict": {
+      "count": "{{n}} ta mahsulot menyingizda allaqachon bor",
+      "skip": "O‘tkazib yuborish",
+      "updatePrice": "Narxni yangilash",
+      "create": "Baribir qo‘shish",
+      "ambiguousCount": "{{n}} ta mahsulot bir nechta mavjud mahsulotga mos keldi — hech biri o‘zgartirilmaydi. Baribir qo‘shmoqchi bo‘lsangiz, o‘sha qatorda \"Baribir qo‘shish\"ni tanlang.",
+      "ambiguous": "bir nechta moslik",
+      "willCreate": "Baribir qo‘shiladi ✓",
+      "was": "hozir {{p}}",
+      "priceOnlyHint": "Bu qatorda faqat narx yangilanadi — tavsif va QQS o‘zgarmaydi"
+    }
+  },
+  "source": {
+    "hint": "Menyungiz joylashgan sahifa manzilini joylashtiring yoki PDF / Excel / CSV faylingizni yuklang (10 MB gacha). Barcha mahsulotlar chiqarib olinib, ko‘rib chiqishingiz uchun taqdim etiladi.",
+    "parse": "Mahsulotlarni chiqarish",
+    "reading": "O‘qilmoqda…",
+    "summary": "{{p}} ta mahsulot · {{u}} ta yangilandi · {{cc}} ta yangi + {{cm}} ta mavjud kategoriya",
+    "fileTooLarge": "Fayl juda katta — {{mb}} MB dan oshmasligi kerak."
   }
 }

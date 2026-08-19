@@ -15,7 +15,9 @@ import { isUnlimited } from "../../../common/constants/subscription-plans.const"
 import {
   CommitMenuImportDto,
   MenuImportCategoryDraftDto,
+  MenuImportProductDraftDto,
 } from "../dto/menu-import.dto";
+import { foldMenuKey } from "./menu-key-fold";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const SUPPORTED_IMAGE_TYPES = [
@@ -53,6 +55,8 @@ export interface CommitSummary {
   categoriesCreated: number;
   categoriesMatched: number;
   productsCreated: number;
+  productsUpdated: number;
+  productsSkipped: number;
   failures: { category: string; product: string; reason: string }[];
 }
 
@@ -118,47 +122,13 @@ export class MenuImportService {
       };
     });
 
-    const model =
-      this.config.get<string>("MENU_IMPORT_MODEL") || "claude-sonnet-5";
-
     let text: string;
     try {
-      const res = await axios.post(
-        ANTHROPIC_URL,
-        {
-          model,
-          max_tokens: 8000,
-          messages: [
-            {
-              role: "user",
-              content: [
-                ...imageBlocks,
-                { type: "text", text: EXTRACTION_PROMPT },
-              ],
-            },
-          ],
-        },
-        {
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          timeout: 120_000,
-        },
-      );
-      text = (res.data?.content ?? [])
-        .filter((b: any) => b?.type === "text")
-        .map((b: any) => b.text)
-        .join("\n");
-    } catch (err: any) {
+      text = await this.askClaude(imageBlocks, EXTRACTION_PROMPT);
+    } catch (err) {
       // Failed vision call — refund the claim.
       await this.quota.voidUsage(usageId).catch(() => undefined);
-      const detail = err?.response?.data?.error?.message ?? err?.message;
-      this.logger.error(`Anthropic menu-parse failed: ${detail}`);
-      throw new ServiceUnavailableException(
-        "Menu digitisation service is temporarily unavailable — try again.",
-      );
+      throw err;
     }
 
     try {
@@ -171,25 +141,147 @@ export class MenuImportService {
     }
   }
 
-  /** Robustly parse + clamp the model's JSON into the commit DTO shape. */
-  private normaliseDraft(raw: string): CommitMenuImportDto {
+  /** Text (a page, a chunk of one) → draft. Not metered — the caller meters. */
+  async parseTextToDraft(text: string): Promise<CommitMenuImportDto> {
+    const answer = await this.askClaude(
+      [{ type: "text", text }],
+      EXTRACTION_PROMPT,
+    );
+    return this.normaliseDraft(answer, "source");
+  }
+
+  /** A PDF (or any Claude-supported document) → draft. Not metered. */
+  async parseDocumentToDraft(
+    bytes: Buffer,
+    mediaType: string,
+  ): Promise<CommitMenuImportDto> {
+    const answer = await this.askClaude(
+      [
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: mediaType,
+            data: bytes.toString("base64"),
+          },
+        },
+      ],
+      EXTRACTION_PROMPT,
+    );
+    return this.normaliseDraft(answer, "source");
+  }
+
+  /** Header + sample rows → which column is which. Not metered. */
+  async parseColumnMap(
+    sample: string,
+    prompt: string,
+  ): Promise<Record<string, string | null>> {
+    const answer = await this.askClaude(
+      [{ type: "text", text: sample }],
+      prompt,
+    );
+    const cleaned = answer.replace(/```json\s*|\s*```/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      throw new BadRequestException("could not read the column mapping");
+    }
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      throw new BadRequestException("could not read the column mapping");
+    }
+  }
+
+  /**
+   * Single Claude transport for every menu source. Content blocks differ per
+   * source (image / document / text); everything else — model, headers,
+   * timeout, how the answer's text parts are joined — is identical, so it
+   * lives here once.
+   *
+   * Deliberately does NOT touch the quota: the caller claims before and
+   * refunds after, because only the caller knows how many units the whole
+   * operation cost (a chunked import claims N up front).
+   */
+  private async askClaude(blocks: unknown[], prompt: string): Promise<string> {
+    const apiKey = this.config.get<string>("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        "AI menu import is not configured (ANTHROPIC_API_KEY missing).",
+      );
+    }
+    const model =
+      this.config.get<string>("MENU_IMPORT_MODEL") || "claude-sonnet-5";
+    try {
+      const res = await axios.post(
+        ANTHROPIC_URL,
+        {
+          model,
+          max_tokens: 8000,
+          messages: [
+            {
+              role: "user",
+              content: [...blocks, { type: "text", text: prompt }],
+            },
+          ],
+        },
+        {
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          timeout: 120_000,
+        },
+      );
+      return (res.data?.content ?? [])
+        .filter((b: any) => b?.type === "text")
+        .map((b: any) => b.text)
+        .join("\n");
+    } catch (err: any) {
+      const detail = err?.response?.data?.error?.message ?? err?.message;
+      this.logger.error(`Anthropic call failed: ${detail}`);
+      throw new ServiceUnavailableException(
+        "Menu digitisation service is temporarily unavailable — try again.",
+      );
+    }
+  }
+
+  /**
+   * Robustly parse + clamp the model's JSON into the commit DTO shape.
+   *
+   * `source` picks the wording of the two failure messages below: the
+   * default "photo" advice ("try a clearer, well-lit image") is right for
+   * parseMenuPhotos, but nonsensical for a link/file/text import — those
+   * pass "source" instead so an operator who pasted a URL is never told to
+   * take a better picture.
+   */
+  private normaliseDraft(
+    raw: string,
+    source: "photo" | "source" = "photo",
+  ): CommitMenuImportDto {
+    const unreadableMessage =
+      source === "photo"
+        ? "Could not read the menu from the photo — try a clearer, well-lit image."
+        : "Could not read a menu from that source — check the file or link and try again.";
+    const emptyMessage =
+      source === "photo"
+        ? "No menu items were found in the photo — try a clearer image."
+        : "No menu items were found at that source.";
+
     // Strip accidental markdown fences and locate the JSON object.
     const cleaned = raw.replace(/```json\s*|\s*```/g, "").trim();
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start === -1 || end === -1) {
-      throw new ServiceUnavailableException(
-        "Could not read the menu from the photo — try a clearer, well-lit image.",
-      );
+      throw new ServiceUnavailableException(unreadableMessage);
     }
 
     let parsed: any;
     try {
       parsed = JSON.parse(cleaned.slice(start, end + 1));
     } catch {
-      throw new ServiceUnavailableException(
-        "Could not read the menu from the photo — try a clearer, well-lit image.",
-      );
+      throw new ServiceUnavailableException(unreadableMessage);
     }
 
     const validTax = new Set([0, 1, 10, 20]);
@@ -229,11 +321,97 @@ export class MenuImportService {
       : [];
 
     if (!categories.length) {
-      throw new ServiceUnavailableException(
-        "No menu items were found in the photo — try a clearer image.",
-      );
+      throw new ServiceUnavailableException(emptyMessage);
     }
     return { categories };
+  }
+
+  /**
+   * Mark the draft rows that already exist, so the review grid can offer a
+   * choice instead of silently doubling the menu.
+   *
+   * Matching is scoped to the category, not the whole menu: "Ayran" can
+   * legitimately live in both İçecekler and Menüler and those are two
+   * different products. A draft category the tenant does not have yet can
+   * therefore never collide.
+   *
+   * Deliberately does NOT pick a winner when a fold key is ambiguous — the
+   * tenants this feature exists for are exactly the ones whose menu already
+   * got doubled by the old unconditional-CREATE behaviour, so two
+   * same-named products in one category is the expected, not the edge,
+   * case. Ambiguous rows come back with no `existingProductId` (an
+   * `ambiguous: true` marker instead, for the grid to surface) rather than
+   * a nondeterministically-chosen one.
+   */
+  async annotateConflicts(
+    draft: CommitMenuImportDto,
+    tenantId: string,
+  ): Promise<CommitMenuImportDto> {
+    // Product has no deletedAt column (hard-deletes only) — filtering on it
+    // would throw a Prisma validation error at runtime.
+    const existing = await this.prisma.product.findMany({
+      where: { tenantId },
+      // Deterministic order: with none, Postgres is free to return two
+      // same-named-in-one-category products in a different order on every
+      // call, and the "last one wins" index below would then point
+      // UPDATE_PRICE at a different twin each time it runs.
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        category: { select: { name: true } },
+      },
+    });
+
+    const key = (cat: string, name: string) =>
+      `${foldMenuKey(cat)} ${foldMenuKey(name)}`;
+
+    const index = new Map<string, { id: string; price: number }>();
+    const ambiguousKeys = new Set<string>();
+    for (const p of existing) {
+      if (!p.category?.name) continue;
+      const k = key(p.category.name, p.name);
+      if (index.has(k)) {
+        // Product has no unique constraint on (categoryId, name) — two
+        // existing rows already share this fold key. Do not silently pick
+        // one; leave it for the operator to resolve by hand.
+        ambiguousKeys.add(k);
+        continue;
+      }
+      index.set(k, { id: p.id, price: Number(p.price) });
+    }
+
+    // A draft row can itself repeat a (category, name) key — a duplicated
+    // OCR read is the common case. Only the first occurrence claims the
+    // match; a second occurrence claiming the same existing product would
+    // otherwise race UPDATE_PRICE against itself and double-count as two
+    // updates for one product touched.
+    const claimed = new Set<string>();
+    return {
+      categories: draft.categories.map((c) => ({
+        ...c,
+        products: c.products.map((p) => {
+          const k = key(c.name, p.name);
+          if (ambiguousKeys.has(k) || claimed.has(k)) {
+            // Strip any existingProductId the incoming draft already
+            // carried (a re-annotated draft, or a stale grid edit) — an
+            // ambiguous key must never leave with an id attached, or
+            // commit would honour it as a confident match.
+            return { ...p, ambiguous: true, existingProductId: undefined };
+          }
+          const hit = index.get(k);
+          if (!hit) return p;
+          claimed.add(k);
+          return {
+            ...p,
+            existingProductId: hit.id,
+            existingPrice: hit.price,
+            onConflict: "SKIP" as const,
+          };
+        }),
+      })),
+    } as CommitMenuImportDto;
   }
 
   /**
@@ -247,8 +425,15 @@ export class MenuImportService {
     dto: CommitMenuImportDto,
     tenantId: string,
   ): Promise<CommitSummary> {
+    // Only rows that will actually CREATE a product count against the plan
+    // limit — a SKIP, UPDATE_PRICE, or unresolved-ambiguous row touches (or
+    // refuses to touch) an existing product, it does not add one. Shares
+    // resolveRowAction with the commit loop below so the two can never
+    // disagree about which rows create.
     const totalProducts = dto.categories.reduce(
-      (n, c) => n + c.products.length,
+      (n, c) =>
+        n +
+        c.products.filter((p) => this.resolveRowAction(p) === "CREATE").length,
       0,
     );
 
@@ -267,11 +452,9 @@ export class MenuImportService {
       where: { tenantId },
       select: { id: true, name: true },
     });
-    const byName = new Map(
-      existing.map((c) => [c.name.trim().toLowerCase(), c.id]),
-    );
+    const byName = new Map(existing.map((c) => [foldMenuKey(c.name), c.id]));
     const newCategoryCount = dto.categories.filter(
-      (c) => !byName.has(c.name.trim().toLowerCase()),
+      (c) => !byName.has(foldMenuKey(c.name)),
     ).length;
     await this.assertWithinLimit(
       tenantId,
@@ -284,12 +467,21 @@ export class MenuImportService {
       categoriesCreated: 0,
       categoriesMatched: 0,
       productsCreated: 0,
+      productsUpdated: 0,
+      productsSkipped: 0,
       failures: [],
     };
 
+    // Products already repriced by an earlier row in THIS commit call. A
+    // crafted body (commit is callable directly, without going through
+    // annotateConflicts first) can still name the same existingProductId
+    // twice; without this, both rows would "succeed" and productsUpdated
+    // would claim two updates for one product actually touched.
+    const touchedProductIds = new Set<string>();
+
     for (let i = 0; i < dto.categories.length; i++) {
       const cat = dto.categories[i];
-      const key = cat.name.trim().toLowerCase();
+      const key = foldMenuKey(cat.name);
       let categoryId = byName.get(key);
       if (categoryId) {
         summary.categoriesMatched++;
@@ -315,6 +507,115 @@ export class MenuImportService {
       }
 
       for (const p of cat.products) {
+        const action = this.resolveRowAction(p);
+
+        if (action === "AMBIGUOUS") {
+          // annotateConflicts withheld existingProductId on purpose — this
+          // row's (category, name) matched more than one existing product
+          // (or another row in this same draft already claimed the only
+          // match) and the server refused to guess which one. Defaulting
+          // to CREATE here would add a THIRD copy to a menu that is
+          // already doubled — exactly the population this feature exists
+          // to help. Fail instead; the operator's explicit CREATE stays
+          // the escape hatch for "yes, really add another".
+          summary.failures.push({
+            category: cat.name,
+            product: p.name,
+            reason:
+              "this row matches more than one existing product in this " +
+              "category — resolve manually, or choose Create to add another",
+          });
+          continue;
+        }
+
+        if (action === "SKIP") {
+          summary.productsSkipped++;
+          continue;
+        }
+
+        if (action === "UPDATE_PRICE") {
+          // A price of 0 is never a real quote — parsing/normalisation
+          // coerces an unreadable cell to 0, and today only the SKIP
+          // default and the operator's attention stand between a
+          // badly-parsed price and a real, already-selling product being
+          // silently zeroed out. Refuse. A brand-new product created at 0
+          // stays allowed — that is a visible new row the operator can
+          // fix, not a silent edit to something already live.
+          if (p.price === 0) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: "price could not be read — refusing to update to 0",
+            });
+            continue;
+          }
+
+          if (touchedProductIds.has(p.existingProductId!)) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: "already updated by another row in this import",
+            });
+            continue;
+          }
+
+          try {
+            // ProductsService.update already calls findOne(id, tenantId),
+            // which enforces tenant ownership and would throw a 404 for a
+            // foreign id — that would abort the whole import. Checking
+            // ownership AND identity here first turns both into a per-row
+            // failure the operator can see, instead of a thrown 404 (or,
+            // worse, a silent write to the wrong product) that aborts or
+            // corrupts the rest of the import. Identity is re-derived the
+            // same way annotateConflicts computed it — folded (category
+            // name, product name) — so a row whose name or category was
+            // edited in the review grid, or a crafted existingProductId
+            // that actually belongs to a different row, no longer
+            // silently reprices whatever that id currently points to.
+            const owned = await this.prisma.product.findFirst({
+              where: { id: p.existingProductId, tenantId },
+              select: {
+                id: true,
+                name: true,
+                category: { select: { name: true } },
+              },
+            });
+            if (!owned || !owned.category) {
+              summary.failures.push({
+                category: cat.name,
+                product: p.name,
+                reason: "product not found",
+              });
+              continue;
+            }
+            const stillMatches =
+              foldMenuKey(owned.category.name) === foldMenuKey(cat.name) &&
+              foldMenuKey(owned.name) === foldMenuKey(p.name);
+            if (!stillMatches) {
+              summary.failures.push({
+                category: cat.name,
+                product: p.name,
+                reason: "row no longer matches that product",
+              });
+              continue;
+            }
+            await this.products.update(
+              p.existingProductId!,
+              { price: p.price } as any,
+              tenantId,
+            );
+            touchedProductIds.add(p.existingProductId!);
+            summary.productsUpdated++;
+          } catch (err: any) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: err?.message ?? "unknown",
+            });
+          }
+          continue;
+        }
+
         try {
           await this.products.create(
             {
@@ -338,6 +639,26 @@ export class MenuImportService {
     }
 
     return summary;
+  }
+
+  /**
+   * What commitDraft will do with a single draft row. Shared by the
+   * plan-limit pre-check and the commit loop itself so the two can never
+   * disagree about which rows actually create a product.
+   *
+   * `ambiguous` is checked before `existingProductId`: annotateConflicts
+   * never emits both together (it strips existingProductId on an
+   * ambiguous row), but a crafted body could send both, and an ambiguous
+   * row must never be trusted to SKIP/UPDATE_PRICE via a stale id — only
+   * an explicit onConflict: "CREATE" overrides it.
+   */
+  private resolveRowAction(
+    p: MenuImportProductDraftDto,
+  ): "SKIP" | "UPDATE_PRICE" | "CREATE" | "AMBIGUOUS" {
+    if (p.ambiguous) {
+      return p.onConflict === "CREATE" ? "CREATE" : "AMBIGUOUS";
+    }
+    return p.existingProductId ? (p.onConflict ?? "SKIP") : "CREATE";
   }
 
   private async assertWithinLimit(
