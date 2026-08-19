@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  Optional,
+} from "@nestjs/common";
 import { parse as parseCsv } from "csv-parse/sync";
 import ExcelJS from "exceljs";
 import { MenuSourceFetcher } from "./menu-source-fetcher.service";
@@ -13,6 +18,14 @@ import {
 } from "./menu-tabular-mapper";
 import { foldMenuKey } from "./menu-key-fold";
 import { CommitMenuImportDto } from "../dto/menu-import.dto";
+import { EntitlementService } from "../../entitlements/entitlement.service";
+import { EntitlementOfferResolver } from "../../entitlements/entitlement-offer.resolver";
+import {
+  EntitlementRequiredException,
+  OfferSummary,
+} from "../../entitlements/entitlement-required.exception";
+import { hasFeature } from "../../entitlements/entitlement-engine";
+import { PlanFeature } from "../../../common/constants/subscription.enum";
 
 const COLUMN_MAP_PROMPT = `You are mapping a spreadsheet's columns onto a restaurant menu import.
 
@@ -34,6 +47,11 @@ Rules:
 // text columns cannot blow the prompt up unboundedly.
 const SAMPLE_CELL_MAX_CHARS = 80;
 
+// Identical to what `@RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)`
+// resolves to (see requires-feature.decorator.ts) — built the same way so
+// the two can never drift.
+const AI_FEATURE_KEY = `feature.${PlanFeature.AI_CONTENT_GENERATION}`;
+
 /**
  * Turns "a link or a file" into the same draft the photo importer produces.
  *
@@ -42,6 +60,15 @@ const SAMPLE_CELL_MAX_CHARS = 80;
  * to learn which column is which — the rows themselves are mapped locally.
  * That is both cheaper and more accurate than asking a model to retype
  * several hundred prices.
+ *
+ * The AI entitlement gate lives HERE, not on the controller route, for the
+ * same reason: a recognised-header CSV/XLSX never calls the model, so
+ * gating the whole endpoint on `AI_CONTENT_GENERATION` would block a tenant
+ * from the same free bulk-entry capability BulkAddModal already gets
+ * ungated — just because they used a spreadsheet instead of typing. Only
+ * the three paths that actually spend a model call (PDF, HTML/text, and
+ * the unrecognised-header column-map fallback) assert it, each before any
+ * credit is claimed.
  */
 @Injectable()
 export class MenuSourceService {
@@ -51,6 +78,12 @@ export class MenuSourceService {
     private readonly fetcher: MenuSourceFetcher,
     private readonly importSvc: MenuImportService,
     private readonly quota: MenuAiQuotaService,
+    // Required: the AI gate must never silently fail open — same stance
+    // BranchesService takes on its own EntitlementService dependency.
+    private readonly entitlements: EntitlementService,
+    // Optional — without it the gate still DENIES, it just cannot name the
+    // product to buy (see EntitlementGuard's identical comment).
+    @Optional() private readonly offers?: EntitlementOfferResolver,
   ) {}
 
   async parseSource(
@@ -84,6 +117,7 @@ export class MenuSourceService {
       case "xlsx":
         return this.fromRows(tenantId, await this.readXlsx(source.bytes));
       case "pdf":
+        await this.assertAiEntitlement(tenantId);
         return this.metered(tenantId, 1, () =>
           this.importSvc.parseDocumentToDraft(source.bytes, "application/pdf"),
         );
@@ -101,6 +135,7 @@ export class MenuSourceService {
     tenantId: string,
     text: string,
   ): Promise<CommitMenuImportDto> {
+    await this.assertAiEntitlement(tenantId);
     if (!text.trim()) {
       throw new BadRequestException("nothing readable at that link");
     }
@@ -142,6 +177,7 @@ export class MenuSourceService {
     // does not actually exist in this sheet, or a mapping that ends up
     // matching zero rows — is validated INSIDE metered(), so a bad answer
     // refunds the claim instead of silently billing for an empty draft.
+    await this.assertAiEntitlement(tenantId);
     return this.metered(tenantId, 1, async () => {
       const sample = [headers, ...rows.slice(0, 5)]
         .map((r) => r.map(truncateForSample).join(" | "))
@@ -236,6 +272,39 @@ export class MenuSourceService {
   }
 
   /**
+   * Same 403 shape `EntitlementGuard` builds for `@RequiresFeature` — a
+   * hand-rolled duplicate rather than a shared call, matching the existing
+   * precedent (BranchesService.create's branch-cap check) for asserting an
+   * entitlement from inside a service instead of a route guard. Kept in
+   * lock-step with the guard's `deny()`: same offer-resolution best-effort
+   * (never let a catalog hiccup turn a clean 403 into a 500), same
+   * license-vs-product distinction.
+   */
+  private async assertAiEntitlement(tenantId: string): Promise<void> {
+    const set = await this.entitlements.getForTenant(tenantId, null);
+    if (hasFeature(set, AI_FEATURE_KEY)) return;
+
+    const licensed = set.features?.["feature.license"] === true;
+    let offer: OfferSummary | null = null;
+    let reason: "not_owned" | "lapsed" = "not_owned";
+    try {
+      offer = (await this.offers?.forKey(tenantId, AI_FEATURE_KEY)) ?? null;
+      if (!licensed && offer?.kind !== "license") {
+        offer = (await this.offers?.licenceOffer(tenantId)) ?? offer;
+      }
+      reason = (await this.offers?.reasonFor(tenantId, offer)) ?? "not_owned";
+    } catch {
+      // Never let offer resolution turn a clean 403 into a 500.
+    }
+    throw new EntitlementRequiredException({
+      requirement: { type: "feature", key: AI_FEATURE_KEY },
+      offer,
+      licenseRequired: !licensed,
+      reason,
+    });
+  }
+
+  /**
    * Claim up front, refund the whole claim on any failure. The operator got
    * nothing, so they pay nothing — same contract parseMenuPhotos honours.
    */
@@ -283,11 +352,53 @@ export function htmlToText(html: string): string {
     .join("\n");
 }
 
+const DELIMITER_CANDIDATES = [";", ",", "\t"] as const;
+
+/**
+ * csv-parse's `delimiter` option accepts an array, but that does NOT mean
+ * "try each one and see" — it means "treat every one of these as a
+ * delimiter, simultaneously". A semicolon-delimited Turkish export whose
+ * prices use a decimal comma ("180,50") then gets shredded on both
+ * characters at once: "Fiyat" turns into two fields, "180" and "50", and
+ * every field after it shifts — which is exactly the shape Excel writes
+ * under a Turkish locale, not a rare edge case for this product.
+ *
+ * So the delimiter is sniffed from the header line ourselves — whichever
+ * of `;`, `,`, `\t` appears most often outside quotes — and only that one
+ * character is handed to csv-parse.
+ */
+export function sniffCsvDelimiter(headerLine: string): string {
+  const counts: Record<string, number> = { ";": 0, ",": 0, "\t": 0 };
+  let inQuotes = false;
+  for (let i = 0; i < headerLine.length; i++) {
+    const ch = headerLine[i];
+    if (ch === '"') {
+      if (inQuotes && headerLine[i + 1] === '"') {
+        i++; // escaped "" inside a quoted field — not a close-quote
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (!inQuotes && ch in counts) counts[ch]++;
+  }
+  let best: string = ",";
+  let bestCount = 0;
+  for (const c of DELIMITER_CANDIDATES) {
+    if (counts[c] > bestCount) {
+      bestCount = counts[c];
+      best = c;
+    }
+  }
+  return best; // "," when every candidate's count is zero (single column).
+}
+
 export function csvToRows(bytes: Buffer): string[][] {
   const text = bytes.toString("utf8").replace(/^﻿/, "");
-  // Let csv-parse work out , vs ; vs tab — Turkish exports use ; routinely.
+  const headerLine = text.split(/\r\n|\r|\n/, 1)[0] ?? "";
+  const delimiter = sniffCsvDelimiter(headerLine);
   return parseCsv(text, {
-    delimiter: [",", ";", "\t"],
+    delimiter,
     relax_column_count: true,
     skip_empty_lines: true,
     trim: true,

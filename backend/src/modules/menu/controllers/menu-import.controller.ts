@@ -66,11 +66,15 @@ export class MenuImportController {
     return this.menuImport.parseMenuPhotos(req.tenantId, images);
   }
 
-  // Same gate as photo parse: this is an AI call and it costs a credit.
-  // commit below stays ungated, as it already is.
+  // NOT gated with @RequiresFeature here, unlike photo parse: a
+  // recognised-header CSV/XLSX never calls the model at all (same free
+  // bulk-entry capability BulkAddModal already gets ungated), so gating the
+  // whole endpoint would block that path along with the AI ones. The three
+  // paths that actually spend a model call — PDF, HTML/text, and the
+  // unrecognised-header column-map fallback — assert the entitlement
+  // themselves inside MenuSourceService, before any credit is claimed.
   @Post("parse-source")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @RequiresFeature(PlanFeature.AI_CONTENT_GENERATION)
   @ApiConsumes("multipart/form-data", "application/json")
   @ApiOperation({
     summary:

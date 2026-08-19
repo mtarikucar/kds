@@ -1,6 +1,20 @@
 import { Logger } from "@nestjs/common";
 import ExcelJS from "exceljs";
-import { MenuSourceService } from "./menu-source.service";
+import {
+  MenuSourceService,
+  csvToRows,
+  sniffCsvDelimiter,
+} from "./menu-source.service";
+
+/** A minimal EntitlementSet, entitled or not, for getForTenant to resolve. */
+function entitlementSet(aiContentGeneration: boolean) {
+  return {
+    features: { "feature.aiContentGeneration": aiContentGeneration, "feature.license": true },
+    limits: {},
+    integrations: {},
+    computedAt: new Date().toISOString(),
+  };
+}
 
 describe("MenuSourceService", () => {
   let svc: MenuSourceService;
@@ -11,6 +25,7 @@ describe("MenuSourceService", () => {
     parseColumnMap: jest.Mock;
   };
   let quota: { claim: jest.Mock; attachJob: jest.Mock; voidUsage: jest.Mock };
+  let entitlements: { getForTenant: jest.Mock };
 
   const TENANT = "t1";
 
@@ -30,7 +45,18 @@ describe("MenuSourceService", () => {
       attachJob: jest.fn().mockResolvedValue(undefined),
       voidUsage: jest.fn().mockResolvedValue(undefined),
     };
-    svc = new MenuSourceService(fetcher as any, importSvc as any, quota as any);
+    // Entitled by default — most tests are about routing/metering, not the
+    // gate itself. The gate-specific tests below override this per case.
+    entitlements = {
+      getForTenant: jest.fn().mockResolvedValue(entitlementSet(true)),
+    };
+    svc = new MenuSourceService(
+      fetcher as any,
+      importSvc as any,
+      quota as any,
+      entitlements as any,
+      undefined, // EntitlementOfferResolver — optional, absent in these tests
+    );
   });
 
   it("routes a CSV to the local mapper and never calls the model", async () => {
@@ -422,6 +448,175 @@ describe("MenuSourceService", () => {
       ).rejects.toThrow(/could not be read/i);
       expect(quota.claim).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("AI entitlement gate — asserted per model-calling path, not on the whole endpoint", () => {
+    it("a recognised-header CSV succeeds with no entitlement at all (never calls the model)", async () => {
+      entitlements.getForTenant.mockResolvedValue(entitlementSet(false));
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("Ad,Fiyat,Kategori\nAyran,25,İçecekler\n"),
+        contentType: "text/csv",
+        filename: "menu.csv",
+        finalUrl: "https://x.test/menu.csv",
+      });
+
+      const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.csv" });
+
+      expect(draft.categories[0].products[0]).toMatchObject({ name: "Ayran", price: 25 });
+      // The gate must not even be consulted on this path.
+      expect(entitlements.getForTenant).not.toHaveBeenCalled();
+      expect(quota.claim).not.toHaveBeenCalled();
+    });
+
+    it("a PDF is refused without the entitlement, before any credit is claimed", async () => {
+      entitlements.getForTenant.mockResolvedValue(entitlementSet(false));
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("%PDF-1.7 ..."),
+        contentType: "application/pdf",
+        filename: "menu.pdf",
+        finalUrl: "https://x.test/menu.pdf",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.pdf" }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(quota.claim).not.toHaveBeenCalled();
+      expect(importSvc.parseDocumentToDraft).not.toHaveBeenCalled();
+    });
+
+    it("HTML/text is refused without the entitlement, before any credit is claimed", async () => {
+      entitlements.getForTenant.mockResolvedValue(entitlementSet(false));
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("<html><body><h2>İçecekler</h2><p>Ayran 25</p></body></html>"),
+        contentType: "text/html",
+        finalUrl: "https://x.test/",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/" }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(quota.claim).not.toHaveBeenCalled();
+      expect(importSvc.parseTextToDraft).not.toHaveBeenCalled();
+    });
+
+    it("an unrecognised-header CSV is refused without the entitlement, before any credit is claimed", async () => {
+      entitlements.getForTenant.mockResolvedValue(entitlementSet(false));
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("Ürün Kodu,Bedel\nAyran,25\n"),
+        contentType: "text/csv",
+        filename: "menu.csv",
+        finalUrl: "https://x.test/menu.csv",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(quota.claim).not.toHaveBeenCalled();
+      expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
+    });
+
+    it("the 403 carries the same ENTITLEMENT_REQUIRED shape EntitlementGuard produces", async () => {
+      entitlements.getForTenant.mockResolvedValue(entitlementSet(false));
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("%PDF-1.7 ..."),
+        contentType: "application/pdf",
+        filename: "menu.pdf",
+        finalUrl: "https://x.test/menu.pdf",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.pdf" }),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: expect.objectContaining({
+          errorCode: "ENTITLEMENT_REQUIRED",
+          requirement: { type: "feature", key: "feature.aiContentGeneration" },
+        }),
+      });
+    });
+  });
+
+  describe("CSV delimiter sniffing — an array delimiter to csv-parse means ALL of them at once, not 'pick one'", () => {
+    it("sniffCsvDelimiter picks ';' for a Turkish semicolon header", () => {
+      expect(sniffCsvDelimiter("Ürün Adı;Açıklama;Fiyat;Kategori")).toBe(";");
+    });
+
+    it("sniffCsvDelimiter picks ',' for a plain comma header", () => {
+      expect(sniffCsvDelimiter("Ad,Fiyat,Kategori")).toBe(",");
+    });
+
+    it("sniffCsvDelimiter picks tab for a tab-separated header", () => {
+      expect(sniffCsvDelimiter("Ad\tFiyat\tKategori")).toBe("\t");
+    });
+
+    it("sniffCsvDelimiter ignores delimiter characters inside quotes", () => {
+      expect(sniffCsvDelimiter('Ürün Adı;"Açıklama, uzun metin";Fiyat')).toBe(";");
+    });
+
+    it("sniffCsvDelimiter falls back to ',' when no delimiter is present (single column)", () => {
+      expect(sniffCsvDelimiter("Ürün")).toBe(",");
+    });
+
+    it("csvToRows correctly splits a Turkish semicolon file with decimal-comma prices, instead of shredding on both characters", () => {
+      const bytes = Buffer.from(
+        "Ürün Adı;Açıklama;Fiyat;Kategori\nAdana Kebap;Acılı;180,50;Ana Yemekler\n",
+      );
+      const rows = csvToRows(bytes);
+      expect(rows[0]).toEqual(["Ürün Adı", "Açıklama", "Fiyat", "Kategori"]);
+      // Previously (delimiter: [",",";","\t"]) this came back as 5 fields:
+      // ["Adana Kebap","Acılı","180","50","Ana Yemekler"].
+      expect(rows[1]).toEqual(["Adana Kebap", "Acılı", "180,50", "Ana Yemekler"]);
+    });
+
+    it("csvToRows parses a plain comma file correctly", () => {
+      const rows = csvToRows(Buffer.from("Ad,Fiyat\nAyran,25\n"));
+      expect(rows).toEqual([["Ad", "Fiyat"], ["Ayran", "25"]]);
+    });
+
+    it("csvToRows parses a tab-delimited file correctly", () => {
+      const rows = csvToRows(Buffer.from("Ad\tFiyat\nAyran\t25\n"));
+      expect(rows).toEqual([["Ad", "Fiyat"], ["Ayran", "25"]]);
+    });
+
+    it("csvToRows keeps a quoted comma intact inside a semicolon-delimited field", () => {
+      const bytes = Buffer.from(
+        'Ürün Adı;Açıklama;Fiyat\nAdana Kebap;"Acılı, baharatlı, közlenmiş";180,50\n',
+      );
+      const rows = csvToRows(bytes);
+      expect(rows[1]).toEqual(["Adana Kebap", "Acılı, baharatlı, közlenmiş", "180,50"]);
+    });
+
+    it("csvToRows handles a single-column file with no delimiter at all", () => {
+      const rows = csvToRows(Buffer.from("Ürün\nAyran\nKebap\n"));
+      expect(rows).toEqual([["Ürün"], ["Ayran"], ["Kebap"]]);
+    });
+
+    it("end-to-end: a Turkish semicolon CSV with comma-decimal prices imports the right names/prices/categories — no more '50'/'90' phantom categories", async () => {
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from(
+          "Ürün Adı;Açıklama;Fiyat;Kategori\n" +
+            "Adana Kebap;Acılı;180,50;Ana Yemekler\n" +
+            "Ayran;;12,90;İçecekler\n",
+        ),
+        contentType: "text/csv",
+        filename: "menu.csv",
+        finalUrl: "https://x.test/menu.csv",
+      });
+
+      const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.csv" });
+
+      const categoryNames = (draft.categories as any[]).map((c) => c.name).sort();
+      expect(categoryNames).toEqual(["Ana Yemekler", "İçecekler"]);
+      expect(categoryNames).not.toContain("50");
+      expect(categoryNames).not.toContain("90");
+      const anaYemekler = (draft.categories as any[]).find((c) => c.name === "Ana Yemekler")!;
+      expect(anaYemekler.products[0]).toMatchObject({ name: "Adana Kebap", price: 180.5 });
+      const icecekler = (draft.categories as any[]).find((c) => c.name === "İçecekler")!;
+      expect(icecekler.products[0]).toMatchObject({ name: "Ayran", price: 12.9 });
+      // Recognised headers — still never touches the model or the gate.
+      expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
+      expect(quota.claim).not.toHaveBeenCalled();
     });
   });
 });
