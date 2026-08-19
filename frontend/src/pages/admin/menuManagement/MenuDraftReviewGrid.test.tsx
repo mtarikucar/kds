@@ -4,9 +4,21 @@ import MenuDraftReviewGrid from "./MenuDraftReviewGrid";
 import { useMenuDraft } from "./useMenuDraft";
 import { renderHook, act } from "@testing-library/react";
 
+// Interpolates {{var}} against whichever argument carries the values —
+// this codebase calls t() both as t(key, optionsWithDefaultValue) and as
+// t(key, defaultValueString, options). A mock that ignores interpolation
+// entirely lets an assertion pass for the wrong reason (a literal
+// "{{p}}" happens to satisfy a loose text match) instead of proving the
+// label actually renders the value.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (k: string, d?: any) => (typeof d === "string" ? d : d?.defaultValue ?? k),
+    t: (key: string, defaultValueOrOptions?: any, maybeOptions?: any) => {
+      const hasStringDefault = typeof defaultValueOrOptions === "string";
+      const template = hasStringDefault ? defaultValueOrOptions : (defaultValueOrOptions?.defaultValue ?? key);
+      const values = hasStringDefault ? maybeOptions : defaultValueOrOptions;
+      if (typeof template !== "string" || !values) return template;
+      return template.replace(/\{\{(\w+)\}\}/g, (_: string, name: string) => String(values[name] ?? ""));
+    },
   }),
 }));
 
@@ -102,6 +114,100 @@ describe("useMenuDraft", () => {
     const cleaned = result.current.cleanForCommit();
     expect(cleaned!.categories[0].products.map((p) => p.name)).toEqual(["B"]);
   });
+
+  it("cleanForCommit trims product names, so the server sees the same key draftAfterCommit will match on", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [{ name: " X ", products: [{ name: " Ayran ", price: 25 }] }],
+      }),
+    );
+    const cleaned = result.current.cleanForCommit();
+    expect(cleaned!.categories[0].name).toBe("X");
+    expect(cleaned!.categories[0].products[0].name).toBe("Ayran");
+  });
+
+  it("withheldCounts reports SKIP and unresolved-ambiguous rows separately", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [
+          {
+            name: "X",
+            products: [
+              { name: "A", price: 1, existingProductId: "p1", onConflict: "SKIP" },
+              { name: "B", price: 2, ambiguous: true },
+              { name: "C", price: 3, ambiguous: true, onConflict: "CREATE" },
+              { name: "D", price: 4 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.current.withheldCounts).toEqual({ skipped: 1, ambiguous: 1 });
+  });
+
+  it("draftAfterCommit returns null after a clean commit with nothing withheld", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [{ name: "X", products: [{ name: "A", price: 1 }] }],
+      }),
+    );
+    expect(result.current.draftAfterCommit([])).toBeNull();
+  });
+
+  it("draftAfterCommit retains an unresolved ambiguous row after a clean commit, drops the sent row", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [
+          {
+            name: "X",
+            products: [
+              { name: "A", price: 1 },
+              { name: "B", price: 2, ambiguous: true },
+            ],
+          },
+        ],
+      }),
+    );
+    const remaining = result.current.draftAfterCommit([]);
+    expect(remaining!.categories[0].products.map((p) => p.name)).toEqual(["B"]);
+  });
+
+  it("draftAfterCommit matches a server failure by trimmed name, even when the draft row has padding", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [{ name: "X", products: [{ name: " Ayran ", price: 1 }] }],
+      }),
+    );
+    const remaining = result.current.draftAfterCommit([{ category: "X", product: "Ayran" }]);
+    expect(remaining!.categories[0].products).toHaveLength(1);
+  });
+
+  it("draftAfterCommit falls back to every sent row instead of emptying the draft on a key mismatch", () => {
+    const { result } = renderHook(() => useMenuDraft());
+    act(() =>
+      result.current.setDraft({
+        categories: [
+          {
+            name: "X",
+            products: [
+              { name: "A", price: 1 },
+              { name: "B", price: 2 },
+            ],
+          },
+        ],
+      }),
+    );
+    // Reports a failure but under a key that matches nothing in the draft.
+    const remaining = result.current.draftAfterCommit([
+      { category: "does-not-exist", product: "nor-this" },
+    ]);
+    expect(remaining!.categories[0].products.map((p) => p.name)).toEqual(["A", "B"]);
+  });
 });
 
 describe("MenuDraftReviewGrid", () => {
@@ -139,7 +245,10 @@ describe("MenuDraftReviewGrid", () => {
 
   it("surfaces the existing price on a conflicting row", () => {
     render(<MenuDraftReviewGrid controls={controls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
-    expect(screen.getByText(/20/)).toBeInTheDocument();
+    // Assert via the dedicated testid, not a loose /20/ text match — the
+    // %20 tax-rate <option> would satisfy that regex even if this label
+    // were deleted entirely.
+    expect(screen.getByTestId("existing-price-0-0")).toHaveTextContent("20");
   });
 
   const ambiguousControls = {

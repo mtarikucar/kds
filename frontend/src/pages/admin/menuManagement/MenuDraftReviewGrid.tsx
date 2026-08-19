@@ -188,12 +188,17 @@ export default function MenuDraftReviewGrid({
                   </div>
                 ) : p.existingProductId ? (
                   <div className="col-span-2 flex items-center gap-1">
-                    <span className="whitespace-nowrap text-xs text-amber-700">
+                    <span
+                      data-testid={`existing-price-${ci}-${pi}`}
+                      className="whitespace-nowrap text-xs text-amber-700"
+                    >
                       {t("menu:import.conflict.was", "şu an {{p}}", { p: p.existingPrice })}
                     </span>
                     <select
                       value={p.onConflict ?? "SKIP"}
-                      onChange={(e) => updateProduct(ci, pi, { onConflict: e.target.value })}
+                      onChange={(e) =>
+                        updateProduct(ci, pi, { onConflict: e.target.value as ConflictPolicy })
+                      }
                       className={`${cellCls} text-xs`}
                     >
                       {POLICIES.map((op) => (

@@ -56,6 +56,11 @@ function MenuImportTabInner({
 
   const [photos, setPhotos] = useState<File[]>([]);
   const [summary, setSummary] = useState<MenuImportCommitSummary | null>(null);
+  // Snapshotted from controls.withheldCounts at the moment of commit — the
+  // server's own productsSkipped is structurally always 0 (SKIP rows never
+  // leave the browser), so it can't be used to tell the operator what
+  // didn't happen. This is computed client-side instead.
+  const [withheld, setWithheld] = useState<{ skipped: number; ambiguous: number } | null>(null);
 
   // One object URL per File, revoked when the photo set changes/unmounts —
   // creating them inline in render leaked a blob URL on every render.
@@ -108,42 +113,37 @@ function MenuImportTabInner({
       toast.error(t("menu:import.nothingToImport", "İçe aktarılacak ürün yok"));
       return;
     }
+    // Snapshot BEFORE the request: what cleanForCommit is holding back right
+    // now, so the summary can report it even though the server never saw
+    // those rows (and its productsSkipped can't be trusted for this).
+    const withheldNow = controls.withheldCounts;
     try {
       const result = await commit.mutateAsync(cleaned);
       setSummary(result);
+      setWithheld(withheldNow);
+      // What's left to review: server-reported failures, plus any
+      // ambiguous row that was never sent because it's still unresolved.
+      // Retained (not nulled) so the operator can come back to it instead
+      // of it silently vanishing along with a parse they already paid
+      // for. An ordinary SKIP conflict is not retained — it was a
+      // deliberate, completed choice.
+      const remaining = controls.draftAfterCommit(result.failures);
+      setDraft(remaining);
+      if (!remaining) setPhotos([]);
       if (result.failures.length === 0) {
-        setDraft(null);
-        setPhotos([]);
         toast.success(
           t("menu:import.done", "{{count}} ürün oluşturuldu", {
             count: result.productsCreated,
           }),
         );
-        return;
+      } else {
+        toast.warning(
+          t("menu:import.partial", "{{ok}} ürün eklendi, {{fail}} başarısız.", {
+            ok: result.productsCreated,
+            fail: result.failures.length,
+          }),
+        );
       }
-      // Partial: keep ONLY the rows that failed so they can be fixed and
-      // retried, the way BulkAddModal already does. Clearing the whole
-      // draft here would throw away a parse the tenant was already
-      // charged for over rows that had nothing wrong with them.
-      const failedKeys = new Set(
-        result.failures.map((f) => `${f.category}||${f.product}`),
-      );
-      setDraft({
-        categories: cleaned.categories
-          .map((c) => ({
-            ...c,
-            products: c.products.filter((p) =>
-              failedKeys.has(`${c.name}||${p.name.trim()}`),
-            ),
-          }))
-          .filter((c) => c.products.length),
-      });
-      toast.warning(
-        t("menu:import.partial", "{{ok}} ürün eklendi, {{fail}} başarısız.", {
-          ok: result.productsCreated,
-          fail: result.failures.length,
-        }),
-      );
     } catch {
       /* toast handled in the hook */
     }
@@ -153,6 +153,7 @@ function MenuImportTabInner({
     setDraft(null);
     setPhotos([]);
     setSummary(null);
+    setWithheld(null);
   };
 
   return (
@@ -265,16 +266,27 @@ function MenuImportTabInner({
           <p className="text-sm text-green-700">
             {t(
               "menu:import.summary",
-              "{{p}} ürün · {{u}} güncellendi · {{s}} atlandı · {{cc}} yeni + {{cm}} mevcut kategori",
+              "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori",
               {
                 p: summary.productsCreated,
                 u: summary.productsUpdated,
-                s: summary.productsSkipped,
                 cc: summary.categoriesCreated,
                 cm: summary.categoriesMatched,
               },
             )}
           </p>
+          {/* Computed client-side, not from summary.productsSkipped — SKIP
+              rows and unresolved-ambiguous rows never reach the server, so
+              its own count of them is structurally always 0. */}
+          {withheld && (withheld.skipped > 0 || withheld.ambiguous > 0) && (
+            <p className="mt-1 text-sm text-amber-700">
+              {t(
+                "menu:import.withheld",
+                "{{s}} atlandı · {{a}} belirsiz, aktarılmadı",
+                { s: withheld.skipped, a: withheld.ambiguous },
+              )}
+            </p>
+          )}
           {summary.failures.length > 0 && (
             <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
               <div className="mb-1 flex items-center gap-1 font-medium">
