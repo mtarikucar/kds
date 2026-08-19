@@ -1184,8 +1184,12 @@ const POSPage = () => {
                 />
               </div>
 
-              {/* Order Cart - 1/3 width */}
-              <div className="col-span-1" data-tour="order-cart">
+              {/* Order Cart - 1/3 width. min-h-0 like its sibling: without it
+                  this column's automatic minimum size is the whole cart's
+                  min-content (header + every line + totals + buttons), which
+                  sizes the grid row and pushes the row past the grid box —
+                  a long order dragged the bottom of the cart out of reach. */}
+              <div className="col-span-1 min-h-0" data-tour="order-cart">
                 <div className="sticky top-0 h-full">
                   <OrderCart
                     items={cartItems}

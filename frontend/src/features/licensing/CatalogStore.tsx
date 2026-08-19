@@ -337,6 +337,53 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
             </ul>
           </section>
         ))}
+
+        {/* On a phone the bill sits below the whole catalog, so ticking a line
+            gives no feedback until you scroll past every section. Mirrors the POS
+            sticky cart bar (components/pos/StickyCartBar): running total always
+            visible, one tap to act. Hidden at lg, where the bill is beside the
+            list and already in view. */}
+        {billLines.length > 0 && (
+          // sticky to the page's own scroll box, not fixed to the viewport:
+          // between 768px and 1023px `lg:hidden` still renders this bar while
+          // the sidebar is already docked at 256px, so a viewport-fixed bar put
+          // its running total and its "N seçildi" label behind the sidebar.
+          // It sits at the end of the tall catalog column so it has somewhere
+          // to travel — a sticky box whose containing block is no taller than
+          // itself never actually sticks.
+          <div className="sticky bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500">
+                  {t('licensing:store.selectedCount', { count: billLines.length })}
+                </div>
+                <div className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                  {formatCents(totalCents)}
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  // Consent lives in the bill. Sending them there beats a
+                  // disabled button with no explanation of what to do about it.
+                  if (!consentGiven) {
+                    document
+                      .getElementById('catalog-bill')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                  }
+                  void pay();
+                }}
+                disabled={busy}
+                className="shrink-0"
+              >
+                <ShoppingCart size={16} className="mr-1" />
+                {consentGiven
+                  ? t('licensing:store.pay')
+                  : t('licensing:store.reviewBill')}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── The bill ────────────────────────────────────────────────── */}
@@ -423,48 +470,8 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
         </Button>
       </aside>
 
-      {/* On a phone the bill sits below the whole catalog, so ticking a line
-          gives no feedback until you scroll past every section. Mirrors the POS
-          sticky cart bar (components/pos/StickyCartBar): running total always
-          visible, one tap to act. Hidden at lg, where the bill is beside the
-          list and already in view. */}
-      {billLines.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 p-3 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95 lg:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs text-gray-500">
-                {t('licensing:store.selectedCount', { count: billLines.length })}
-              </div>
-              <div className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                {formatCents(totalCents)}
-              </div>
-            </div>
-            <Button
-              onClick={() => {
-                // Consent lives in the bill. Sending them there beats a
-                // disabled button with no explanation of what to do about it.
-                if (!consentGiven) {
-                  document
-                    .getElementById('catalog-bill')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  return;
-                }
-                void pay();
-              }}
-              disabled={busy}
-              className="shrink-0"
-            >
-              <ShoppingCart size={16} className="mr-1" />
-              {consentGiven
-                ? t('licensing:store.pay')
-                : t('licensing:store.reviewBill')}
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Clears the fixed bar so the last row is never trapped under it. */}
-      {billLines.length > 0 && <div className="h-24 lg:hidden" aria-hidden />}
     </div>
   );
 };

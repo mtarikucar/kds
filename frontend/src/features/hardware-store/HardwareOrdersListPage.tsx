@@ -97,8 +97,14 @@ export default function HardwareOrdersListPage({ embedded = false }: { embedded?
           </Link>
         </div>
       ) : (
-        <div className="overflow-hidden rounded border bg-white">
-          <table className="w-full text-sm">
+        // overflow-x-auto, not just overflow-hidden: the hidden was only there
+        // to clip the rounded corners, but it also swallowed this 7-column
+        // table's horizontal overflow with no scrollbar anywhere — and the
+        // shell above clips too, so the columns past the fold were simply
+        // unreachable on a phone. min-w keeps the columns legible while the
+        // wrapper scrolls.
+        <div className="overflow-x-auto rounded border bg-white">
+          <table className="w-full min-w-[46rem] text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-2">{t('ordersList.col.orderNo')}</th>
