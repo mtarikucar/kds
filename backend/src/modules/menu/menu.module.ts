@@ -5,6 +5,8 @@ import { MenuQueryService } from "./services/menu-query.service";
 import { MenuCollectionsService } from "./services/menu-collections.service";
 import { MenuCacheService } from "./services/menu-cache.service";
 import { MenuImportService } from "./services/menu-import.service";
+import { MenuSourceService } from "./services/menu-source.service";
+import { MenuSourceFetcher } from "./services/menu-source-fetcher.service";
 import { Product3dService } from "./services/product-3d.service";
 import { ProductMediaService } from "./services/product-media.service";
 import { MenuAiQuotaService } from "./services/menu-ai-quota.service";
@@ -41,6 +43,8 @@ import { UploadModule } from "../upload/upload.module";
     MenuCollectionsService,
     MenuCacheService,
     MenuImportService,
+    MenuSourceService,
+    MenuSourceFetcher,
     Product3dService,
     ProductMediaService,
     MenuAiQuotaService,
