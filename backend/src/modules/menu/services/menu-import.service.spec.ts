@@ -18,6 +18,11 @@ describe("MenuImportService", () => {
   const TENANT = "t1";
 
   beforeEach(() => {
+    // axios is module-mocked once for the whole file (jest.mock("axios") at
+    // the top), so its call history is otherwise cumulative across every
+    // `it` here — clear it so a test asserting on axios.post's call count
+    // or args never sees a call made by an earlier test.
+    (axios.post as jest.Mock).mockClear();
     prisma = mockPrismaClient();
     config = { get: jest.fn() };
     categories = { create: jest.fn() };
@@ -231,5 +236,29 @@ describe("MenuImportService", () => {
       const summary = await svc.commitDraft(draft as any, TENANT);
       expect(summary.productsCreated).toBe(3);
     });
+  });
+
+  it("askClaude posts the given blocks and joins text parts", async () => {
+    config.get.mockImplementation((k: string) =>
+      k === "ANTHROPIC_API_KEY" ? "key1" : undefined,
+    );
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: { content: [{ type: "text", text: "a" }, { type: "other" }, { type: "text", text: "b" }] },
+    });
+
+    const out = await (svc as any).askClaude(
+      [{ type: "text", text: "BLOCK" }],
+      "PROMPT",
+    );
+
+    expect(out).toBe("a\nb");
+    const [url, body, opts] = (axios.post as jest.Mock).mock.calls[0];
+    expect(url).toBe("https://api.anthropic.com/v1/messages");
+    expect(body.messages[0].content).toEqual([
+      { type: "text", text: "BLOCK" },
+      { type: "text", text: "PROMPT" },
+    ]);
+    expect(opts.headers["anthropic-version"]).toBe("2023-06-01");
+    expect(opts.timeout).toBe(120_000);
   });
 });

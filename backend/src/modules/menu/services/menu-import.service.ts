@@ -118,10 +118,44 @@ export class MenuImportService {
       };
     });
 
+    let text: string;
+    try {
+      text = await this.askClaude(imageBlocks, EXTRACTION_PROMPT);
+    } catch (err) {
+      // Failed vision call — refund the claim.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
+      throw err;
+    }
+
+    try {
+      return this.normaliseDraft(text);
+    } catch (err) {
+      // The model answered but with an unusable draft — the user got
+      // nothing, so give the unit back.
+      await this.quota.voidUsage(usageId).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  /**
+   * Single Claude transport for every menu source. Content blocks differ per
+   * source (image / document / text); everything else — model, headers,
+   * timeout, how the answer's text parts are joined — is identical, so it
+   * lives here once.
+   *
+   * Deliberately does NOT touch the quota: the caller claims before and
+   * refunds after, because only the caller knows how many units the whole
+   * operation cost (a chunked import claims N up front).
+   */
+  private async askClaude(blocks: unknown[], prompt: string): Promise<string> {
+    const apiKey = this.config.get<string>("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        "AI menu import is not configured (ANTHROPIC_API_KEY missing).",
+      );
+    }
     const model =
       this.config.get<string>("MENU_IMPORT_MODEL") || "claude-sonnet-5";
-
-    let text: string;
     try {
       const res = await axios.post(
         ANTHROPIC_URL,
@@ -129,13 +163,7 @@ export class MenuImportService {
           model,
           max_tokens: 8000,
           messages: [
-            {
-              role: "user",
-              content: [
-                ...imageBlocks,
-                { type: "text", text: EXTRACTION_PROMPT },
-              ],
-            },
+            { role: "user", content: [...blocks, { type: "text", text: prompt }] },
           ],
         },
         {
@@ -147,27 +175,16 @@ export class MenuImportService {
           timeout: 120_000,
         },
       );
-      text = (res.data?.content ?? [])
+      return (res.data?.content ?? [])
         .filter((b: any) => b?.type === "text")
         .map((b: any) => b.text)
         .join("\n");
     } catch (err: any) {
-      // Failed vision call — refund the claim.
-      await this.quota.voidUsage(usageId).catch(() => undefined);
       const detail = err?.response?.data?.error?.message ?? err?.message;
-      this.logger.error(`Anthropic menu-parse failed: ${detail}`);
+      this.logger.error(`Anthropic call failed: ${detail}`);
       throw new ServiceUnavailableException(
         "Menu digitisation service is temporarily unavailable — try again.",
       );
-    }
-
-    try {
-      return this.normaliseDraft(text);
-    } catch (err) {
-      // The model answered but with an unusable draft — the user got
-      // nothing, so give the unit back.
-      await this.quota.voidUsage(usageId).catch(() => undefined);
-      throw err;
     }
   }
 
