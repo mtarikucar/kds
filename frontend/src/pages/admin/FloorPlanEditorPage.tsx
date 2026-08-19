@@ -346,9 +346,19 @@ export default function FloorPlanEditorPage({
   return (
     <div
       className={
+        // Both variants fill whatever box the parent gives them rather than
+        // guessing the viewport: embedded, that box is the Tables page's
+        // editor column; standalone, it is <main> itself (see the
+        // page-height contract in Layout.tsx). The old calc(100vh-15rem) /
+        // calc(100vh-7rem) pair double-counted the header, ignored the demo
+        // and renewal banners, and on mobile measured a viewport taller
+        // than the one the user can actually see.
         embedded
-          ? 'flex flex-col h-[calc(100vh-15rem)] min-h-[28rem] rounded-2xl border border-slate-200/60 bg-white overflow-hidden'
-          : 'flex flex-col h-[calc(100vh-7rem)] -m-4 md:-m-6'
+          ? 'flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200/60 bg-white overflow-hidden'
+          : // Standalone the canvas bleeds over <main>'s padding, so its height
+            // is that padding back on top of the content box — the negative
+            // margins then pull it flush to all four edges.
+            'flex min-h-0 flex-col h-[calc(100%+2rem)] md:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)] -m-4 md:-m-6 lg:-m-8'
       }
     >
       {/* header — hidden when embedded in the Tables page (which supplies its

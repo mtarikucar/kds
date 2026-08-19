@@ -8,6 +8,7 @@ import NotificationCenter from '../NotificationCenter';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { MascotButton } from '../../features/onboarding';
 import BranchPicker from './BranchPicker';
+import { useUiStore } from '../../store/uiStore';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -18,6 +19,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
   const user = useAuthStore((state) => state.user);
   const demoMode = useAuthStore((state) => state.demoMode);
   const { mutate: logout, isPending } = useLogout();
+  const isSidebarCollapsed = useUiStore((state) => state.isSidebarCollapsed);
 
   return (
     <header className="bg-white border-b border-slate-200/60 px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 sticky top-0 z-30">
@@ -32,7 +34,17 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             <Menu className="h-5 w-5" />
           </button>
 
-          <h1 className="text-lg sm:text-xl md:text-2xl font-heading font-bold text-slate-900 truncate">
+          {/* The sidebar carries the same wordmark whenever it is docked and
+              expanded, which is exactly the md-to-lg band where the header
+              has the least room — so drop the duplicate there rather than
+              truncate it to "Hum…". Below md the sidebar is off-canvas, and
+              when it is collapsed to icons its wordmark is hidden; in both
+              cases this is the only brand on screen, so it stays. */}
+          <h1
+            className={`text-lg sm:text-xl md:text-2xl font-heading font-bold text-slate-900 truncate ${
+              isSidebarCollapsed ? '' : 'md:hidden lg:block'
+            }`}
+          >
             {t('app.name')}
           </h1>
         </div>
@@ -75,12 +87,17 @@ const Header = ({ onMenuClick }: HeaderProps) => {
           {/* User Profile */}
           <Link
             to="/profile"
-            className="flex items-center gap-3 hover:bg-slate-50 px-2 sm:px-3 py-2 rounded-lg transition-all duration-150 border border-transparent hover:border-slate-200"
+            className="flex items-center gap-3 hover:bg-slate-50 px-2 lg:px-3 py-2 rounded-lg transition-all duration-150 border border-transparent hover:border-slate-200 shrink-0"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500/10 to-primary-500/5 ring-1 ring-primary-500/20 flex items-center justify-center flex-shrink-0">
               <User className="h-4 w-4 text-primary-600" />
             </div>
-            <div className="hidden md:block">
+            {/* Name + role only from lg up. At the md band the sidebar is
+                already docked (256px), so the header has ~460px to work with
+                and this block plus the logout label used to push the cluster
+                ~90px past the right edge — where the shell clips it and the
+                logout button becomes unclickable. */}
+            <div className="hidden lg:block">
               <p className="text-sm font-medium text-slate-900">
                 {user?.firstName} {user?.lastName}
               </p>
@@ -96,7 +113,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             size="sm"
             onClick={() => logout()}
             isLoading={isPending}
-            className="hidden md:flex text-slate-600 hover:text-slate-900"
+            className="hidden lg:flex text-slate-600 hover:text-slate-900"
           >
             <LogOut className="h-4 w-4 mr-2" />
             {t('app.logout')}
@@ -108,7 +125,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             size="sm"
             onClick={() => logout()}
             isLoading={isPending}
-            className="md:hidden p-2"
+            className="lg:hidden p-2"
             aria-label={t('app.logout')}
           >
             <LogOut className="h-4 w-4" />

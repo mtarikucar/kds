@@ -309,8 +309,13 @@ const MenuManagementPage = () => {
   const closePanel = () => setSelection(null);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    // From lg up this page is a two-pane workspace that fills the shell's
+    // content area exactly and lets each pane scroll on its own — h-full
+    // resolves against <main>, so it stays right whatever the header and
+    // banners are doing (see the page-height contract in Layout.tsx).
+    // Below lg it is a plain stacked page that scrolls in <main>.
+    <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+      <div className="flex flex-wrap items-end justify-between gap-3 lg:shrink-0">
         <div>
           <h1 className="font-heading text-2xl font-bold text-slate-900">
             {t("menu.title")}
@@ -346,16 +351,18 @@ const MenuManagementPage = () => {
       </div>
 
       {!canAddProduct && (
-        <UpgradePrompt
-          limitKey="maxProducts"
-          currentCount={products?.length ?? 0}
-          limit={productLimit.limit}
-          compact
-        />
+        <div className="lg:shrink-0">
+          <UpgradePrompt
+            limitKey="maxProducts"
+            currentCount={products?.length ?? 0}
+            limit={productLimit.limit}
+            compact
+          />
+        </div>
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex justify-center py-16 lg:shrink-0">
           <Spinner />
         </div>
       ) : categoriesError || productsError ? (
@@ -367,12 +374,18 @@ const MenuManagementPage = () => {
           }}
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
+        <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)]">
           {/* The spine. Hidden on a phone once something is open: two panes
-              side by side at 390px is neither. */}
+              side by side at 390px is neither.
+              lg:h-full — not max-h plus a 100vh guess — is what makes
+              MenuTree's own `flex-1 overflow-y-auto` bound and scroll. A
+              max-height alone leaves this box's height indefinite, so the
+              tree's h-full collapsed to auto and overflow-hidden ate the
+              bottom of the list: 263px of categories unreachable at
+              1280x720, with no scrollbar anywhere to reveal them. */}
           <aside
             className={cn(
-              "overflow-hidden rounded-xl border border-slate-200 bg-white lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)]",
+              "overflow-hidden rounded-xl border border-slate-200 bg-white lg:h-full lg:min-h-0",
               selection ? "hidden lg:block" : "block",
             )}
           >
@@ -398,12 +411,13 @@ const MenuManagementPage = () => {
           <section
             className={cn(
               "rounded-xl border border-slate-200 bg-white",
-              selection ? "block" : "hidden lg:block",
+              "lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden",
+              selection ? "block" : "hidden lg:flex",
             )}
           >
             {selection ? (
               <>
-                <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 lg:shrink-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <button
                       type="button"
@@ -434,7 +448,7 @@ const MenuManagementPage = () => {
                   )}
                 </div>
 
-                <div className="p-4">
+                <div className="p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                   {/* key: remount on selection change so the editor's form
                       state and draft ref never leak between products. */}
                   <ProductEditorPage
@@ -456,7 +470,7 @@ const MenuManagementPage = () => {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+              <div className="flex flex-col items-center justify-center px-6 py-20 text-center lg:min-h-0 lg:flex-1">
                 <Package className="h-10 w-10 text-slate-300" />
                 <h2 className="mt-3 text-sm font-semibold text-slate-900">
                   {t("menu.pickProduct", "Soldan bir ürün seçin")}

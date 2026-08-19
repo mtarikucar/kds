@@ -314,13 +314,23 @@ const TableManagementPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    // The editor view is a canvas workspace: it fills the shell's content
+    // area and scrolls nothing (h-full resolves against <main> — see the
+    // page-height contract in Layout.tsx). The plan/list views are ordinary
+    // scrolling pages, so they keep the plain stacked box.
+    <div
+      className={
+        view === 'edit'
+          ? 'flex h-full min-h-0 flex-col gap-6'
+          : 'space-y-6'
+      }
+    >
       {/* Page Header. `flex-wrap` lets the right-side action cluster
           drop to a second row on narrow viewports — without it the
           fixed-width icon + title kept the row at desktop width and
           pushed the "Add Table" button off-screen on mobile. The
           gap modifier keeps the wrapped layout visually clean. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
             <LayoutGrid className="w-7 h-7 text-white" />

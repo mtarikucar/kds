@@ -225,7 +225,7 @@ const QRManagementPage = () => {
 
   if (settingsLoading || codesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex h-full min-h-[24rem] items-center justify-center">
         <Spinner size="lg" />
       </div>
     );

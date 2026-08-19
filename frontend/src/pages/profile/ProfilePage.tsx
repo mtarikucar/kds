@@ -109,7 +109,7 @@ const ProfilePage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-full min-h-[24rem] items-center justify-center">
         <div className="text-slate-600">{t('common:app.loading')}</div>
       </div>
     );

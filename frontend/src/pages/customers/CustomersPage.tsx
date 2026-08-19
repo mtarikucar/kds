@@ -76,7 +76,7 @@ const CustomersPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-full min-h-[24rem] items-center justify-center">
         <div className="text-slate-600">{t('common:app.loading')}</div>
       </div>
     );
@@ -85,7 +85,7 @@ const CustomersPage = () => {
   // Without this branch a failed fetch fell through to the "no customers"
   // empty state — misleading the operator into thinking the list is empty.
   if (isError) {
-    return <ErrorState error={error} onRetry={() => refetch()} className="h-screen" />;
+    return <ErrorState error={error} onRetry={() => refetch()} className="h-full min-h-[24rem]" />;
   }
 
   return (

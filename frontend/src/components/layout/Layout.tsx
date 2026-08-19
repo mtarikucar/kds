@@ -29,7 +29,12 @@ const Layout = () => {
   return (
     <SubscriptionProvider>
       <OnboardingProvider>
-      <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* The shell owns the viewport: body never scrolls, <main> below is the
+          one and only scroll container. h-dvh, not h-screen — on iOS/Android
+          100vh is taller than the visible viewport by the URL-bar height, and
+          since body can't scroll, that difference used to park the bottom of
+          every page permanently under the browser chrome. */}
+      <div className="flex h-dvh overflow-hidden bg-slate-50">
         {/* Mobile overlay */}
         {isSidebarOpen && (
           <div
@@ -40,14 +45,31 @@ const Layout = () => {
 
         <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} isRTL={isRTL} />
 
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isRTL ? 'md:order-1' : ''}`}>
+        {/* min-w-0 so this column may shrink below the intrinsic width of its
+            widest child. Without it the header's action cluster pushed the
+            column wider than the viewport and — since the column clips —
+            the logout button simply disappeared off the right edge at
+            tablet widths. */}
+        <div className={`flex-1 min-w-0 flex flex-col overflow-hidden transition-all duration-300 ${isRTL ? 'md:order-1' : ''}`}>
           <Header onMenuClick={toggleSidebar} />
           {/* Demo-mode banner — renders null unless authStore.demoMode is on. */}
           <DemoBanner />
           {/* Status banner — sits between header and main content. Renders
               null when there's nothing to surface, so layout doesn't shift. */}
           <RenewalBanner />
-          <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
+          {/* THE PAGE-HEIGHT CONTRACT.
+              This element is the app's only scroll container, and its height
+              is 100dvh minus the header minus whichever of the banners above
+              happen to be rendering — a number no page can compute for
+              itself. So a page that wants to fill the content area exactly
+              (POS, KDS, floor plan, the menu workspace) must NOT guess with
+              `h-[calc(100vh-Xrem)]`; it puts `h-full min-h-0` on its root
+              instead. height:100% resolves against this box's content area,
+              which stays correct at every breakpoint, with or without the
+              banners, and on mobile where 100vh lies.
+              min-h-0 keeps this a shrinkable flex item so tall page content
+              scrolls here rather than pushing the box past the shell. */}
+          <main className="flex-1 min-h-0 min-w-0 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
             {/* Onboarding gates: first ensure the account is complete (phone —
                 e.g. a social signup → /welcome), then enforce the trial lock
                 (TRIAL_ENDED → plan selection). */}

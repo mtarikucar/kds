@@ -33,8 +33,15 @@ const LanguageSwitcher = () => {
         aria-label="Change Language"
       >
         <Globe className="h-5 w-5 text-slate-600" />
+        {/* The flag alone identifies the language; the written name only
+            earns its ~60px from lg up. Below that the header is the
+            tightest row in the app — at 768px the sidebar is already
+            docked, leaving it barely 460px for every control it carries. */}
         <span className="text-sm font-medium text-slate-700 hidden sm:inline">
-          {currentLanguage?.flag} {currentLanguage?.name}
+          {currentLanguage?.flag}
+        </span>
+        <span className="text-sm font-medium text-slate-700 hidden lg:inline">
+          {currentLanguage?.name}
         </span>
       </button>
 

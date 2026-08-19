@@ -90,7 +90,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
 
   if (bootstrapping) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-dvh items-center justify-center">
         <Spinner size="lg" />
       </div>
     );

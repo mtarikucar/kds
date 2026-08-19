@@ -899,7 +899,11 @@ const POSPage = () => {
   };
 
   return (
-    <div className="h-full pb-20 md:pb-0">
+    // A column that fills the shell's content area exactly: the alert bar is
+    // a fixed row and whichever screen is active takes the rest, so the POS
+    // never needs to guess the viewport (it used to say calc(100vh-12rem),
+    // which double-counted the header and ignored the banners entirely).
+    <div className="flex h-full min-h-0 flex-col pb-20 md:pb-0">
       {/* Notification Bar */}
       <NotificationBar
         onShowPendingOrders={() => setIsPendingOrdersPanelOpen(true)}
@@ -909,7 +913,7 @@ const POSPage = () => {
 
       {/* ========== STEP 1: TABLE SELECTION SCREEN ========== */}
       {currentView === 'table-selection' && !isTablelessMode && (
-        <div className="h-[calc(100vh-12rem)] flex flex-col">
+        <div className="min-h-0 flex-1 flex flex-col">
           {/* Header */}
           <div className="mb-6 flex items-start justify-between gap-3">
             <div>
@@ -1099,7 +1103,7 @@ const POSPage = () => {
 
       {/* ========== STEP 2: ORDER SCREEN ========== */}
       {currentView === 'order' && (
-        <div className="h-[calc(100vh-12rem)] flex flex-col">
+        <div className="min-h-0 flex-1 flex flex-col">
           {/* Header with Back Button and Table Info */}
           <div className="flex items-center gap-4 mb-4 pb-4 border-b border-slate-200">
             {/* Back button - only show when tableless mode is NOT active */}
