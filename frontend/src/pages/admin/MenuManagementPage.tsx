@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  Link2,
   ListPlus,
   Package,
   Plus,
@@ -43,7 +44,13 @@ import {
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Input from "../../components/ui/Input";
-import BulkAddModal from "../../components/product/BulkAddModal";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
+import { BulkAddModalBody } from "../../components/product/BulkAddModal";
 import { useSubscription } from "../../contexts/SubscriptionContext";
 import {
   createCategorySchema,
@@ -52,6 +59,7 @@ import {
 import MenuTree from "./menuManagement/MenuTree";
 import ProductEditorPage from "./ProductEditorPage";
 import MenuImportTab from "./menuManagement/MenuImportTab";
+import MenuSourceTab from "./menuManagement/MenuSourceTab";
 import Spinner from "../../components/ui/Spinner";
 import { ErrorState } from "../../components/ui/ErrorState";
 import UpgradePrompt from "../../components/subscriptions/UpgradePrompt";
@@ -71,14 +79,17 @@ const MenuManagementPage = () => {
     | { type: "product"; id: string }
     | { type: "new"; categoryId?: string };
   const [selection, setSelection] = useState<Selection | null>(null);
-  // AI photo-import: promoted from a conditional tab to a persistent header
-  // action + full-screen modal so it's always discoverable.
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  // True while MenuImportTab holds an unsaved draft (or a parse is running) —
-  // the Modal closes on Escape/backdrop unconditionally, which would unmount
-  // the tab and destroy a quota-consuming parse + manual price edits.
+  // One "Toplu ekle" entry point, three ways in: give a source (link/PDF/
+  // Excel), take it from a photo, or type products by hand. All three mount
+  // into the SAME page-owned modal below so all three share one importDirty
+  // guard instead of each tab needing its own Modal + close-confirmation.
+  type ImportMode = "source" | "photo" | "manual" | null;
+  const [importMode, setImportMode] = useState<ImportMode>(null);
+  // True while the open tab holds unsaved input (a draft, a pending parse,
+  // or typed-but-uncommitted bulk rows) — the Modal closes on Escape/backdrop
+  // unconditionally, which would unmount the tab and destroy a
+  // quota-consuming parse + manual edits.
   const [importDirty, setImportDirty] = useState(false);
-  const [bulkAddOpen, setBulkAddOpen] = useState(false);
   const { data: menuImportStatus } = useMenuImportStatus();
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -177,7 +188,7 @@ const MenuManagementPage = () => {
     ) {
       return;
     }
-    setImportModalOpen(false);
+    setImportMode(null);
     setImportDirty(false);
   };
 
@@ -326,20 +337,32 @@ const MenuManagementPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setBulkAddOpen(true)}
-            disabled={!canAddProduct}
-          >
-            <ListPlus className="mr-1.5 h-4 w-4" />
-            {t("menu.bulkAdd", "Toplu ekle")}
-          </Button>
-          {menuImportStatus?.configured !== false && (
-            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              {t("menu.importAction", "Fotoğraftan menü")}
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={!canAddProduct}>
+                <ListPlus className="mr-1.5 h-4 w-4" />
+                {t("menu.bulkAdd", "Toplu ekle")}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {menuImportStatus?.configured !== false && (
+                <DropdownMenuItem onClick={() => setImportMode("source")}>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  {t("menu.importFromSource", "Kaynak ver (link / PDF / Excel)")}
+                </DropdownMenuItem>
+              )}
+              {menuImportStatus?.configured !== false && (
+                <DropdownMenuItem onClick={() => setImportMode("photo")}>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {t("menu.importAction", "Fotoğraftan menü")}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => setImportMode("manual")}>
+                <ListPlus className="mr-2 h-4 w-4" />
+                {t("menu.bulkAddManual", "Manuel toplu ekle")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={() => setSelection({ type: "new" })}
             disabled={!canAddProduct}
@@ -487,18 +510,31 @@ const MenuManagementPage = () => {
         </div>
       )}
 
-      {/* AI menu import (photo → digitized menu) — full-screen modal */}
+      {/* One "Toplu ekle" entry point, three ways in — all three mount here
+          so all three share this ONE page-owned modal's importDirty guard
+          (only a page-owned modal can carry it: an Escape or backdrop click
+          must not silently destroy a parse the tenant was charged for). */}
       <Modal
-        isOpen={importModalOpen}
+        isOpen={importMode !== null}
         onClose={handleCloseImportModal}
-        title={t("menu.importAction", "Fotoğraftan menü")}
+        title={
+          importMode === "source"
+            ? t("menu.importFromSource", "Kaynak ver (link / PDF / Excel)")
+            : importMode === "photo"
+              ? t("menu.importAction", "Fotoğraftan menü")
+              : t("menu.bulkAddManual", "Manuel toplu ekle")
+        }
         size="full"
       >
-        <MenuImportTab onDirtyChange={setImportDirty} />
+        {importMode === "source" && <MenuSourceTab onDirtyChange={setImportDirty} />}
+        {importMode === "photo" && <MenuImportTab onDirtyChange={setImportDirty} />}
+        {importMode === "manual" && (
+          <BulkAddModalBody
+            onDone={() => setImportMode(null)}
+            onDirtyChange={setImportDirty}
+          />
+        )}
       </Modal>
-
-      {/* Bulk product add */}
-      <BulkAddModal isOpen={bulkAddOpen} onClose={() => setBulkAddOpen(false)} />
 
 
       {/* Category Modal */}

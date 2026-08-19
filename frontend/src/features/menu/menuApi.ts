@@ -461,6 +461,27 @@ export const useParseMenuPhotos = () =>
     },
   });
 
+/** Import a menu from a link or an uploaded PDF/CSV/XLSX → editable draft. */
+export const useParseMenuSource = () =>
+  useMutation({
+    mutationFn: async (input: { url?: string; file?: File }) => {
+      const formData = new FormData();
+      if (input.url) formData.append("url", input.url);
+      if (input.file) formData.append("file", input.file);
+      const response = await api.post<MenuImportDraft>(
+        "/menu/import/parse-source",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      return response.data;
+    },
+    onError: (error: any) => {
+      toast.error(
+        getApiErrorMessage(error, i18n.t("common:notifications.operationFailed")),
+      );
+    },
+  });
+
 /** Commit the reviewed draft → creates categories + products. */
 export const useCommitMenuImport = () => {
   const queryClient = useQueryClient();

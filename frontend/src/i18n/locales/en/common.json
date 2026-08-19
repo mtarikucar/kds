@@ -1393,5 +1393,6 @@
     "referrals": "Referrals",
     "pointsEarned": "Points Earned",
     "noReferralCode": "Contact support to get your referral code"
-  }
+  },
+  "cancel": "Cancel"
 }

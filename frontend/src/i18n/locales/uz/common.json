@@ -1393,5 +1393,6 @@
     "kitchen": {
       "printFailed": "Oshxona chekini chop etib bo‘lmadi — buyurtmadan qayta chop eting."
     }
-  }
+  },
+  "cancel": "Bekor qilish"
 }
