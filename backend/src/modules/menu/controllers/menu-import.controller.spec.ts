@@ -147,9 +147,18 @@ describe("MenuModule provider graph", () => {
   it("resolves MenuSourceService and MenuSourceFetcher through real DI", async () => {
     const { MenuModule } = await import("../menu.module");
 
+    // overrideProvider, not just the @Global() stub: MenuModule imports
+    // PrismaModule directly, and a concrete provider from an imported module
+    // beats a global one — so without this the REAL PrismaService is
+    // constructed and `new PrismaClient()` throws whenever DATABASE_URL is
+    // absent. That is exactly the CI unit-test job, which has no database.
+    // This test is about the new providers resolving, not about Prisma.
     const moduleRef = await Test.createTestingModule({
       imports: [StubGlobalsModule, MenuModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .compile();
 
     expect(moduleRef.get(MenuSourceService)).toBeInstanceOf(MenuSourceService);
     expect(moduleRef.get(MenuSourceFetcher)).toBeInstanceOf(MenuSourceFetcher);
