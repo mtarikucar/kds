@@ -351,5 +351,49 @@ describe("MenuImportService", () => {
         /column mapping/i,
       );
     });
+
+    it("parseColumnMap throws the same clear error on braced-but-invalid JSON, instead of a bare SyntaxError", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        // Unquoted key — valid-looking braces, invalid JSON.
+        data: { content: [{ type: "text", text: '{name: "Ürün Kodu", price: "Bedel"}' }] },
+      });
+
+      await expect(svc.parseColumnMap("sample", "PROMPT")).rejects.toThrow(
+        /column mapping/i,
+      );
+    });
+
+    it("parseTextToDraft's failure message talks about the source, not a photo", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { content: [{ type: "text", text: "not JSON at all" }] },
+      });
+
+      await expect(svc.parseTextToDraft("some page text")).rejects.toThrow(
+        /could not read a menu from that source/i,
+      );
+      await expect(svc.parseTextToDraft("some page text")).rejects.not.toThrow(/photo|well-lit/i);
+    });
+
+    it("parseDocumentToDraft's 'no items found' message talks about the source, not a photo", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: {
+          content: [{ type: "text", text: JSON.stringify({ categories: [] }) }],
+        },
+      });
+
+      await expect(
+        svc.parseDocumentToDraft(Buffer.from("%PDF-1.7"), "application/pdf"),
+      ).rejects.toThrow(/no menu items were found at that source/i);
+    });
+
+    it("parseMenuPhotos keeps the original photo-specific wording (default source label unchanged)", async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { content: [{ type: "text", text: "not JSON at all" }] },
+      });
+
+      await expect(
+        svc.parseMenuPhotos("t1", [{ buffer: Buffer.from("img"), mimetype: "image/jpeg" }]),
+      ).rejects.toThrow(/clearer, well-lit image/i);
+    });
   });
 });

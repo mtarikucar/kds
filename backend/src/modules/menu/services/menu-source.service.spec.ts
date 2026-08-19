@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import ExcelJS from "exceljs";
 import { MenuSourceService } from "./menu-source.service";
 
@@ -212,5 +213,215 @@ describe("MenuSourceService", () => {
       svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
     ).rejects.toThrow(/could not tell/i);
     expect(quota.voidUsage).toHaveBeenCalledWith("usage1");
+  });
+
+  it("resolves the model's column map through case/diacritic-fold — 'ürün kodu' still matches header 'Ürün Kodu'", async () => {
+    fetcher.fetch.mockResolvedValue({
+      bytes: Buffer.from("Ürün Kodu,Bedel\nAyran,25\n"),
+      contentType: "text/csv",
+      filename: "menu.csv",
+      finalUrl: "https://x.test/menu.csv",
+    });
+    // The model echoed the headers back lower-cased — exactly the kind of
+    // case drift a model produces, not a different column.
+    importSvc.parseColumnMap.mockResolvedValue({ name: "ürün kodu", price: "bedel" });
+
+    const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.csv" });
+
+    expect(draft.categories[0].products[0]).toMatchObject({ name: "Ayran", price: 25 });
+    expect(quota.voidUsage).not.toHaveBeenCalled();
+  });
+
+  it("refunds a paid column map that names a header which does not actually exist on the sheet", async () => {
+    fetcher.fetch.mockResolvedValue({
+      bytes: Buffer.from("Ürün Kodu,Bedel\nAyran,25\n"),
+      contentType: "text/csv",
+      filename: "menu.csv",
+      finalUrl: "https://x.test/menu.csv",
+    });
+    // "Urun Kodu" (diacritics dropped) is not the same string as the real
+    // header "Ürün Kodu" even after folding — this must be treated as an
+    // unresolved mapping, not silently matched or silently emptied.
+    importSvc.parseColumnMap.mockResolvedValue({ name: "Urun Kodu", price: "Bedel" });
+
+    await expect(
+      svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
+    ).rejects.toThrow(/could not tell/i);
+    expect(quota.voidUsage).toHaveBeenCalledWith("usage1");
+  });
+
+  it("refunds a paid column map whose resolved columns produce zero products, instead of resolving an empty draft", async () => {
+    fetcher.fetch.mockResolvedValue({
+      // Both headers are real and resolve, but every row's "Ürün Kodu"
+      // cell is blank — rowsToDraft skips nameless rows, so this table has
+      // no data behind it once mapped.
+      bytes: Buffer.from("Ürün Kodu,Bedel\n,25\n,30\n"),
+      contentType: "text/csv",
+      filename: "menu.csv",
+      finalUrl: "https://x.test/menu.csv",
+    });
+    importSvc.parseColumnMap.mockResolvedValue({ name: "Ürün Kodu", price: "Bedel" });
+
+    await expect(
+      svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
+    ).rejects.toThrow(/could not match any rows/i);
+    expect(quota.voidUsage).toHaveBeenCalledWith("usage1");
+  });
+
+  it("rejects (without charging) a locally-recognised sheet whose rows produce zero products", async () => {
+    fetcher.fetch.mockResolvedValue({
+      // "Ad"/"Fiyat" are recognised locally — no model call — but every
+      // name cell is blank.
+      bytes: Buffer.from("Ad,Fiyat\n,25\n,30\n"),
+      contentType: "text/csv",
+      filename: "menu.csv",
+      finalUrl: "https://x.test/menu.csv",
+    });
+
+    await expect(
+      svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
+    ).rejects.toThrow(/could not match any rows/i);
+    expect(quota.claim).not.toHaveBeenCalled();
+    expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
+  });
+
+  it("truncates long cells before sending the column-mapping sample to the model", async () => {
+    const longDescription = "x".repeat(500);
+    fetcher.fetch.mockResolvedValue({
+      bytes: Buffer.from(`Ürün Kodu,Bedel,Not\nAyran,25,${longDescription}\n`),
+      contentType: "text/csv",
+      filename: "menu.csv",
+      finalUrl: "https://x.test/menu.csv",
+    });
+    importSvc.parseColumnMap.mockResolvedValue({ name: "Ürün Kodu", price: "Bedel" });
+
+    await svc.parseSource(TENANT, { url: "https://x.test/menu.csv" });
+
+    const [sample] = importSvc.parseColumnMap.mock.calls[0];
+    expect(sample).not.toContain(longDescription);
+    // Truncated cell keeps a short prefix plus an ellipsis marker.
+    expect(sample).toContain("x".repeat(80) + "…");
+  });
+
+  describe("real exceljs cell shapes — richText, formulas, dates, hyperlinks, sparse holes", () => {
+    it("reads rich text, a numeric formula result, an error formula result, a Date, a hyperlink, and real 0/'' values — never '[object Object]'", async () => {
+      const wb = new ExcelJS.Workbook();
+      const sheet = wb.addWorksheet("Menü");
+      sheet.addRow(["Ad", "Fiyat", "Açıklama"]);
+
+      // Row 2: rich text name, formula → numeric result, plain description.
+      sheet.getCell("A2").value = {
+        richText: [{ text: "Acı ", font: { bold: true } }, { text: "Kebap" }],
+      };
+      sheet.getCell("B2").value = { formula: "SUM(1,179)", result: 180 };
+      sheet.getCell("C2").value = "lezzetli";
+
+      // Row 3: plain name, formula → error result (must become 0, not
+      // "[object Object]" mis-parsed as 0 by accident), Date description.
+      sheet.getCell("A3").value = "Ayran";
+      sheet.getCell("B3").value = { formula: "1/0", result: { error: "#DIV/0!" } };
+      sheet.getCell("C3").value = new Date("2026-08-19T00:00:00Z");
+
+      // Row 4: hyperlink name, a REAL zero price, a REAL empty description —
+      // both must survive as the falsy-but-valid values they are.
+      sheet.getCell("A4").value = { text: "Kola", hyperlink: "https://example.test/kola" };
+      sheet.getCell("B4").value = 0;
+      sheet.getCell("C4").value = "";
+
+      const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+      fetcher.fetch.mockResolvedValue({
+        bytes: buffer,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename: "menu.xlsx",
+        finalUrl: "https://x.test/menu.xlsx",
+      });
+
+      const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.xlsx" });
+
+      const products = draft.categories[0].products as any[];
+      expect(products.map((p) => p.name)).toEqual(["Acı Kebap", "Ayran", "Kola"]);
+      for (const p of products) {
+        expect(p.name).not.toContain("[object Object]");
+      }
+      expect(products[0]).toMatchObject({ name: "Acı Kebap", price: 180, description: "lezzetli" });
+      // Error-formula price reads as 0 — a deliberate "unreadable price"
+      // outcome, not a stringified-object coincidence.
+      expect(products[1]).toMatchObject({ name: "Ayran", price: 0 });
+      expect(products[1].description).toContain("2026-08-19");
+      expect(products[2]).toMatchObject({ name: "Kola", price: 0 });
+      expect(importSvc.parseTextToDraft).not.toHaveBeenCalled();
+      expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
+      expect(quota.claim).not.toHaveBeenCalled();
+    });
+
+    it("does not crash on a blank spacer header column (sparse row.values hole)", async () => {
+      const wb = new ExcelJS.Workbook();
+      const sheet = wb.addWorksheet("Menü");
+      // Column B is never written — a genuine sparse hole in row.values,
+      // not a defined empty string.
+      sheet.getCell("A1").value = "Ad";
+      sheet.getCell("C1").value = "Fiyat";
+      sheet.getCell("A2").value = "Ayran";
+      sheet.getCell("C2").value = 25;
+
+      const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+      fetcher.fetch.mockResolvedValue({
+        bytes: buffer,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename: "menu.xlsx",
+        finalUrl: "https://x.test/menu.xlsx",
+      });
+
+      const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.xlsx" });
+
+      expect(draft.categories[0].products[0]).toMatchObject({ name: "Ayran", price: 25 });
+    });
+  });
+
+  describe("malformed input surfaces an actionable 400, not a raw parser error", () => {
+    let warnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      warnSpy = jest.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it("wraps a csv-parse unmatched-quote error into a clear BadRequestException", async () => {
+      fetcher.fetch.mockResolvedValue({
+        // An opening quote appears mid-field without being the field's
+        // first character — csv-parse throws INVALID_OPENING_QUOTE for this.
+        bytes: Buffer.from('Ad,Fiyat\nPizza 12",25\n'),
+        contentType: "text/csv",
+        filename: "menu.csv",
+        finalUrl: "https://x.test/menu.csv",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.csv" }),
+      ).rejects.toThrow(/unmatched quote/i);
+      expect(quota.claim).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it("wraps a corrupt .xlsx (unreadable zip) into a clear BadRequestException", async () => {
+      const bytes = Buffer.concat([
+        Buffer.from([0x50, 0x4b, 0x03, 0x04]), // PK.. — sniffs as xlsx
+        Buffer.from("not actually a zip file"),
+      ]);
+      fetcher.fetch.mockResolvedValue({
+        bytes,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename: "menu.xlsx",
+        finalUrl: "https://x.test/menu.xlsx",
+      });
+
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.xlsx" }),
+      ).rejects.toThrow(/could not be read/i);
+      expect(quota.claim).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalled();
+    });
   });
 });

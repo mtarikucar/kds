@@ -143,7 +143,7 @@ export class MenuImportService {
       [{ type: "text", text }],
       EXTRACTION_PROMPT,
     );
-    return this.normaliseDraft(answer);
+    return this.normaliseDraft(answer, "source");
   }
 
   /** A PDF (or any Claude-supported document) → draft. Not metered. */
@@ -164,7 +164,7 @@ export class MenuImportService {
       ],
       EXTRACTION_PROMPT,
     );
-    return this.normaliseDraft(answer);
+    return this.normaliseDraft(answer, "source");
   }
 
   /** Header + sample rows → which column is which. Not metered. */
@@ -182,7 +182,11 @@ export class MenuImportService {
     if (start === -1 || end === -1) {
       throw new BadRequestException("could not read the column mapping");
     }
-    return JSON.parse(cleaned.slice(start, end + 1));
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      throw new BadRequestException("could not read the column mapping");
+    }
   }
 
   /**
@@ -239,25 +243,41 @@ export class MenuImportService {
     }
   }
 
-  /** Robustly parse + clamp the model's JSON into the commit DTO shape. */
-  private normaliseDraft(raw: string): CommitMenuImportDto {
+  /**
+   * Robustly parse + clamp the model's JSON into the commit DTO shape.
+   *
+   * `source` picks the wording of the two failure messages below: the
+   * default "photo" advice ("try a clearer, well-lit image") is right for
+   * parseMenuPhotos, but nonsensical for a link/file/text import — those
+   * pass "source" instead so an operator who pasted a URL is never told to
+   * take a better picture.
+   */
+  private normaliseDraft(
+    raw: string,
+    source: "photo" | "source" = "photo",
+  ): CommitMenuImportDto {
+    const unreadableMessage =
+      source === "photo"
+        ? "Could not read the menu from the photo — try a clearer, well-lit image."
+        : "Could not read a menu from that source — check the file or link and try again.";
+    const emptyMessage =
+      source === "photo"
+        ? "No menu items were found in the photo — try a clearer image."
+        : "No menu items were found at that source.";
+
     // Strip accidental markdown fences and locate the JSON object.
     const cleaned = raw.replace(/```json\s*|\s*```/g, "").trim();
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start === -1 || end === -1) {
-      throw new ServiceUnavailableException(
-        "Could not read the menu from the photo — try a clearer, well-lit image.",
-      );
+      throw new ServiceUnavailableException(unreadableMessage);
     }
 
     let parsed: any;
     try {
       parsed = JSON.parse(cleaned.slice(start, end + 1));
     } catch {
-      throw new ServiceUnavailableException(
-        "Could not read the menu from the photo — try a clearer, well-lit image.",
-      );
+      throw new ServiceUnavailableException(unreadableMessage);
     }
 
     const validTax = new Set([0, 1, 10, 20]);
@@ -297,9 +317,7 @@ export class MenuImportService {
       : [];
 
     if (!categories.length) {
-      throw new ServiceUnavailableException(
-        "No menu items were found in the photo — try a clearer image.",
-      );
+      throw new ServiceUnavailableException(emptyMessage);
     }
     return { categories };
   }
