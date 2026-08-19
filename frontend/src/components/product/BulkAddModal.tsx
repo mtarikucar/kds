@@ -77,10 +77,16 @@ export function BulkAddModalBody({
     r.price !== "" &&
     Number(r.price) >= 0;
 
-  // Whether any row has user input worth losing (or a commit in flight) —
-  // reported after isFilled exists, so the hosting page's Escape/backdrop
-  // guard knows whether closing would discard unsaved typing.
-  const dirty = rows.some(isFilled) || commit.isPending;
+  // Whether any row has something the operator actually TYPED — name or
+  // price. Deliberately NOT isFilled: addRow() pre-seeds a new row's
+  // categoryId with the first category as a convenience default, so a bare
+  // "Satır ekle" click with zero typing would otherwise make isFilled true
+  // and arm the close-confirmation over a default the operator never
+  // chose. isValid/isFilled (below) stay as they are for submit()'s own
+  // partial-row validation — this is a separate, stricter predicate only
+  // for "is there something worth losing".
+  const hasTypedInput = (r: Row) => r.name.trim() !== "" || r.price !== "";
+  const dirty = rows.some(hasTypedInput) || commit.isPending;
   useEffect(() => {
     onDirtyChange?.(dirty);
     // eslint-disable-next-line react-hooks/exhaustive-deps

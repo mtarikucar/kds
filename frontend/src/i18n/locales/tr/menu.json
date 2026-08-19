@@ -251,9 +251,10 @@
     }
   },
   "source": {
-    "hint": "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin. Tüm ürünler çıkarılıp önünüze gelir.",
+    "hint": "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin (en fazla 10 MB). Tüm ürünler çıkarılıp önünüze gelir.",
     "parse": "Ürünleri çıkar",
     "reading": "Okunuyor…",
-    "summary": "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori"
+    "summary": "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori",
+    "fileTooLarge": "Dosya çok büyük — en fazla {{mb}} MB olmalı."
   }
 }

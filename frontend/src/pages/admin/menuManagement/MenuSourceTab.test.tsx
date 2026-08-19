@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import MenuSourceTab from "./MenuSourceTab";
 
@@ -15,12 +15,27 @@ vi.mock("react-i18next", () => ({
 vi.mock("../../../components/subscriptions/FeatureGate", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn(), warning: vi.fn() } }));
+
+function makeFile(name: string, type: string, sizeBytes: number): File {
+  const file = new File(["x"], name, { type });
+  Object.defineProperty(file, "size", { value: sizeBytes });
+  return file;
+}
 
 describe("MenuSourceTab", () => {
-  it("refuses to submit an empty link", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("disables submit until a link or a file is provided", () => {
     render(<MenuSourceTab />);
-    fireEvent.click(screen.getByTestId("source-submit"));
-    expect(parseMutate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("source-submit")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("source-url"), {
+      target: { value: "https://restoran.com/menu" },
+    });
+    expect(screen.getByTestId("source-submit")).not.toBeDisabled();
   });
 
   it("sends the pasted link", async () => {
@@ -31,5 +46,33 @@ describe("MenuSourceTab", () => {
     });
     fireEvent.click(screen.getByTestId("source-submit"));
     expect(parseMutate).toHaveBeenCalledWith({ url: "https://restoran.com/menu", file: undefined });
+  });
+
+  it("sends the selected file", async () => {
+    parseMutate.mockResolvedValue({ categories: [] });
+    render(<MenuSourceTab />);
+    const file = makeFile("menu.pdf", "application/pdf", 1024);
+    fireEvent.change(screen.getByTestId("source-file"), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("source-submit"));
+    expect(parseMutate).toHaveBeenCalledWith({ url: undefined, file });
+  });
+
+  it("rejects a file over the 10MB cap without ever calling the mutation", () => {
+    render(<MenuSourceTab />);
+    const big = makeFile("menu.pdf", "application/pdf", 11 * 1024 * 1024);
+    fireEvent.change(screen.getByTestId("source-file"), { target: { files: [big] } });
+    expect(toastError).toHaveBeenCalled();
+    // Rejected, not merely un-set: submit must still be disabled (no url either).
+    expect(screen.getByTestId("source-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("source-submit"));
+    expect(parseMutate).not.toHaveBeenCalled();
+  });
+
+  it("accepts a file right at the 10MB cap", () => {
+    render(<MenuSourceTab />);
+    const atCap = makeFile("menu.pdf", "application/pdf", 10 * 1024 * 1024);
+    fireEvent.change(screen.getByTestId("source-file"), { target: { files: [atCap] } });
+    expect(toastError).not.toHaveBeenCalled();
+    expect(screen.getByTestId("source-submit")).not.toBeDisabled();
   });
 });

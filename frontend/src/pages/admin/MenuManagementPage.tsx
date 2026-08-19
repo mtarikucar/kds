@@ -192,6 +192,18 @@ const MenuManagementPage = () => {
     setImportDirty(false);
   };
 
+  // What a deliberate, completed dismissal of the import modal means —
+  // shared by manual mode's Cancel/finished-commit (BulkAddModalBody's
+  // onDone) so it resets importDirty exactly like the confirmed-close path
+  // does. Calling setImportMode(null) alone left importDirty stuck at
+  // whatever the tab last reported: harmless today (the next tab's mount
+  // effect self-corrects it before any user input reaches it) but one
+  // refactor away from a stale-true flag surviving to matter.
+  const closeImportModal = () => {
+    setImportMode(null);
+    setImportDirty(false);
+  };
+
   const handleCategorySubmit = (data: CategoryFormData) => {
     // Double-submit guard: Enter + click (or two quick clicks) while the
     // first mutation is in flight would create the category twice.
@@ -339,7 +351,14 @@ const MenuManagementPage = () => {
         <div className="flex flex-wrap items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={!canAddProduct}>
+              {/* Not gated by canAddProduct: the two AI-backed options below
+                  cost a credit on a draft that can include price-UPDATE
+                  rows via "Fiyatı güncelle" — commitDraft's plan-limit
+                  pre-check only counts rows that will actually be CREATEd
+                  (see T7), so a tenant sitting at their product limit can
+                  still legitimately run an update-only price import. Only
+                  the manual/create-only path below is gated. */}
+              <Button variant="outline">
                 <ListPlus className="mr-1.5 h-4 w-4" />
                 {t("menu.bulkAdd", "Toplu ekle")}
               </Button>
@@ -357,7 +376,10 @@ const MenuManagementPage = () => {
                   {t("menu.importAction", "Fotoğraftan menü")}
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => setImportMode("manual")}>
+              <DropdownMenuItem
+                onClick={() => setImportMode("manual")}
+                disabled={!canAddProduct}
+              >
                 <ListPlus className="mr-2 h-4 w-4" />
                 {t("menu.bulkAddManual", "Manuel toplu ekle")}
               </DropdownMenuItem>
@@ -530,7 +552,7 @@ const MenuManagementPage = () => {
         {importMode === "photo" && <MenuImportTab onDirtyChange={setImportDirty} />}
         {importMode === "manual" && (
           <BulkAddModalBody
-            onDone={() => setImportMode(null)}
+            onDone={closeImportModal}
             onDirtyChange={setImportDirty}
           />
         )}

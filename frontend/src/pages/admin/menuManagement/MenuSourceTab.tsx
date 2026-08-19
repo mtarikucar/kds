@@ -12,7 +12,11 @@ import {
 import { useMenuDraft } from "./useMenuDraft";
 import MenuDraftReviewGrid from "./MenuDraftReviewGrid";
 
-const ACCEPT = ".pdf,.csv,.tsv,.xlsx,.xls,application/pdf,text/csv";
+// .xls (legacy OLE2) deliberately excluded: it sniffs as "xlsx" and then
+// exceljs.xlsx.load throws on it, telling the operator their valid legacy
+// workbook is "corrupted" — better not to offer what we cannot read.
+const ACCEPT = ".pdf,.csv,.tsv,.xlsx,application/pdf,text/csv";
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /**
  * "Kaynak ver": paste a link or drop a PDF/Excel/CSV file, and every
@@ -129,7 +133,7 @@ export default function MenuSourceTab({
             <p className="text-sm text-gray-600">
               {t(
                 "menu:source.hint",
-                "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin. Tüm ürünler çıkarılıp önünüze gelir.",
+                "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin (en fazla 10 MB). Tüm ürünler çıkarılıp önünüze gelir.",
               )}
             </p>
 
@@ -150,7 +154,21 @@ export default function MenuSourceTab({
                 data-testid="source-file"
                 type="file"
                 accept={ACCEPT}
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const picked = e.target.files?.[0] ?? null;
+                  if (picked && picked.size > MAX_FILE_BYTES) {
+                    toast.error(
+                      t("menu:source.fileTooLarge", "Dosya çok büyük — en fazla {{mb}} MB olmalı.", { mb: 10 }),
+                    );
+                    // Reset the native input so re-selecting the SAME oversized
+                    // file (after trimming it) still fires a fresh onChange —
+                    // browsers don't fire change for an unchanged file list.
+                    e.target.value = "";
+                    setFile(null);
+                    return;
+                  }
+                  setFile(picked);
+                }}
                 className="text-sm"
               />
             </div>

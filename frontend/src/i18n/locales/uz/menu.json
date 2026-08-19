@@ -251,9 +251,10 @@
     }
   },
   "source": {
-    "hint": "Menyungiz joylashgan sahifa manzilini joylashtiring yoki PDF / Excel / CSV faylingizni yuklang. Barcha mahsulotlar chiqarib olinib, ko‘rib chiqishingiz uchun taqdim etiladi.",
+    "hint": "Menyungiz joylashgan sahifa manzilini joylashtiring yoki PDF / Excel / CSV faylingizni yuklang (10 MB gacha). Barcha mahsulotlar chiqarib olinib, ko‘rib chiqishingiz uchun taqdim etiladi.",
     "parse": "Mahsulotlarni chiqarish",
     "reading": "O‘qilmoqda…",
-    "summary": "{{p}} ta mahsulot · {{u}} ta yangilandi · {{cc}} ta yangi + {{cm}} ta mavjud kategoriya"
+    "summary": "{{p}} ta mahsulot · {{u}} ta yangilandi · {{cc}} ta yangi + {{cm}} ta mavjud kategoriya",
+    "fileTooLarge": "Fayl juda katta — {{mb}} MB dan oshmasligi kerak."
   }
 }

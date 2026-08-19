@@ -251,9 +251,10 @@
     }
   },
   "source": {
-    "hint": "Paste the address of the page your menu is on, or upload your PDF / Excel / CSV file. Every product is extracted and lands in front of you for review.",
+    "hint": "Paste the address of the page your menu is on, or upload your PDF / Excel / CSV file (up to 10 MB). Every product is extracted and lands in front of you for review.",
     "parse": "Extract products",
     "reading": "Reading…",
-    "summary": "{{p}} products · {{u}} updated · {{cc}} new + {{cm}} existing categories"
+    "summary": "{{p}} products · {{u}} updated · {{cc}} new + {{cm}} existing categories",
+    "fileTooLarge": "File is too large — must be at most {{mb}} MB."
   }
 }
