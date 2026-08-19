@@ -551,6 +551,106 @@ describe("MenuImportService", () => {
       expect(s.productsSkipped).toBe(1);
       expect(s.productsUpdated).toBe(1);
     });
+
+    it("an ambiguous row with no explicit choice creates nothing and produces a failure", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              products: [{ name: "Ayran", price: 25, ambiguous: true }],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(products.create).not.toHaveBeenCalled();
+      expect(products.update).not.toHaveBeenCalled();
+      expect(s.productsCreated).toBe(0);
+      expect(s.failures).toHaveLength(1);
+      expect(s.failures[0].reason).toMatch(/more than one existing product/i);
+    });
+
+    it("an ambiguous row with onConflict CREATE does create, and is counted as created", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      products.create.mockResolvedValue({ id: "new-1" });
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              // Explicit escape hatch: "yes, really add another" even though
+              // the row was flagged ambiguous.
+              products: [{ name: "Ayran", price: 25, ambiguous: true, onConflict: "CREATE" }],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Ayran", price: 25 }),
+        TENANT,
+      );
+      expect(s.productsCreated).toBe(1);
+      expect(s.failures).toEqual([]);
+    });
+
+    it("the plan-limit pre-check does not reserve headroom for an ambiguous row that will not be created", async () => {
+      // limit=1, 1 already used. A naive count that treats the ambiguous
+      // row as a CREATE would reject (1 + 1 = 2 > 1); it must be excluded,
+      // since it resolves to a failure, not a create.
+      entitlements.getForTenant.mockResolvedValue({
+        limits: { "limit.maxProducts": 1 },
+      });
+      (prisma.product.count as any).mockResolvedValue(1);
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              products: [{ name: "Ayran", price: 25, ambiguous: true }],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(products.create).not.toHaveBeenCalled();
+      expect(s.failures).toHaveLength(1);
+      expect(s.failures[0].reason).toMatch(/more than one existing product/i);
+    });
+
+    it("re-annotating a draft that already carries an existingProductId for a now-ambiguous key returns no id", async () => {
+      // A prior annotate pass matched a single product and stamped
+      // existingProductId; since then a second same-named product turned
+      // up in the same category (e.g. someone else's bulk-add). Running
+      // annotateConflicts again must not trust the stale id.
+      (prisma.product.findMany as any).mockResolvedValue([
+        { id: "p1", name: "Ayran", price: 20, category: { name: "İçecekler" } },
+        { id: "p2", name: "Ayran", price: 22, category: { name: "İçecekler" } },
+      ]);
+      const out = await svc.annotateConflicts(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              products: [
+                {
+                  name: "Ayran",
+                  price: 25,
+                  existingProductId: "p1",
+                  onConflict: "UPDATE_PRICE",
+                },
+              ],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(out.categories[0].products[0].existingProductId).toBeUndefined();
+      expect((out.categories[0].products[0] as any).ambiguous).toBe(true);
+    });
   });
 
   it("askClaude posts the given blocks and joins text parts", async () => {

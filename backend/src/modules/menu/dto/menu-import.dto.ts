@@ -3,6 +3,7 @@ import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -72,6 +73,20 @@ export class MenuImportProductDraftDto {
   @IsString()
   @MaxLength(64)
   existingProductId?: string;
+
+  /**
+   * Set by annotateConflicts when this row's (category, name) fold key
+   * matches more than one existing product, or is claimed by an earlier
+   * row in the same draft — the server deliberately did not pick a
+   * winner. Declared (unlike existingPrice) because commitDraft must be
+   * able to read it back: without it, whitelist:true strips an
+   * undeclared property on the way into /commit and the server loses the
+   * one signal that stops it from creating an unwanted third duplicate.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  ambiguous?: boolean;
 }
 
 export class MenuImportCategoryDraftDto {

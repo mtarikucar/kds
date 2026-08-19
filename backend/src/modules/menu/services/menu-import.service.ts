@@ -15,6 +15,7 @@ import { isUnlimited } from "../../../common/constants/subscription-plans.const"
 import {
   CommitMenuImportDto,
   MenuImportCategoryDraftDto,
+  MenuImportProductDraftDto,
 } from "../dto/menu-import.dto";
 import { foldMenuKey } from "./menu-key-fold";
 
@@ -393,7 +394,11 @@ export class MenuImportService {
         products: c.products.map((p) => {
           const k = key(c.name, p.name);
           if (ambiguousKeys.has(k) || claimed.has(k)) {
-            return { ...p, ambiguous: true };
+            // Strip any existingProductId the incoming draft already
+            // carried (a re-annotated draft, or a stale grid edit) — an
+            // ambiguous key must never leave with an id attached, or
+            // commit would honour it as a confident match.
+            return { ...p, ambiguous: true, existingProductId: undefined };
           }
           const hit = index.get(k);
           if (!hit) return p;
@@ -421,14 +426,14 @@ export class MenuImportService {
     tenantId: string,
   ): Promise<CommitSummary> {
     // Only rows that will actually CREATE a product count against the plan
-    // limit — a SKIP or UPDATE_PRICE row touches an existing product, it
-    // does not add one.
+    // limit — a SKIP, UPDATE_PRICE, or unresolved-ambiguous row touches (or
+    // refuses to touch) an existing product, it does not add one. Shares
+    // resolveRowAction with the commit loop below so the two can never
+    // disagree about which rows create.
     const totalProducts = dto.categories.reduce(
       (n, c) =>
         n +
-        c.products.filter(
-          (p) => !p.existingProductId || (p.onConflict ?? "SKIP") === "CREATE",
-        ).length,
+        c.products.filter((p) => this.resolveRowAction(p) === "CREATE").length,
       0,
     );
 
@@ -502,9 +507,26 @@ export class MenuImportService {
       }
 
       for (const p of cat.products) {
-        const action = p.existingProductId
-          ? (p.onConflict ?? "SKIP")
-          : "CREATE";
+        const action = this.resolveRowAction(p);
+
+        if (action === "AMBIGUOUS") {
+          // annotateConflicts withheld existingProductId on purpose — this
+          // row's (category, name) matched more than one existing product
+          // (or another row in this same draft already claimed the only
+          // match) and the server refused to guess which one. Defaulting
+          // to CREATE here would add a THIRD copy to a menu that is
+          // already doubled — exactly the population this feature exists
+          // to help. Fail instead; the operator's explicit CREATE stays
+          // the escape hatch for "yes, really add another".
+          summary.failures.push({
+            category: cat.name,
+            product: p.name,
+            reason:
+              "this row matches more than one existing product in this " +
+              "category — resolve manually, or choose Create to add another",
+          });
+          continue;
+        }
 
         if (action === "SKIP") {
           summary.productsSkipped++;
@@ -617,6 +639,26 @@ export class MenuImportService {
     }
 
     return summary;
+  }
+
+  /**
+   * What commitDraft will do with a single draft row. Shared by the
+   * plan-limit pre-check and the commit loop itself so the two can never
+   * disagree about which rows actually create a product.
+   *
+   * `ambiguous` is checked before `existingProductId`: annotateConflicts
+   * never emits both together (it strips existingProductId on an
+   * ambiguous row), but a crafted body could send both, and an ambiguous
+   * row must never be trusted to SKIP/UPDATE_PRICE via a stale id — only
+   * an explicit onConflict: "CREATE" overrides it.
+   */
+  private resolveRowAction(
+    p: MenuImportProductDraftDto,
+  ): "SKIP" | "UPDATE_PRICE" | "CREATE" | "AMBIGUOUS" {
+    if (p.ambiguous) {
+      return p.onConflict === "CREATE" ? "CREATE" : "AMBIGUOUS";
+    }
+    return p.existingProductId ? (p.onConflict ?? "SKIP") : "CREATE";
   }
 
   private async assertWithinLimit(
