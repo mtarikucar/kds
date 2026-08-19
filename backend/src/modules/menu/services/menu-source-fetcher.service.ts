@@ -173,8 +173,17 @@ export class MenuSourceFetcher {
  * validated, so no second, unvalidated DNS resolution is left to pick a
  * different peer (DNS rebinding). Only the low-level connect target is
  * overridden — the request keeps the real hostname for Host/SNI.
+ *
+ * Node has shipped `autoSelectFamily` on by default since v20: `net`
+ * always calls `lookup` with `{ all: true }` and expects the *array*
+ * overload (`(err, [{ address, family }]) => void`), not the classic
+ * scalar one. Answering the scalar shape when `all` is set throws
+ * `ERR_INVALID_IP_ADDRESS` on every real connection attempt — invisible to
+ * a unit suite that mocks axios, since axios's own dispatcher and Node's
+ * connection machinery never run. Both shapes are handled here so this
+ * keeps working regardless of what a caller's `lookup` options carry.
  */
-function pinnedAgent(
+export function pinnedAgent(
   protocol: string,
   resolvedIp: string,
 ): http.Agent | https.Agent {
@@ -182,13 +191,19 @@ function pinnedAgent(
   const options = {
     lookup: (
       _hostname: string,
-      _opts: unknown,
+      opts: unknown,
       cb: (
         err: NodeJS.ErrnoException | null,
-        address: string,
-        family: number,
+        address: string | { address: string; family: number }[],
+        family?: number,
       ) => void,
-    ) => cb(null, resolvedIp, family),
+    ) => {
+      if ((opts as { all?: boolean } | null)?.all) {
+        cb(null, [{ address: resolvedIp, family }]);
+      } else {
+        cb(null, resolvedIp, family);
+      }
+    },
   };
   return protocol === "https:"
     ? new https.Agent(options)

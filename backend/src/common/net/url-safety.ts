@@ -18,10 +18,21 @@ import { isIP, isIPv4, isIPv6 } from "node:net";
  *     local / CGNAT / multicast / IPv4-mapped-IPv6 of any of the above
  *
  * Note on DNS rebind: a malicious DNS server can return a public IP at
- * subscribe-time and a private IP at fetch-time. Callers should
- * `assertPublicHttpUrl(url)` again immediately before the network call;
- * full mitigation requires pinning the resolved IP into the connect-time
- * socket which is invasive enough we defer it.
+ * validate-time and a private IP at connect-time. Calling
+ * `assertPublicHttpUrl` a second time immediately before the network call
+ * does NOT close this — it is still two independent resolutions, and
+ * whatever resolves the connection itself (unpinned) is the one that
+ * actually picks the peer. The real mitigation is pinning: take the
+ * `resolvedIp` this function already returns and feed it into a per-request
+ * `http.Agent`/`https.Agent` whose `lookup` hands back that same IP, so
+ * there is no second, unvalidated resolution left to rebind — the request
+ * still carries the real hostname for Host/SNI, only the low-level connect
+ * target is overridden. See `MenuSourceFetcher`
+ * (`backend/src/modules/menu/services/menu-source-fetcher.service.ts`) for
+ * the reference implementation, including the Node `autoSelectFamily`
+ * subtlety (the `lookup` callback must answer the array-of-addresses shape
+ * when Node calls it with `{ all: true }`, which it does by default since
+ * Node 20).
  */
 
 const BLOCKED_PORTS = new Set([

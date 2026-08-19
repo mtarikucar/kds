@@ -12,7 +12,8 @@ jest.mock("../../../common/net/url-safety", () => ({
 }));
 import { assertPublicHttpUrl, UnsafeUrlError } from "../../../common/net/url-safety";
 import { BadRequestException } from "@nestjs/common";
-import { MenuSourceFetcher } from "./menu-source-fetcher.service";
+import { MenuSourceFetcher, pinnedAgent } from "./menu-source-fetcher.service";
+import * as http from "node:http";
 
 describe("MenuSourceFetcher", () => {
   let svc: MenuSourceFetcher;
@@ -249,5 +250,70 @@ describe("MenuSourceFetcher", () => {
     await expect(svc.fetch("https://short.link/xyz")).rejects.toThrow(
       /herkese açık|not publicly/i,
     );
+  });
+});
+
+
+// Everything above mocks axios at the module boundary, which is exactly why
+// the pinned lookup's ERR_INVALID_IP_ADDRESS regression was invisible to it:
+// axios's own dispatcher and Node's real connection machinery never ran.
+// This suite makes a genuine socket through pinnedAgent() against a real
+// server, so Node's actual autoSelectFamily/lookup contract is exercised
+// for real, on whatever Node version actually runs the test.
+describe("pinnedAgent (real socket, no axios/network mocks)", () => {
+  let server: http.Server | undefined;
+
+  afterEach(async () => {
+    if (!server) return;
+    await new Promise<void>((resolve) => server!.close(() => resolve()));
+    server = undefined;
+  });
+
+  it("connects to the pinned IP over a real socket, keeping the requested Host header", async () => {
+    let seenHost: string | undefined;
+    server = http.createServer((req, res) => {
+      seenHost = req.headers.host;
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("pinned-ok");
+    });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", () => resolve()));
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("expected the test server to bind a TCP port");
+    }
+    const { port } = address;
+
+    const agent = pinnedAgent("http:", "127.0.0.1");
+
+    const body: string = await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          protocol: "http:",
+          // This hostname does not resolve via real DNS at all — if the
+          // pinned lookup weren't doing its job (or answered the wrong
+          // callback shape, as in the regression), this request would
+          // fail outright instead of reaching the local test server.
+          hostname: "pinned.invalid",
+          port,
+          path: "/",
+          method: "GET",
+          agent,
+          headers: { host: "pinned.invalid" },
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => resolve(data));
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+
+    expect(body).toBe("pinned-ok");
+    // Proves we did not rewrite the request to target the IP directly —
+    // the server still saw the real hostname, so Host/vhost routing (and,
+    // for https, TLS SNI) keeps working.
+    expect(seenHost).toBe("pinned.invalid");
   });
 });
