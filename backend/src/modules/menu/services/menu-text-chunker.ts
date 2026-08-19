@@ -1,4 +1,5 @@
 import { CommitMenuImportDto } from "../dto/menu-import.dto";
+import { foldMenuKey } from "./menu-key-fold";
 
 /**
  * The Claude call is capped at max_tokens 8000. A whole restaurant website or
@@ -59,15 +60,9 @@ export function mergeDrafts(drafts: CommitMenuImportDto[]): CommitMenuImportDto 
   const order: string[] = [];
   const byKey = new Map<string, { name: string; products: any[]; seen: Set<string> }>();
 
-  // Turkish-locale lowercasing: plain .toLowerCase() maps "İ" to "i̇" (i +
-  // combining dot above), which does not equal "i" — so "İçecekler" and
-  // "içecekler" would fail to merge on a menu written in Turkish. The
-  // Turkish locale collapses both dotted forms to the same "i".
-  const foldKey = (s: string) => s.trim().toLocaleLowerCase("tr-TR");
-
   for (const draft of drafts) {
     for (const cat of draft.categories ?? []) {
-      const key = foldKey(cat.name ?? "");
+      const key = foldMenuKey(cat.name ?? "");
       let bucket = byKey.get(key);
       if (!bucket) {
         bucket = { name: (cat.name ?? "").trim(), products: [], seen: new Set() };
@@ -75,7 +70,7 @@ export function mergeDrafts(drafts: CommitMenuImportDto[]): CommitMenuImportDto 
         order.push(key);
       }
       for (const p of cat.products ?? []) {
-        const pk = foldKey(p.name ?? "");
+        const pk = foldMenuKey(p.name ?? "");
         if (!pk || bucket.seen.has(pk)) continue;
         bucket.seen.add(pk);
         bucket.products.push(p);

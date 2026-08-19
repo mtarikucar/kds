@@ -1,4 +1,5 @@
 import { CommitMenuImportDto } from "../dto/menu-import.dto";
+import { foldMenuKey } from "./menu-key-fold";
 
 export interface ColumnMap {
   name: string;
@@ -87,7 +88,7 @@ export function rowsToDraft(
     if (!name) continue;
 
     const catName = (iCat >= 0 ? cleanCell(row[iCat]) : "") || "Menü";
-    const key = catName.toLowerCase();
+    const key = foldMenuKey(catName);
     if (!buckets.has(key)) {
       buckets.set(key, { name: catName, products: [] });
       order.push(key);
