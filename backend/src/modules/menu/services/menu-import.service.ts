@@ -333,6 +333,14 @@ export class MenuImportService {
    * legitimately live in both İçecekler and Menüler and those are two
    * different products. A draft category the tenant does not have yet can
    * therefore never collide.
+   *
+   * Deliberately does NOT pick a winner when a fold key is ambiguous — the
+   * tenants this feature exists for are exactly the ones whose menu already
+   * got doubled by the old unconditional-CREATE behaviour, so two
+   * same-named products in one category is the expected, not the edge,
+   * case. Ambiguous rows come back with no `existingProductId` (an
+   * `ambiguous: true` marker instead, for the grid to surface) rather than
+   * a nondeterministically-chosen one.
    */
   async annotateConflicts(
     draft: CommitMenuImportDto,
@@ -342,6 +350,11 @@ export class MenuImportService {
     // would throw a Prisma validation error at runtime.
     const existing = await this.prisma.product.findMany({
       where: { tenantId },
+      // Deterministic order: with none, Postgres is free to return two
+      // same-named-in-one-category products in a different order on every
+      // call, and the "last one wins" index below would then point
+      // UPDATE_PRICE at a different twin each time it runs.
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
         name: true,
@@ -354,20 +367,37 @@ export class MenuImportService {
       `${foldMenuKey(cat)} ${foldMenuKey(name)}`;
 
     const index = new Map<string, { id: string; price: number }>();
+    const ambiguousKeys = new Set<string>();
     for (const p of existing) {
       if (!p.category?.name) continue;
-      index.set(key(p.category.name, p.name), {
-        id: p.id,
-        price: Number(p.price),
-      });
+      const k = key(p.category.name, p.name);
+      if (index.has(k)) {
+        // Product has no unique constraint on (categoryId, name) — two
+        // existing rows already share this fold key. Do not silently pick
+        // one; leave it for the operator to resolve by hand.
+        ambiguousKeys.add(k);
+        continue;
+      }
+      index.set(k, { id: p.id, price: Number(p.price) });
     }
 
+    // A draft row can itself repeat a (category, name) key — a duplicated
+    // OCR read is the common case. Only the first occurrence claims the
+    // match; a second occurrence claiming the same existing product would
+    // otherwise race UPDATE_PRICE against itself and double-count as two
+    // updates for one product touched.
+    const claimed = new Set<string>();
     return {
       categories: draft.categories.map((c) => ({
         ...c,
         products: c.products.map((p) => {
-          const hit = index.get(key(c.name, p.name));
+          const k = key(c.name, p.name);
+          if (ambiguousKeys.has(k) || claimed.has(k)) {
+            return { ...p, ambiguous: true };
+          }
+          const hit = index.get(k);
           if (!hit) return p;
+          claimed.add(k);
           return {
             ...p,
             existingProductId: hit.id,
@@ -437,6 +467,13 @@ export class MenuImportService {
       failures: [],
     };
 
+    // Products already repriced by an earlier row in THIS commit call. A
+    // crafted body (commit is callable directly, without going through
+    // annotateConflicts first) can still name the same existingProductId
+    // twice; without this, both rows would "succeed" and productsUpdated
+    // would claim two updates for one product actually touched.
+    const touchedProductIds = new Set<string>();
+
     for (let i = 0; i < dto.categories.length; i++) {
       const cat = dto.categories[i];
       const key = foldMenuKey(cat.name);
@@ -475,22 +512,68 @@ export class MenuImportService {
         }
 
         if (action === "UPDATE_PRICE") {
+          // A price of 0 is never a real quote — parsing/normalisation
+          // coerces an unreadable cell to 0, and today only the SKIP
+          // default and the operator's attention stand between a
+          // badly-parsed price and a real, already-selling product being
+          // silently zeroed out. Refuse. A brand-new product created at 0
+          // stays allowed — that is a visible new row the operator can
+          // fix, not a silent edit to something already live.
+          if (p.price === 0) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: "price could not be read — refusing to update to 0",
+            });
+            continue;
+          }
+
+          if (touchedProductIds.has(p.existingProductId!)) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: "already updated by another row in this import",
+            });
+            continue;
+          }
+
           try {
             // ProductsService.update already calls findOne(id, tenantId),
             // which enforces tenant ownership and would throw a 404 for a
             // foreign id — that would abort the whole import. Checking
-            // ownership here first turns it into a per-row failure the
-            // operator can see instead, leaving the rest of the import to
-            // proceed.
+            // ownership AND identity here first turns both into a per-row
+            // failure the operator can see, instead of a thrown 404 (or,
+            // worse, a silent write to the wrong product) that aborts or
+            // corrupts the rest of the import. Identity is re-derived the
+            // same way annotateConflicts computed it — folded (category
+            // name, product name) — so a row whose name or category was
+            // edited in the review grid, or a crafted existingProductId
+            // that actually belongs to a different row, no longer
+            // silently reprices whatever that id currently points to.
             const owned = await this.prisma.product.findFirst({
               where: { id: p.existingProductId, tenantId },
-              select: { id: true },
+              select: {
+                id: true,
+                name: true,
+                category: { select: { name: true } },
+              },
             });
-            if (!owned) {
+            if (!owned || !owned.category) {
               summary.failures.push({
                 category: cat.name,
                 product: p.name,
                 reason: "product not found",
+              });
+              continue;
+            }
+            const stillMatches =
+              foldMenuKey(owned.category.name) === foldMenuKey(cat.name) &&
+              foldMenuKey(owned.name) === foldMenuKey(p.name);
+            if (!stillMatches) {
+              summary.failures.push({
+                category: cat.name,
+                product: p.name,
+                reason: "row no longer matches that product",
               });
               continue;
             }
@@ -499,6 +582,7 @@ export class MenuImportService {
               { price: p.price } as any,
               tenantId,
             );
+            touchedProductIds.add(p.existingProductId!);
             summary.productsUpdated++;
           } catch (err: any) {
             summary.failures.push({

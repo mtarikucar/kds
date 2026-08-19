@@ -298,7 +298,46 @@ describe("MenuImportService", () => {
       expect(out.categories[0].products[0].existingProductId).toBeUndefined();
     });
 
-    it("SKIP creates nothing and counts as skipped", async () => {
+    it("does not pick a winner when two existing products already share a (category, name) fold key", async () => {
+      // Product has no unique constraint on (categoryId, name), and this is
+      // exactly the population the feature exists for: a tenant whose menu
+      // was already doubled by the old unconditional-CREATE commitDraft.
+      (prisma.product.findMany as any).mockResolvedValue([
+        { id: "p1", name: "Ayran", price: 20, category: { name: "İçecekler" } },
+        { id: "p2", name: "Ayran", price: 22, category: { name: "İçecekler" } },
+      ]);
+      const out = await svc.annotateConflicts(
+        { categories: [{ name: "İçecekler", products: [{ name: "Ayran", price: 25 }] }] } as any,
+        TENANT,
+      );
+      // No id silently chosen — neither p1 nor p2 — and the grid gets a
+      // marker instead so it can't be committed as an unnoticed UPDATE_PRICE.
+      expect(out.categories[0].products[0].existingProductId).toBeUndefined();
+      expect((out.categories[0].products[0] as any).ambiguous).toBe(true);
+    });
+
+    it("does not let two identical rows in the SAME draft claim the same existing product", async () => {
+      (prisma.product.findMany as any).mockResolvedValue([
+        { id: "p1", name: "Ayran", price: 20, category: { name: "İçecekler" } },
+      ]);
+      const out = await svc.annotateConflicts(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              // A duplicated OCR read: the same row twice in one draft.
+              products: [{ name: "Ayran", price: 25 }, { name: "Ayran", price: 27 }],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(out.categories[0].products[0].existingProductId).toBe("p1");
+      expect(out.categories[0].products[1].existingProductId).toBeUndefined();
+      expect((out.categories[0].products[1] as any).ambiguous).toBe(true);
+    });
+
+    it("SKIP creates and updates nothing, and counts as skipped", async () => {
       (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
       const s = await svc.commitDraft(
         { categories: [{ name: "İçecekler", products: [
@@ -307,13 +346,57 @@ describe("MenuImportService", () => {
         TENANT,
       );
       expect(products.create).not.toHaveBeenCalled();
+      expect(products.update).not.toHaveBeenCalled();
       expect(s.productsSkipped).toBe(1);
       expect(s.productsCreated).toBe(0);
     });
 
+    it("a row with onConflict set but no existingProductId behaves as CREATE (BulkAddModal parity)", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      products.create.mockResolvedValue({ id: "new-1" });
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              // onConflict present, but no existingProductId to act on —
+              // must not be treated as SKIP/UPDATE_PRICE.
+              products: [{ name: "Ayran", price: 25, onConflict: "UPDATE_PRICE" }],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(products.update).not.toHaveBeenCalled();
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Ayran", price: 25 }),
+        TENANT,
+      );
+      expect(s.productsCreated).toBe(1);
+      expect(s.productsUpdated).toBe(0);
+      expect(s.productsSkipped).toBe(0);
+    });
+
+    it("a legacy draft with no conflict fields at all leaves productsUpdated/productsSkipped at 0", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      products.create.mockResolvedValue({ id: "new-1" });
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [{ name: "Ayran", price: 25 }] }] } as any,
+        TENANT,
+      );
+      expect(s.productsCreated).toBe(1);
+      expect(s.productsUpdated).toBe(0);
+      expect(s.productsSkipped).toBe(0);
+    });
+
     it("UPDATE_PRICE touches only the price", async () => {
       (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
-      (prisma.product.findFirst as any).mockResolvedValue({ id: "p1", tenantId: TENANT });
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        tenantId: TENANT,
+        name: "Ayran",
+        category: { name: "İçecekler" },
+      });
       const s = await svc.commitDraft(
         { categories: [{ name: "İçecekler", products: [
           { name: "Ayran", price: 25, description: "yeni", onConflict: "UPDATE_PRICE", existingProductId: "p1" },
@@ -337,6 +420,98 @@ describe("MenuImportService", () => {
       expect(s.failures[0].reason).toMatch(/not found/i);
     });
 
+    it("refuses to update a product the row no longer matches (renamed/re-categorised in the review grid)", async () => {
+      // existingProductId belongs to this tenant, but the row's (category,
+      // name) no longer folds to what that product currently is — an
+      // operator edit in the grid, or a crafted id naming a different row's
+      // product. Must fail the row rather than reprice whatever this id
+      // currently points to.
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        tenantId: TENANT,
+        name: "Kola", // actual product is "Kola" ...
+        category: { name: "İçecekler" },
+      });
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [
+          // ... but the row claims "Ayran".
+          { name: "Ayran", price: 25, onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+        ] }] } as any,
+        TENANT,
+      );
+      expect(products.update).not.toHaveBeenCalled();
+      expect(s.productsUpdated).toBe(0);
+      expect(s.failures[0].reason).toMatch(/no longer matches/i);
+    });
+
+    it("refuses UPDATE_PRICE when the row's price is 0 (an unreadable price, not a real quote)", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        tenantId: TENANT,
+        name: "Ayran",
+        category: { name: "İçecekler" },
+      });
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [
+          { name: "Ayran", price: 0, onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+        ] }] } as any,
+        TENANT,
+      );
+      expect(products.update).not.toHaveBeenCalled();
+      expect(s.productsUpdated).toBe(0);
+      expect(s.failures[0].reason).toMatch(/price could not be read/i);
+    });
+
+    it("creating a NEW product at 0 stays allowed (only UPDATE_PRICE refuses 0)", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      products.create.mockResolvedValue({ id: "new-1" });
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [{ name: "Bedava Su", price: 0 }] }] } as any,
+        TENANT,
+      );
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Bedava Su", price: 0 }),
+        TENANT,
+      );
+      expect(s.productsCreated).toBe(1);
+      expect(s.failures).toEqual([]);
+    });
+
+    it("does not double-count when two rows in the same commit target the same existingProductId", async () => {
+      // Defence in depth: /commit is callable directly without going
+      // through annotateConflicts first, so a crafted body can still name
+      // the same existingProductId twice. The summary must never claim
+      // more updates than products actually touched.
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        tenantId: TENANT,
+        name: "Ayran",
+        category: { name: "İçecekler" },
+      });
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              products: [
+                { name: "Ayran", price: 25, onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+                { name: "Ayran", price: 30, onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+              ],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+      expect(products.update).toHaveBeenCalledTimes(1);
+      expect(products.update).toHaveBeenCalledWith("p1", { price: 25 }, TENANT);
+      expect(s.productsUpdated).toBe(1);
+      expect(s.failures).toHaveLength(1);
+      expect(s.failures[0].reason).toMatch(/already updated/i);
+    });
+
     it("counts only rows that will actually be created toward the plan-limit check", async () => {
       // limit=2, 1 already used. Three draft rows: one SKIP, one
       // UPDATE_PRICE, one real CREATE. A naive count of all 3 rows would
@@ -347,7 +522,12 @@ describe("MenuImportService", () => {
       });
       (prisma.product.count as any).mockResolvedValue(1);
       (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
-      (prisma.product.findFirst as any).mockResolvedValue({ id: "p1", tenantId: TENANT });
+      (prisma.product.findFirst as any).mockResolvedValue({
+        id: "p1",
+        tenantId: TENANT,
+        name: "Kola",
+        category: { name: "İçecekler" },
+      });
       products.create.mockResolvedValue({ id: "new-1" });
 
       const s = await svc.commitDraft(

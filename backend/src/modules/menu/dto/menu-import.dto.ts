@@ -59,7 +59,14 @@ export class MenuImportProductDraftDto {
   @IsIn(["SKIP", "UPDATE_PRICE", "CREATE"])
   onConflict?: "SKIP" | "UPDATE_PRICE" | "CREATE";
 
-  /** The product this row collided with. Re-checked server-side. */
+  /**
+   * The product this row collided with. Re-checked server-side before
+   * UPDATE_PRICE writes it — both tenant ownership AND that the row's
+   * (category, name), folded the same way annotateConflicts matched it,
+   * still resolves to this same product id. A rename in the review grid,
+   * or an id that belongs to a different product, fails that row instead
+   * of silently repricing whatever this id currently points to.
+   */
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
