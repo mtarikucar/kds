@@ -29,7 +29,8 @@ export function sniffSourceKind(
   const mime = (contentType ?? "").split(";")[0].trim().toLowerCase();
   if (mime === "application/pdf") return "pdf";
   if (
-    mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mime ===
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
     mime === "application/vnd.ms-excel"
   ) {
     return "xlsx";

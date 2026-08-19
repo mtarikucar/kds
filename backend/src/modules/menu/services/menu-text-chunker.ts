@@ -56,16 +56,25 @@ export function chunkMenuText(
  * own capitalisation), and a product already present under that category is
  * dropped — that is how the chunk overlap stops being visible.
  */
-export function mergeDrafts(drafts: CommitMenuImportDto[]): CommitMenuImportDto {
+export function mergeDrafts(
+  drafts: CommitMenuImportDto[],
+): CommitMenuImportDto {
   const order: string[] = [];
-  const byKey = new Map<string, { name: string; products: any[]; seen: Set<string> }>();
+  const byKey = new Map<
+    string,
+    { name: string; products: any[]; seen: Set<string> }
+  >();
 
   for (const draft of drafts) {
     for (const cat of draft.categories ?? []) {
       const key = foldMenuKey(cat.name ?? "");
       let bucket = byKey.get(key);
       if (!bucket) {
-        bucket = { name: (cat.name ?? "").trim(), products: [], seen: new Set() };
+        bucket = {
+          name: (cat.name ?? "").trim(),
+          products: [],
+          seen: new Set(),
+        };
         byKey.set(key, bucket);
         order.push(key);
       }

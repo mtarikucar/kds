@@ -103,5 +103,7 @@ export function rowsToDraft(
     });
   }
 
-  return { categories: order.map((k) => buckets.get(k)!) } as CommitMenuImportDto;
+  return {
+    categories: order.map((k) => buckets.get(k)!),
+  } as CommitMenuImportDto;
 }
