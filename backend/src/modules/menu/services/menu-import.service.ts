@@ -16,6 +16,7 @@ import {
   CommitMenuImportDto,
   MenuImportCategoryDraftDto,
 } from "../dto/menu-import.dto";
+import { foldMenuKey } from "./menu-key-fold";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const SUPPORTED_IMAGE_TYPES = [
@@ -53,6 +54,8 @@ export interface CommitSummary {
   categoriesCreated: number;
   categoriesMatched: number;
   productsCreated: number;
+  productsUpdated: number;
+  productsSkipped: number;
   failures: { category: string; product: string; reason: string }[];
 }
 
@@ -323,6 +326,60 @@ export class MenuImportService {
   }
 
   /**
+   * Mark the draft rows that already exist, so the review grid can offer a
+   * choice instead of silently doubling the menu.
+   *
+   * Matching is scoped to the category, not the whole menu: "Ayran" can
+   * legitimately live in both İçecekler and Menüler and those are two
+   * different products. A draft category the tenant does not have yet can
+   * therefore never collide.
+   */
+  async annotateConflicts(
+    draft: CommitMenuImportDto,
+    tenantId: string,
+  ): Promise<CommitMenuImportDto> {
+    // Product has no deletedAt column (hard-deletes only) — filtering on it
+    // would throw a Prisma validation error at runtime.
+    const existing = await this.prisma.product.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        category: { select: { name: true } },
+      },
+    });
+
+    const key = (cat: string, name: string) =>
+      `${foldMenuKey(cat)} ${foldMenuKey(name)}`;
+
+    const index = new Map<string, { id: string; price: number }>();
+    for (const p of existing) {
+      if (!p.category?.name) continue;
+      index.set(key(p.category.name, p.name), {
+        id: p.id,
+        price: Number(p.price),
+      });
+    }
+
+    return {
+      categories: draft.categories.map((c) => ({
+        ...c,
+        products: c.products.map((p) => {
+          const hit = index.get(key(c.name, p.name));
+          if (!hit) return p;
+          return {
+            ...p,
+            existingProductId: hit.id,
+            existingPrice: hit.price,
+            onConflict: "SKIP" as const,
+          };
+        }),
+      })),
+    } as CommitMenuImportDto;
+  }
+
+  /**
    * Persist the operator-reviewed draft: match/create categories, then create
    * products. NOT one big transaction on purpose — a partial import (with a
    * per-item failure report) is better UX for a bulk paper-menu import than an
@@ -333,8 +390,15 @@ export class MenuImportService {
     dto: CommitMenuImportDto,
     tenantId: string,
   ): Promise<CommitSummary> {
+    // Only rows that will actually CREATE a product count against the plan
+    // limit — a SKIP or UPDATE_PRICE row touches an existing product, it
+    // does not add one.
     const totalProducts = dto.categories.reduce(
-      (n, c) => n + c.products.length,
+      (n, c) =>
+        n +
+        c.products.filter(
+          (p) => !p.existingProductId || (p.onConflict ?? "SKIP") === "CREATE",
+        ).length,
       0,
     );
 
@@ -353,11 +417,9 @@ export class MenuImportService {
       where: { tenantId },
       select: { id: true, name: true },
     });
-    const byName = new Map(
-      existing.map((c) => [c.name.trim().toLowerCase(), c.id]),
-    );
+    const byName = new Map(existing.map((c) => [foldMenuKey(c.name), c.id]));
     const newCategoryCount = dto.categories.filter(
-      (c) => !byName.has(c.name.trim().toLowerCase()),
+      (c) => !byName.has(foldMenuKey(c.name)),
     ).length;
     await this.assertWithinLimit(
       tenantId,
@@ -370,12 +432,14 @@ export class MenuImportService {
       categoriesCreated: 0,
       categoriesMatched: 0,
       productsCreated: 0,
+      productsUpdated: 0,
+      productsSkipped: 0,
       failures: [],
     };
 
     for (let i = 0; i < dto.categories.length; i++) {
       const cat = dto.categories[i];
-      const key = cat.name.trim().toLowerCase();
+      const key = foldMenuKey(cat.name);
       let categoryId = byName.get(key);
       if (categoryId) {
         summary.categoriesMatched++;
@@ -401,6 +465,51 @@ export class MenuImportService {
       }
 
       for (const p of cat.products) {
+        const action = p.existingProductId
+          ? (p.onConflict ?? "SKIP")
+          : "CREATE";
+
+        if (action === "SKIP") {
+          summary.productsSkipped++;
+          continue;
+        }
+
+        if (action === "UPDATE_PRICE") {
+          try {
+            // ProductsService.update already calls findOne(id, tenantId),
+            // which enforces tenant ownership and would throw a 404 for a
+            // foreign id — that would abort the whole import. Checking
+            // ownership here first turns it into a per-row failure the
+            // operator can see instead, leaving the rest of the import to
+            // proceed.
+            const owned = await this.prisma.product.findFirst({
+              where: { id: p.existingProductId, tenantId },
+              select: { id: true },
+            });
+            if (!owned) {
+              summary.failures.push({
+                category: cat.name,
+                product: p.name,
+                reason: "product not found",
+              });
+              continue;
+            }
+            await this.products.update(
+              p.existingProductId!,
+              { price: p.price } as any,
+              tenantId,
+            );
+            summary.productsUpdated++;
+          } catch (err: any) {
+            summary.failures.push({
+              category: cat.name,
+              product: p.name,
+              reason: err?.message ?? "unknown",
+            });
+          }
+          continue;
+        }
+
         try {
           await this.products.create(
             {

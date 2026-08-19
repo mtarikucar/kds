@@ -46,6 +46,25 @@ export class MenuImportProductDraftDto {
   @IsInt()
   @IsIn([0, 1, 10, 20])
   taxRate?: number;
+
+  /**
+   * What to do when this row already exists in the target category. The
+   * server annotates the row on parse; the operator may change it in the
+   * review grid. Absent means CREATE — that is what every pre-conflict
+   * caller (BulkAddModal, the photo flow) sends, and it keeps their
+   * behaviour byte-identical.
+   */
+  @ApiProperty({ required: false, enum: ["SKIP", "UPDATE_PRICE", "CREATE"] })
+  @IsOptional()
+  @IsIn(["SKIP", "UPDATE_PRICE", "CREATE"])
+  onConflict?: "SKIP" | "UPDATE_PRICE" | "CREATE";
+
+  /** The product this row collided with. Re-checked server-side. */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  existingProductId?: string;
 }
 
 export class MenuImportCategoryDraftDto {

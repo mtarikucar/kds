@@ -11,7 +11,7 @@ describe("MenuImportService", () => {
   let prisma: MockPrismaClient;
   let config: { get: jest.Mock };
   let categories: { create: jest.Mock };
-  let products: { create: jest.Mock };
+  let products: { create: jest.Mock; update: jest.Mock };
   let entitlements: { getForTenant: jest.Mock };
   let svc: MenuImportService;
 
@@ -26,7 +26,7 @@ describe("MenuImportService", () => {
     prisma = mockPrismaClient();
     config = { get: jest.fn() };
     categories = { create: jest.fn() };
-    products = { create: jest.fn() };
+    products = { create: jest.fn(), update: jest.fn() };
     entitlements = {
       getForTenant: jest.fn().mockResolvedValue({ limits: {} }),
     };
@@ -196,6 +196,35 @@ describe("MenuImportService", () => {
       );
     });
 
+    it("matches an existing category via Turkish-locale folding, not plain toLowerCase", async () => {
+      // "İÇECEKLER".toLowerCase() (default/ASCII fold) yields "i̇çecekler" —
+      // an ASCII i plus a combining dot above — which never equals the
+      // stored "içecekler". Only foldMenuKey's tr-TR fold makes these match.
+      (prisma.category.findMany as any).mockResolvedValue([
+        { id: "existing-tr", name: "içecekler" },
+      ]);
+      categories.create.mockImplementation(async ({ name }: any) => ({
+        id: `cat-${name}`,
+      }));
+      products.create.mockResolvedValue({ id: "p" });
+
+      const summary = await svc.commitDraft(
+        {
+          categories: [
+            { name: "İÇECEKLER", products: [{ name: "Ayran", price: 25 }] },
+          ],
+        } as any,
+        TENANT,
+      );
+
+      expect(summary.categoriesMatched).toBe(1);
+      expect(summary.categoriesCreated).toBe(0);
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ categoryId: "existing-tr" }),
+        TENANT,
+      );
+    });
+
     it("collects a per-product failure without aborting the rest of the import", async () => {
       categories.create.mockImplementation(async ({ name }: any) => ({
         id: `cat-${name}`,
@@ -235,6 +264,112 @@ describe("MenuImportService", () => {
 
       const summary = await svc.commitDraft(draft as any, TENANT);
       expect(summary.productsCreated).toBe(3);
+    });
+  });
+
+  describe("conflicts", () => {
+    it("annotates a draft row that already exists in the same category", async () => {
+      (prisma.product.findMany as any).mockResolvedValue([
+        { id: "p1", name: "Ayran", price: 20, category: { name: "İçecekler" } },
+      ]);
+      const draft = {
+        categories: [
+          { name: "içecekler", products: [{ name: " ayran ", price: 25 }, { name: "Kola", price: 30 }] },
+        ],
+      };
+
+      const out = await svc.annotateConflicts(draft as any, TENANT);
+
+      expect(out.categories[0].products[0]).toMatchObject({
+        existingProductId: "p1",
+        onConflict: "SKIP",
+      });
+      expect(out.categories[0].products[1].existingProductId).toBeUndefined();
+    });
+
+    it("does not match the same name in a different category", async () => {
+      (prisma.product.findMany as any).mockResolvedValue([
+        { id: "p1", name: "Ayran", price: 20, category: { name: "İçecekler" } },
+      ]);
+      const out = await svc.annotateConflicts(
+        { categories: [{ name: "Menüler", products: [{ name: "Ayran", price: 25 }] }] } as any,
+        TENANT,
+      );
+      expect(out.categories[0].products[0].existingProductId).toBeUndefined();
+    });
+
+    it("SKIP creates nothing and counts as skipped", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [
+          { name: "Ayran", price: 25, onConflict: "SKIP", existingProductId: "p1" },
+        ] }] } as any,
+        TENANT,
+      );
+      expect(products.create).not.toHaveBeenCalled();
+      expect(s.productsSkipped).toBe(1);
+      expect(s.productsCreated).toBe(0);
+    });
+
+    it("UPDATE_PRICE touches only the price", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue({ id: "p1", tenantId: TENANT });
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [
+          { name: "Ayran", price: 25, description: "yeni", onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+        ] }] } as any,
+        TENANT,
+      );
+      expect(products.update).toHaveBeenCalledWith("p1", { price: 25 }, TENANT);
+      expect(s.productsUpdated).toBe(1);
+    });
+
+    it("refuses to update a product belonging to another tenant", async () => {
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue(null); // not found for THIS tenant
+      const s = await svc.commitDraft(
+        { categories: [{ name: "İçecekler", products: [
+          { name: "Ayran", price: 25, onConflict: "UPDATE_PRICE", existingProductId: "someone-elses" },
+        ] }] } as any,
+        TENANT,
+      );
+      expect(products.update).not.toHaveBeenCalled();
+      expect(s.failures[0].reason).toMatch(/not found/i);
+    });
+
+    it("counts only rows that will actually be created toward the plan-limit check", async () => {
+      // limit=2, 1 already used. Three draft rows: one SKIP, one
+      // UPDATE_PRICE, one real CREATE. A naive count of all 3 rows would
+      // reject (1 + 3 = 4 > 2); counting only the row that actually creates
+      // a product must allow it (1 + 1 = 2, not > 2).
+      entitlements.getForTenant.mockResolvedValue({
+        limits: { "limit.maxProducts": 2 },
+      });
+      (prisma.product.count as any).mockResolvedValue(1);
+      (prisma.category.findMany as any).mockResolvedValue([{ id: "c1", name: "İçecekler" }]);
+      (prisma.product.findFirst as any).mockResolvedValue({ id: "p1", tenantId: TENANT });
+      products.create.mockResolvedValue({ id: "new-1" });
+
+      const s = await svc.commitDraft(
+        {
+          categories: [
+            {
+              name: "İçecekler",
+              products: [
+                { name: "Ayran", price: 25, onConflict: "SKIP", existingProductId: "p1" },
+                { name: "Kola", price: 30, onConflict: "UPDATE_PRICE", existingProductId: "p1" },
+                { name: "Limonata", price: 35 },
+              ],
+            },
+          ],
+        } as any,
+        TENANT,
+      );
+
+      expect(products.create).toHaveBeenCalledTimes(1);
+      expect(s.productsCreated).toBe(1);
+      expect(s.productsSkipped).toBe(1);
+      expect(s.productsUpdated).toBe(1);
     });
   });
 
