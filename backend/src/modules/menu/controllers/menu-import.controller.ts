@@ -91,16 +91,24 @@ export class MenuImportController {
     @Request() req,
   ) {
     const f = (files ?? [])[0];
-    const draft = await this.menuSource.parseSource(req.tenantId, {
-      url: dto.url,
-      file: f
-        ? {
-            buffer: f.buffer,
-            mimetype: f.mimetype,
-            originalname: f.originalname,
-          }
-        : undefined,
-    });
+    // Same read EntitlementGuard uses (entitlement.guard.ts) — a grant can
+    // be branch-scoped, so this must reach MenuSourceService's entitlement
+    // check or it 403s a branch the guard-gated photo endpoint would allow.
+    const branchId: string | null = req.scope?.branchId ?? null;
+    const draft = await this.menuSource.parseSource(
+      req.tenantId,
+      {
+        url: dto.url,
+        file: f
+          ? {
+              buffer: f.buffer,
+              mimetype: f.mimetype,
+              originalname: f.originalname,
+            }
+          : undefined,
+      },
+      branchId,
+    );
     // Mark what already exists so the grid can offer a choice.
     return this.menuImport.annotateConflicts(draft, req.tenantId);
   }

@@ -19,10 +19,11 @@ describe("MenuImportController parse-source", () => {
     await ctrl.parseSource({ url: "https://x.test/menu" } as any, [], {
       tenantId: "t1",
     } as any);
-    expect(menuSource.parseSource).toHaveBeenCalledWith("t1", {
-      url: "https://x.test/menu",
-      file: undefined,
-    });
+    expect(menuSource.parseSource).toHaveBeenCalledWith(
+      "t1",
+      { url: "https://x.test/menu", file: undefined },
+      null,
+    );
     expect(menuImport.annotateConflicts).toHaveBeenCalled();
   });
 
@@ -34,10 +35,37 @@ describe("MenuImportController parse-source", () => {
       originalname: "m.pdf",
     };
     await ctrl.parseSource({} as any, [file] as any, { tenantId: "t1" } as any);
-    expect(menuSource.parseSource).toHaveBeenCalledWith("t1", {
-      url: undefined,
-      file,
-    });
+    expect(menuSource.parseSource).toHaveBeenCalledWith(
+      "t1",
+      { url: undefined, file },
+      null,
+    );
+  });
+
+  it("threads req.scope.branchId through as the third argument — same read EntitlementGuard uses", async () => {
+    menuSource.parseSource.mockResolvedValue({ categories: [] });
+    await ctrl.parseSource({ url: "https://x.test/menu" } as any, [], {
+      tenantId: "t1",
+      scope: { branchId: "branch-1" },
+    } as any);
+    expect(menuSource.parseSource).toHaveBeenCalledWith(
+      "t1",
+      { url: "https://x.test/menu", file: undefined },
+      "branch-1",
+    );
+  });
+
+  it("falls back to null when req.scope is absent (unscoped request)", async () => {
+    menuSource.parseSource.mockResolvedValue({ categories: [] });
+    await ctrl.parseSource({ url: "https://x.test/menu" } as any, [], {
+      tenantId: "t1",
+      scope: undefined,
+    } as any);
+    expect(menuSource.parseSource).toHaveBeenCalledWith(
+      "t1",
+      { url: "https://x.test/menu", file: undefined },
+      null,
+    );
   });
 
   it("returns the draft after annotateConflicts, not the raw parseSource result", async () => {
@@ -50,6 +78,7 @@ describe("MenuImportController parse-source", () => {
       [],
       {
         tenantId: "t1",
+        scope: { branchId: "branch-1" },
       } as any,
     );
     expect(menuImport.annotateConflicts).toHaveBeenCalledWith(rawDraft, "t1");

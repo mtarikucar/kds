@@ -535,6 +535,49 @@ describe("MenuSourceService", () => {
         }),
       });
     });
+
+    it("honours a BRANCH-SCOPED grant — getForTenant is called with the caller's branch id, not a hardcoded null", async () => {
+      // Entitled ONLY at branch "b1" (e.g. a superadmin comp issued with a
+      // branchId, per comp.dto.ts) — a tenant-wide (null) lookup is false.
+      entitlements.getForTenant.mockImplementation(
+        (_tenantId: string, branchId: string | null) =>
+          Promise.resolve(entitlementSet(branchId === "b1")),
+      );
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("%PDF-1.7 ..."),
+        contentType: "application/pdf",
+        filename: "menu.pdf",
+        finalUrl: "https://x.test/menu.pdf",
+      });
+
+      const draft = await svc.parseSource(
+        TENANT,
+        { url: "https://x.test/menu.pdf" },
+        "b1",
+      );
+
+      expect(entitlements.getForTenant).toHaveBeenCalledWith(TENANT, "b1");
+      expect(draft.categories[0].name).toBe("PDF");
+    });
+
+    it("without a branch id, a branch-scoped-only grant is correctly NOT honoured (null reaches getForTenant)", async () => {
+      entitlements.getForTenant.mockImplementation(
+        (_tenantId: string, branchId: string | null) =>
+          Promise.resolve(entitlementSet(branchId === "b1")),
+      );
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from("%PDF-1.7 ..."),
+        contentType: "application/pdf",
+        filename: "menu.pdf",
+        finalUrl: "https://x.test/menu.pdf",
+      });
+
+      // No third argument — the tenant-wide (branchless) call site.
+      await expect(
+        svc.parseSource(TENANT, { url: "https://x.test/menu.pdf" }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(entitlements.getForTenant).toHaveBeenCalledWith(TENANT, null);
+    });
   });
 
   describe("CSV delimiter sniffing — an array delimiter to csv-parse means ALL of them at once, not 'pick one'", () => {
@@ -617,6 +660,52 @@ describe("MenuSourceService", () => {
       // Recognised headers — still never touches the model or the gate.
       expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
       expect(quota.claim).not.toHaveBeenCalled();
+    });
+
+    it("sniffs from the first NON-empty line — one or more leading blank lines must not defeat the sniff", () => {
+      // A blank first line makes sniffCsvDelimiter("") fall back to ",",
+      // which would shred this exact Turkish file the same way the
+      // original bug did if csvToRows sniffed literally the first line.
+      const bytes = Buffer.from(
+        "\n\n" +
+          "Ürün Adı;Açıklama;Fiyat;Kategori\n" +
+          "Adana Kebap;Acılı;180,50;Ana Yemekler\n",
+      );
+      const rows = csvToRows(bytes);
+      expect(rows[0]).toEqual(["Ürün Adı", "Açıklama", "Fiyat", "Kategori"]);
+      expect(rows[1]).toEqual(["Adana Kebap", "Acılı", "180,50", "Ana Yemekler"]);
+    });
+
+    it("treats a whitespace-only leading line as blank too", () => {
+      const bytes = Buffer.from(
+        "   \n\t\n" +
+          "Ürün Adı;Açıklama;Fiyat;Kategori\nAdana Kebap;Acılı;180,50;Ana Yemekler\n",
+      );
+      const rows = csvToRows(bytes);
+      expect(rows[0]).toEqual(["Ürün Adı", "Açıklama", "Fiyat", "Kategori"]);
+      expect(rows[1]).toEqual(["Adana Kebap", "Acılı", "180,50", "Ana Yemekler"]);
+    });
+
+    it("end-to-end: leading blank lines before a Turkish semicolon header still import correctly through parseSource", async () => {
+      fetcher.fetch.mockResolvedValue({
+        bytes: Buffer.from(
+          "\n" +
+            "Ürün Adı;Açıklama;Fiyat;Kategori\n" +
+            "Adana Kebap;Acılı;180,50;Ana Yemekler\n",
+        ),
+        contentType: "text/csv",
+        filename: "menu.csv",
+        finalUrl: "https://x.test/menu.csv",
+      });
+
+      const draft = await svc.parseSource(TENANT, { url: "https://x.test/menu.csv" });
+
+      const categoryNames = (draft.categories as any[]).map((c) => c.name);
+      expect(categoryNames).toEqual(["Ana Yemekler"]);
+      expect(draft.categories[0].products[0]).toMatchObject({
+        name: "Adana Kebap",
+        price: 180.5,
+      });
     });
   });
 });

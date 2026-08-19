@@ -92,6 +92,12 @@ export class MenuSourceService {
       url?: string;
       file?: { buffer: Buffer; mimetype: string; originalname: string };
     },
+    // Threaded through to the entitlement check the same way
+    // EntitlementGuard reads it: `req.scope?.branchId ?? null`. A grant can
+    // be branch-scoped (superadmin comp with a branchId — see comp.dto.ts),
+    // so hardcoding null here would 403 a tenant the guard-gated photo
+    // `parse` endpoint correctly allows at that branch.
+    branchId: string | null = null,
   ): Promise<CommitMenuImportDto> {
     if (!input.url && !input.file) {
       throw new BadRequestException("a url or file is required");
@@ -113,11 +119,15 @@ export class MenuSourceService {
 
     switch (kind) {
       case "csv":
-        return this.fromRows(tenantId, this.readCsv(source.bytes));
+        return this.fromRows(tenantId, this.readCsv(source.bytes), branchId);
       case "xlsx":
-        return this.fromRows(tenantId, await this.readXlsx(source.bytes));
+        return this.fromRows(
+          tenantId,
+          await this.readXlsx(source.bytes),
+          branchId,
+        );
       case "pdf":
-        await this.assertAiEntitlement(tenantId);
+        await this.assertAiEntitlement(tenantId, branchId);
         return this.metered(tenantId, 1, () =>
           this.importSvc.parseDocumentToDraft(source.bytes, "application/pdf"),
         );
@@ -126,6 +136,7 @@ export class MenuSourceService {
         return this.fromText(
           tenantId,
           htmlToText(source.bytes.toString("utf8")),
+          branchId,
         );
     }
   }
@@ -134,8 +145,9 @@ export class MenuSourceService {
   private async fromText(
     tenantId: string,
     text: string,
+    branchId: string | null,
   ): Promise<CommitMenuImportDto> {
-    await this.assertAiEntitlement(tenantId);
+    await this.assertAiEntitlement(tenantId, branchId);
     if (!text.trim()) {
       throw new BadRequestException("nothing readable at that link");
     }
@@ -160,6 +172,7 @@ export class MenuSourceService {
   private async fromRows(
     tenantId: string,
     table: string[][],
+    branchId: string | null,
   ): Promise<CommitMenuImportDto> {
     if (table.length < 2) {
       throw new BadRequestException("that file has no data rows");
@@ -177,7 +190,7 @@ export class MenuSourceService {
     // does not actually exist in this sheet, or a mapping that ends up
     // matching zero rows — is validated INSIDE metered(), so a bad answer
     // refunds the claim instead of silently billing for an empty draft.
-    await this.assertAiEntitlement(tenantId);
+    await this.assertAiEntitlement(tenantId, branchId);
     return this.metered(tenantId, 1, async () => {
       const sample = [headers, ...rows.slice(0, 5)]
         .map((r) => r.map(truncateForSample).join(" | "))
@@ -278,10 +291,17 @@ export class MenuSourceService {
    * entitlement from inside a service instead of a route guard. Kept in
    * lock-step with the guard's `deny()`: same offer-resolution best-effort
    * (never let a catalog hiccup turn a clean 403 into a 500), same
-   * license-vs-product distinction.
+   * license-vs-product distinction, and — like the guard reading
+   * `req.scope?.branchId ?? null` — the SAME branch scope the caller
+   * resolved. A grant can be branch-scoped (superadmin comp accepts a
+   * branchId), so a hardcoded `null` here would 403 a tenant at a branch
+   * the decorator-gated photo `parse` endpoint correctly allows.
    */
-  private async assertAiEntitlement(tenantId: string): Promise<void> {
-    const set = await this.entitlements.getForTenant(tenantId, null);
+  private async assertAiEntitlement(
+    tenantId: string,
+    branchId: string | null,
+  ): Promise<void> {
+    const set = await this.entitlements.getForTenant(tenantId, branchId);
     if (hasFeature(set, AI_FEATURE_KEY)) return;
 
     const licensed = set.features?.["feature.license"] === true;
@@ -393,10 +413,23 @@ export function sniffCsvDelimiter(headerLine: string): string {
   return best; // "," when every candidate's count is zero (single column).
 }
 
+/**
+ * The first line of the file, unless it's blank — a real export can carry
+ * one or more leading blank lines before the actual header row, and
+ * sniffing an empty string always falls back to "," (the single-column
+ * fallback), which would silently reproduce the original bug on exactly
+ * the semicolon files this function exists to fix.
+ */
+function firstNonEmptyLine(text: string): string {
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    if (line.trim().length > 0) return line;
+  }
+  return "";
+}
+
 export function csvToRows(bytes: Buffer): string[][] {
   const text = bytes.toString("utf8").replace(/^﻿/, "");
-  const headerLine = text.split(/\r\n|\r|\n/, 1)[0] ?? "";
-  const delimiter = sniffCsvDelimiter(headerLine);
+  const delimiter = sniffCsvDelimiter(firstNonEmptyLine(text));
   return parseCsv(text, {
     delimiter,
     relax_column_count: true,
