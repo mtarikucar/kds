@@ -89,6 +89,13 @@ export class MenuImportProductDraftDto {
   ambiguous?: boolean;
 }
 
+// Exported so any caller that builds a draft outside the review grid (e.g.
+// MenuSourceService.fromRows, mapping a raw CSV/XLSX) can enforce the same
+// caps BEFORE handing the operator a draft that would only fail later at
+// /commit's ArrayMaxSize validation — one number, not two places to drift.
+export const MAX_PRODUCTS_PER_CATEGORY = 500;
+export const MAX_CATEGORIES = 200;
+
 export class MenuImportCategoryDraftDto {
   @ApiProperty({ example: "Ana Yemekler" })
   @IsString()
@@ -98,7 +105,7 @@ export class MenuImportCategoryDraftDto {
 
   @ApiProperty({ type: [MenuImportProductDraftDto] })
   @IsArray()
-  @ArrayMaxSize(500)
+  @ArrayMaxSize(MAX_PRODUCTS_PER_CATEGORY)
   @ValidateNested({ each: true })
   @Type(() => MenuImportProductDraftDto)
   products: MenuImportProductDraftDto[];
@@ -111,7 +118,7 @@ export class MenuImportCategoryDraftDto {
 export class CommitMenuImportDto {
   @ApiProperty({ type: [MenuImportCategoryDraftDto] })
   @IsArray()
-  @ArrayMaxSize(200)
+  @ArrayMaxSize(MAX_CATEGORIES)
   @ValidateNested({ each: true })
   @Type(() => MenuImportCategoryDraftDto)
   categories: MenuImportCategoryDraftDto[];

@@ -40,14 +40,6 @@ export default function MenuImportTab({
       quota-consuming parse + manual edits. */
   onDirtyChange?: (dirty: boolean) => void;
 }) {
-  return <MenuImportTabInner onDirtyChange={onDirtyChange} />;
-}
-
-function MenuImportTabInner({
-  onDirtyChange,
-}: {
-  onDirtyChange?: (dirty: boolean) => void;
-}) {
   const { t } = useTranslation(["menu", "common"]);
   const parse = useParseMenuPhotos();
   const commit = useCommitMenuImport();

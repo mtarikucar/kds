@@ -311,6 +311,42 @@ describe("MenuSourceService", () => {
     expect(importSvc.parseColumnMap).not.toHaveBeenCalled();
   });
 
+  it("rejects (without charging) a locally-recognised sheet whose one category has more than 500 products", async () => {
+    const rows = Array.from(
+      { length: 501 },
+      (_, i) => `Ürün ${i},${10 + i},Menü`,
+    ).join("\n");
+    fetcher.fetch.mockResolvedValue({
+      bytes: Buffer.from(`Ad,Fiyat,Kategori\n${rows}\n`),
+      contentType: "text/csv",
+      filename: "huge.csv",
+      finalUrl: "https://x.test/huge.csv",
+    });
+
+    await expect(
+      svc.parseSource(TENANT, { url: "https://x.test/huge.csv" }),
+    ).rejects.toThrow(/Menü.*501 products.*limit per category is 500/i);
+    expect(quota.claim).not.toHaveBeenCalled();
+  });
+
+  it("rejects (without charging) a locally-recognised sheet with more than 200 categories", async () => {
+    const rows = Array.from(
+      { length: 201 },
+      (_, i) => `Ürün ${i},10,Kategori ${i}`,
+    ).join("\n");
+    fetcher.fetch.mockResolvedValue({
+      bytes: Buffer.from(`Ad,Fiyat,Kategori\n${rows}\n`),
+      contentType: "text/csv",
+      filename: "wide.csv",
+      finalUrl: "https://x.test/wide.csv",
+    });
+
+    await expect(
+      svc.parseSource(TENANT, { url: "https://x.test/wide.csv" }),
+    ).rejects.toThrow(/201 categories.*limit is 200/i);
+    expect(quota.claim).not.toHaveBeenCalled();
+  });
+
   it("truncates long cells before sending the column-mapping sample to the model", async () => {
     const longDescription = "x".repeat(500);
     fetcher.fetch.mockResolvedValue({

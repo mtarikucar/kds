@@ -63,7 +63,12 @@ export class MenuImportController {
       buffer: f.buffer,
       mimetype: f.mimetype,
     }));
-    return this.menuImport.parseMenuPhotos(req.tenantId, images);
+    const draft = await this.menuImport.parseMenuPhotos(req.tenantId, images);
+    // Same annotation parse-source gets: without it, re-photographing a menu
+    // that was already imported has no way to recognise the duplicates and
+    // silently doubles it — the review grid already renders the conflict UI
+    // this produces, it just never appeared on this path before.
+    return this.menuImport.annotateConflicts(draft, req.tenantId);
   }
 
   // NOT gated with @RequiresFeature here, unlike photo parse: a

@@ -12,9 +12,6 @@ vi.mock("react-i18next", () => ({
     t: (k: string, d?: any) => (typeof d === "string" ? d : d?.defaultValue ?? k),
   }),
 }));
-vi.mock("../../../components/subscriptions/FeatureGate", () => ({
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn(), warning: vi.fn() } }));
 
@@ -27,6 +24,16 @@ function makeFile(name: string, type: string, sizeBytes: number): File {
 describe("MenuSourceTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("renders the source form ungated — a recognised CSV/XLSX never calls the model, so no AI-entitlement gate should hide it", () => {
+    // Deliberately renders with NO subscription/entitlement mocking at all:
+    // if step 1 were still wrapped in FeatureGate, this would blow up
+    // reaching into SubscriptionContext instead of rendering the form.
+    render(<MenuSourceTab />);
+    expect(screen.getByTestId("source-url")).toBeInTheDocument();
+    expect(screen.getByTestId("source-file")).toBeInTheDocument();
+    expect(screen.getByTestId("source-submit")).toBeInTheDocument();
   });
 
   it("disables submit until a link or a file is provided", () => {

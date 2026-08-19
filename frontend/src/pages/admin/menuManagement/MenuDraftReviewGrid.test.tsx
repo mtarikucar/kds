@@ -251,6 +251,43 @@ describe("MenuDraftReviewGrid", () => {
     expect(screen.getByTestId("existing-price-0-0")).toHaveTextContent("20");
   });
 
+  it("leaves description and KDV editable on an ordinary SKIP conflict row (only UPDATE_PRICE narrows the write)", () => {
+    render(<MenuDraftReviewGrid controls={controls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
+    expect(screen.getByTestId("description-0-0")).not.toBeDisabled();
+    expect(screen.getByTestId("tax-rate-0-0")).not.toBeDisabled();
+  });
+
+  const updatePriceControls = {
+    ...controls,
+    draft: {
+      categories: [
+        {
+          name: "İçecekler",
+          products: [
+            {
+              name: "Ayran",
+              price: 25,
+              existingProductId: "p1",
+              existingPrice: 20,
+              onConflict: "UPDATE_PRICE" as const,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("disables description and KDV on an UPDATE_PRICE row — the server only writes { price } for it", () => {
+    render(<MenuDraftReviewGrid controls={updatePriceControls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
+    const description = screen.getByTestId("description-0-0");
+    const taxRate = screen.getByTestId("tax-rate-0-0");
+    expect(description).toBeDisabled();
+    expect(taxRate).toBeDisabled();
+    // A tooltip explains why, rather than leaving it unexplained.
+    expect(description.getAttribute("title")).toBeTruthy();
+    expect(taxRate.getAttribute("title")).toBeTruthy();
+  });
+
   const ambiguousControls = {
     draft: {
       categories: [

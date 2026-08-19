@@ -17,7 +17,11 @@ import {
   type ColumnMap,
 } from "./menu-tabular-mapper";
 import { foldMenuKey } from "./menu-key-fold";
-import { CommitMenuImportDto } from "../dto/menu-import.dto";
+import {
+  CommitMenuImportDto,
+  MAX_CATEGORIES,
+  MAX_PRODUCTS_PER_CATEGORY,
+} from "../dto/menu-import.dto";
 import { EntitlementService } from "../../entitlements/entitlement.service";
 import { EntitlementOfferResolver } from "../../entitlements/entitlement-offer.resolver";
 import {
@@ -241,6 +245,13 @@ export class MenuSourceService {
    * Map every row locally and refuse a result with no products, rather than
    * resolving a silently-empty draft — on the metered path that emptiness
    * is exactly what must trigger a refund, not a "successful" 0-item import.
+   *
+   * Also enforces the SAME caps CommitMenuImportDto validates at /commit
+   * (500 products per category, 200 categories) — nothing upstream limits
+   * row count, so an unfiltered 10MB CSV/XLSX would otherwise produce a
+   * draft the review grid renders in full (five inputs per row) only for
+   * commit to reject it later on ArrayMaxSize. Failing here, before the
+   * operator ever sees the draft, is both cheaper and more actionable.
    */
   private draftFromRows(
     headers: string[],
@@ -255,6 +266,19 @@ export class MenuSourceService {
     if (!productCount) {
       throw new BadRequestException(
         "could not match any rows to the identified name/price columns",
+      );
+    }
+    if (draft.categories.length > MAX_CATEGORIES) {
+      throw new BadRequestException(
+        `that file has ${draft.categories.length} categories — the limit is ${MAX_CATEGORIES}. Split it into smaller imports.`,
+      );
+    }
+    const oversized = draft.categories.find(
+      (c) => c.products.length > MAX_PRODUCTS_PER_CATEGORY,
+    );
+    if (oversized) {
+      throw new BadRequestException(
+        `"${oversized.name}" has ${oversized.products.length} products — the limit per category is ${MAX_PRODUCTS_PER_CATEGORY}. Split it into smaller imports.`,
       );
     }
     return draft;

@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Link2, Upload, Loader2, Sparkles, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
-import FeatureGate from "../../../components/subscriptions/FeatureGate";
 import {
   useParseMenuSource,
   useCommitMenuImport,
@@ -126,72 +125,77 @@ export default function MenuSourceTab({
 
   return (
     <div className="space-y-6">
-      {/* ── Step 1: give a source (PRO+ gated — the /parse-source endpoint 403s below this plan) ── */}
+      {/* ── Step 1: give a source. NOT feature-gated: a CSV/XLSX whose
+          headers we recognise never calls the model, so it works without
+          the AI add-on — same free bulk-entry capability BulkAddModal
+          already gets ungated. Only the paths that actually spend a model
+          call (PDF, HTML/text, unrecognised-header column-map fallback)
+          assert the entitlement, inside MenuSourceService, before any
+          credit is claimed — if this operator's source needs it and they
+          don't have it, that 403 surfaces through the normal error toast. ── */}
       {!draft && !summary && (
-        <FeatureGate feature="aiContentGeneration" showUpgradePrompt>
-          <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-5">
-            <p className="text-sm text-gray-600">
-              {t(
-                "menu:source.hint",
-                "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin (en fazla 10 MB). Tüm ürünler çıkarılıp önünüze gelir.",
-              )}
-            </p>
+        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-5">
+          <p className="text-sm text-gray-600">
+            {t(
+              "menu:source.hint",
+              "Menünüzün bulunduğu sayfanın adresini yapıştırın ya da PDF / Excel / CSV dosyanızı yükleyin (en fazla 10 MB). Tüm ürünler çıkarılıp önünüze gelir.",
+            )}
+          </p>
 
-            <div className="flex items-center gap-2">
-              <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
-              <input
-                data-testid="source-url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://restoran.com/menu"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Upload className="h-4 w-4 shrink-0 text-gray-400" />
-              <input
-                data-testid="source-file"
-                type="file"
-                accept={ACCEPT}
-                onChange={(e) => {
-                  const picked = e.target.files?.[0] ?? null;
-                  if (picked && picked.size > MAX_FILE_BYTES) {
-                    toast.error(
-                      t("menu:source.fileTooLarge", "Dosya çok büyük — en fazla {{mb}} MB olmalı.", { mb: 10 }),
-                    );
-                    // Reset the native input so re-selecting the SAME oversized
-                    // file (after trimming it) still fires a fresh onChange —
-                    // browsers don't fire change for an unchanged file list.
-                    e.target.value = "";
-                    setFile(null);
-                    return;
-                  }
-                  setFile(picked);
-                }}
-                className="text-sm"
-              />
-            </div>
-
-            <Button
-              data-testid="source-submit"
-              onClick={handleParse}
-              disabled={parse.isPending || (!url.trim() && !file)}
-            >
-              {parse.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("menu:source.reading", "Okunuyor…")}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  {t("menu:source.parse", "Ürünleri çıkar")}
-                </>
-              )}
-            </Button>
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
+            <input
+              data-testid="source-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://restoran.com/menu"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
           </div>
-        </FeatureGate>
+
+          <div className="flex items-center gap-2">
+            <Upload className="h-4 w-4 shrink-0 text-gray-400" />
+            <input
+              data-testid="source-file"
+              type="file"
+              accept={ACCEPT}
+              onChange={(e) => {
+                const picked = e.target.files?.[0] ?? null;
+                if (picked && picked.size > MAX_FILE_BYTES) {
+                  toast.error(
+                    t("menu:source.fileTooLarge", "Dosya çok büyük — en fazla {{mb}} MB olmalı.", { mb: 10 }),
+                  );
+                  // Reset the native input so re-selecting the SAME oversized
+                  // file (after trimming it) still fires a fresh onChange —
+                  // browsers don't fire change for an unchanged file list.
+                  e.target.value = "";
+                  setFile(null);
+                  return;
+                }
+                setFile(picked);
+              }}
+              className="text-sm"
+            />
+          </div>
+
+          <Button
+            data-testid="source-submit"
+            onClick={handleParse}
+            disabled={parse.isPending || (!url.trim() && !file)}
+          >
+            {parse.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t("menu:source.reading", "Okunuyor…")}
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                {t("menu:source.parse", "Ürünleri çıkar")}
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
       {/* ── Step 2: review grid (ungated — commit itself never checks the plan) ── */}

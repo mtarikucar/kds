@@ -247,7 +247,8 @@
       "ambiguousCount": "{{n}} ta mahsulot bir nechta mavjud mahsulotga mos keldi — hech biri o‘zgartirilmaydi. Baribir qo‘shmoqchi bo‘lsangiz, o‘sha qatorda \"Baribir qo‘shish\"ni tanlang.",
       "ambiguous": "bir nechta moslik",
       "willCreate": "Baribir qo‘shiladi ✓",
-      "was": "hozir {{p}}"
+      "was": "hozir {{p}}",
+      "priceOnlyHint": "Bu qatorda faqat narx yangilanadi — tavsif va QQS o‘zgarmaydi"
     }
   },
   "source": {

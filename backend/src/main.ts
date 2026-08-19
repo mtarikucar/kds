@@ -76,6 +76,23 @@ async function bootstrap() {
       },
     }),
   );
+  // Same reasoning, same pattern: /api/menu/import/commit posts the
+  // operator-reviewed menu-import draft as plain JSON. Conflict annotation
+  // (existingProductId + existingPrice + onConflict on every row) inflates
+  // the draft by ~45% over what the AI/CSV extraction produced, and the
+  // DTO's own caps (500 products x 200 categories) allow a draft an order
+  // of magnitude bigger than the generic 100KB limit — a realistic 500-row
+  // annotated draft measures ~116KB and 413s under it, discarding a draft
+  // the operator may have spent import credits producing.
+  app.use(
+    "/api/menu/import",
+    bodyParser.json({
+      limit: "2mb",
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(
     bodyParser.json({
       limit: "100kb",

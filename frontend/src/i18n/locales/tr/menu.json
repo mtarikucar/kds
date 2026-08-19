@@ -247,7 +247,8 @@
       "ambiguousCount": "{{n}} ürün menünüzde birden fazla ürünle eşleşiyor — hiçbiri değiştirilmeyecek. Yine de eklemek isterseniz o satırda \"Yine de ekle\"yi seçin.",
       "ambiguous": "birden çok eşleşme",
       "willCreate": "Yine de eklenecek ✓",
-      "was": "şu an {{p}}"
+      "was": "şu an {{p}}",
+      "priceOnlyHint": "Bu satırda yalnızca fiyat güncellenecek — açıklama ve KDV değişmeyecek"
     }
   },
   "source": {

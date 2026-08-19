@@ -9,6 +9,36 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { EntitlementService } from "../../entitlements/entitlement.service";
 import { CreditService } from "../../credits/credit.service";
 
+describe("MenuImportController parse (photo)", () => {
+  const menuImport = {
+    parseMenuPhotos: jest.fn(),
+    annotateConflicts: jest.fn((d) => Promise.resolve(d)),
+  };
+  const menuSource = { parseSource: jest.fn() };
+  const ctrl = new MenuImportController(menuImport as any, menuSource as any);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    menuImport.annotateConflicts.mockImplementation((d) => Promise.resolve(d));
+  });
+
+  it("annotates conflicts on the photo draft before returning it — re-photographing an already-imported menu must not silently double it", async () => {
+    const rawDraft = { categories: [{ name: "raw" }] };
+    const annotated = { categories: [{ name: "annotated" }] };
+    menuImport.parseMenuPhotos.mockResolvedValue(rawDraft);
+    menuImport.annotateConflicts.mockResolvedValue(annotated);
+
+    const file = { buffer: Buffer.from("x"), mimetype: "image/jpeg" };
+    const result = await ctrl.parse([file] as any, { tenantId: "t1" } as any);
+
+    expect(menuImport.parseMenuPhotos).toHaveBeenCalledWith("t1", [
+      { buffer: file.buffer, mimetype: file.mimetype },
+    ]);
+    expect(menuImport.annotateConflicts).toHaveBeenCalledWith(rawDraft, "t1");
+    expect(result).toBe(annotated);
+  });
+});
+
 describe("MenuImportController parse-source", () => {
   const menuImport = { annotateConflicts: jest.fn((d) => Promise.resolve(d)) };
   const menuSource = { parseSource: jest.fn() };

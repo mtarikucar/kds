@@ -120,7 +120,19 @@ export default function MenuDraftReviewGrid({
           </div>
 
           <div className="space-y-2">
-            {cat.products.map((p, pi) => (
+            {cat.products.map((p, pi) => {
+              // The server only writes { price } for an UPDATE_PRICE row
+              // (see commitDraft) — description/KDV edits here would be
+              // silently ignored, so disable them instead of implying they
+              // matter.
+              const priceOnly = p.onConflict === "UPDATE_PRICE";
+              const priceOnlyTitle = priceOnly
+                ? (t(
+                    "menu:import.conflict.priceOnlyHint",
+                    "Bu satırda yalnızca fiyat güncellenecek — açıklama ve KDV değişmeyecek",
+                  ) as string)
+                : undefined;
+              return (
               <div
                 key={pi}
                 data-testid={p.ambiguous ? `ambiguous-row-${ci}-${pi}` : undefined}
@@ -139,10 +151,13 @@ export default function MenuDraftReviewGrid({
                   className={`${cellCls} col-span-3 ${!p.name.trim() ? "!border-red-500" : ""}`}
                 />
                 <input
+                  data-testid={`description-${ci}-${pi}`}
                   value={p.description ?? ""}
                   onChange={(e) => updateProduct(ci, pi, { description: e.target.value })}
                   placeholder={t("menu:import.itemDesc", "Açıklama") as string}
-                  className={`${cellCls} col-span-3`}
+                  disabled={priceOnly}
+                  title={priceOnlyTitle}
+                  className={`${cellCls} col-span-3 ${priceOnly ? "cursor-not-allowed bg-gray-100 text-gray-400" : ""}`}
                 />
                 <input
                   type="number"
@@ -153,9 +168,12 @@ export default function MenuDraftReviewGrid({
                   className={`${cellCls} col-span-2 text-right ${p.price < 0 ? "!border-red-500" : ""}`}
                 />
                 <select
+                  data-testid={`tax-rate-${ci}-${pi}`}
                   value={p.taxRate ?? 10}
                   onChange={(e) => updateProduct(ci, pi, { taxRate: Number(e.target.value) })}
-                  className={`${cellCls} col-span-1`}
+                  disabled={priceOnly}
+                  title={priceOnlyTitle}
+                  className={`${cellCls} col-span-1 ${priceOnly ? "cursor-not-allowed bg-gray-100 text-gray-400" : ""}`}
                 >
                   {TAX_RATES.map((r) => (
                     <option key={r} value={r}>%{r}</option>
@@ -218,7 +236,8 @@ export default function MenuDraftReviewGrid({
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <button

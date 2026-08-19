@@ -364,12 +364,19 @@ const MenuManagementPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {menuImportStatus?.configured !== false && (
-                <DropdownMenuItem onClick={() => setImportMode("source")}>
-                  <Link2 className="mr-2 h-4 w-4" />
-                  {t("menu.importFromSource", "Kaynak ver (link / PDF / Excel)")}
-                </DropdownMenuItem>
-              )}
+              {/* NOT gated on menuImportStatus.configured: a CSV/XLSX whose
+                  headers we recognise never calls the model, so this option
+                  works with no AI key/entitlement at all — same free
+                  bulk-entry capability "Manuel toplu ekle" already gets
+                  ungated below. If the operator's source DOES need the
+                  model (PDF/HTML/unrecognised headers), the server's 403/503
+                  surfaces through the normal error toast inside that flow. */}
+              <DropdownMenuItem onClick={() => setImportMode("source")}>
+                <Link2 className="mr-2 h-4 w-4" />
+                {t("menu.importFromSource", "Kaynak ver (link / PDF / Excel)")}
+              </DropdownMenuItem>
+              {/* Photo digitisation is ALWAYS a model call — stays gated on
+                  whether AI import is configured at all. */}
               {menuImportStatus?.configured !== false && (
                 <DropdownMenuItem onClick={() => setImportMode("photo")}>
                   <Sparkles className="mr-2 h-4 w-4" />

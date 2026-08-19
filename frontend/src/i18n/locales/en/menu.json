@@ -247,7 +247,8 @@
       "ambiguousCount": "{{n}} products match more than one existing product — none will be changed. To add one anyway, choose \"Add anyway\" on that row.",
       "ambiguous": "multiple matches",
       "willCreate": "Will be added ✓",
-      "was": "currently {{p}}"
+      "was": "currently {{p}}",
+      "priceOnlyHint": "Only the price will be updated on this row — description and VAT stay unchanged"
     }
   },
   "source": {

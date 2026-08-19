@@ -2,17 +2,11 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Plus, Trash2, Loader2 } from "lucide-react";
-import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import {
   useCategories,
   useCommitMenuImport,
 } from "../../features/menu/menuApi";
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 interface Row {
   name: string;
@@ -33,9 +27,9 @@ const emptyRow = (categoryId = ""): Row => ({
  *
  * Body only — no `<Modal>` of its own, so the menu page can host it inside
  * the ONE page-owned modal that also hosts the link/PDF and photo import
- * tabs, under the same `importDirty` Escape/backdrop guard. `BulkAddModal`
- * below stays as a thin standalone wrapper for anything else that still
- * wants its own modal.
+ * tabs, under the same `importDirty` Escape/backdrop guard. This is the
+ * only caller (grep-verified) — there used to be a thin standalone
+ * `BulkAddModal` wrapper for a self-contained modal, but nothing used it.
  */
 export function BulkAddModalBody({
   onDone,
@@ -287,25 +281,5 @@ export function BulkAddModalBody({
         </Button>
       </div>
     </div>
-  );
-}
-
-/**
- * Thin standalone wrapper preserved for any other caller that still wants
- * a self-contained modal (today none does — MenuManagementPage hosts
- * `BulkAddModalBody` directly inside its own page-owned modal instead, so
- * the same `importDirty` guard covers this mode too).
- */
-export default function BulkAddModal({ isOpen, onClose }: Props) {
-  const { t } = useTranslation(["menu", "common"]);
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={t("menu.bulk.title", "Toplu ürün ekle")}
-      size="xl"
-    >
-      <BulkAddModalBody onDone={onClose} />
-    </Modal>
   );
 }
