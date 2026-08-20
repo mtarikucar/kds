@@ -61,7 +61,7 @@
 
 **Interfaces:**
 - Consumes: yok (ilk görev)
-- Produces: `export interface CountryProfile`, `export const COUNTRY_PROFILES: Record<string, CountryProfile>`, `export const DEFAULT_COUNTRY = "TR"`, `export type CountryCode = keyof typeof COUNTRY_PROFILES`
+- Produces: `export interface CountryProfile`, `export const COUNTRY_PROFILES` (yazımı `satisfies Record<string, CountryProfile>`, anotasyon DEĞİL), `export const DEFAULT_COUNTRY = "TR"`, `export type CountryProfileCode = keyof typeof COUNTRY_PROFILES`, `export type _CountryCodeIsNarrow` (derleme-zamanı daralma kanıtı)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -864,6 +864,8 @@ export function normalizePhoneToE164(
   ...
 }
 ```
+
+**Dikkat — buradaki `CountryCode` libphonenumber-js'in tipidir**, Task 1'in `CountryProfileCode`'u değil. `normalize-phone.ts` onu zaten import ediyor ve libphonenumber'a geçiriyor; ikisi karıştırılmamalı. (Task 1'in tipi bu yüzden `CountryProfileCode` diye adlandırıldı.)
 
 `NormalizePhone` decorator'ının imzası `(defaultRegion?: CountryCode)` olur; **21 çağrı yerindeki `@NormalizePhone("TR")` argümanı kaldırılır** ki ambient devreye girsin.
 
