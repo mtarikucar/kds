@@ -26,16 +26,22 @@ export interface CountryTaxIdRule {
 }
 
 export interface CountryCapabilities {
-  /** FiscalProviderRegistry id, or null where no fiscal device applies yet. */
-  fiscalProviderId: string | null;
-  /** PaymentProviderRegistry ids, in preference order. */
+  /**
+   * FiscalProviderRegistry ids that are LEGAL in this country. Plural on
+   * purpose: which fiscal device a restaurant owns is a tenant fact, not a
+   * country fact — Turkey alone has four registered adapters. The country
+   * constrains the legal set; the tenant picks from within it.
+   * Empty = no fiscal device applies here yet.
+   */
+  fiscalProviderIds: string[];
+  /** PaymentProviderRegistry ids, in preference order. Empty = none built. */
   paymentProviderIds: string[];
-  /** AccountingAdapter id for e-invoicing, or null. */
+  /** AccountingProvider enum value for e-invoicing, or null where none. */
   eDocumentAdapterId: string | null;
   /** EscPosBuilderRegistry id. */
   escposBuilderId: string;
-  /** SMS provider id. */
-  smsProviderId: string;
+  /** SMS_PROVIDER value, or null where no local provider is built yet. */
+  smsProviderId: string | null;
 }
 
 export interface CountryProfile {
@@ -56,7 +62,10 @@ export interface CountryProfile {
   capabilities: CountryCapabilities;
 }
 
-export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
+// `satisfies` rather than a `Record<string, …>` annotation: the annotation
+// widens the key type to `string`, so `CountryCode` would accept any string
+// and every downstream task would lose compile-time safety.
+export const COUNTRY_PROFILES = {
   TR: {
     code: "TR",
     currency: "TRY",
@@ -74,11 +83,20 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     intlLocale: "tr-TR",
     defaultTimezone: "Europe/Istanbul",
     capabilities: {
-      fiscalProviderId: "hugin",
+      // Every id below is verbatim what the adapter registers itself under.
+      // Task 9 adds a test that walks every profile and asserts the registry
+      // actually has each id — a typo here is otherwise invisible until a
+      // payment or a receipt fails in production.
+      fiscalProviderIds: [
+        "fiscal_hugin",
+        "fiscal_paygo",
+        "fiscal_beko",
+        "efatura",
+      ],
       paymentProviderIds: ["paytr"],
-      eDocumentAdapterId: "nilvera",
-      escposBuilderId: "generic",
-      smsProviderId: "netgsm",
+      eDocumentAdapterId: "NILVERA", // AccountingProvider enum value, upper-case
+      escposBuilderId: "escpos-tr",
+      smsProviderId: "netgsm", // the SMS_PROVIDER value sms.service.ts checks
     },
   },
 
@@ -94,6 +112,11 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     taxRates: [0, 6, 12],
     defaultTaxRate: 12,
     phoneRegion: "UZ",
+    // UNVERIFIED AGAINST A PRIMARY SOURCE. The repo's own Uzbekistan
+    // benchmark corroborates the currency, the 12% QQS, the 6% catering
+    // rate, the timezone and the phone region — but NOT these two digit
+    // counts. Confirm with the local partner before the first UZ tenant
+    // takes real money.
     taxIdRules: [
       { name: "STIR", pattern: /^\d{9}$/, labelKey: "country.taxId.stir" },
       { name: "PINFL", pattern: /^\d{14}$/, labelKey: "country.taxId.pinfl" },
@@ -102,18 +125,25 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     intlLocale: "uz-UZ",
     defaultTimezone: "Asia/Tashkent",
     capabilities: {
-      // No Uzbek fiscal/payment/e-document adapter exists yet — those are
-      // P3/P4/P5 and each waits on a local legal entity. Null here is
+      // No Uzbek fiscal/payment/e-document/SMS adapter exists yet — those are
+      // P3+ and each waits on a local legal entity. Empty/null here is
       // honest: the resolver refuses rather than silently falling back to
       // the Turkish provider.
-      fiscalProviderId: null,
+      fiscalProviderIds: [],
       paymentProviderIds: [],
       eDocumentAdapterId: null,
-      escposBuilderId: "generic",
-      smsProviderId: "eskiz",
+      // The ESC/POS builder is shared for now; Task 13 gives it a codepage
+      // that does not turn Cyrillic into '?'.
+      escposBuilderId: "escpos-tr",
+      smsProviderId: null,
     },
   },
-};
+} satisfies Record<string, CountryProfile>;
 
 export const DEFAULT_COUNTRY = "TR";
-export type CountryCode = keyof typeof COUNTRY_PROFILES;
+/**
+ * Named CountryProfileCode, not CountryCode: libphonenumber-js already
+ * exports a `CountryCode` that normalize-phone.ts imports, and two different
+ * `CountryCode`s in the same codebase is a foot-gun for Task 5.
+ */
+export type CountryProfileCode = keyof typeof COUNTRY_PROFILES;

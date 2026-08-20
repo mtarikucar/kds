@@ -1,4 +1,8 @@
-import { COUNTRY_PROFILES, DEFAULT_COUNTRY } from "./country-profile.const";
+import {
+  COUNTRY_PROFILES,
+  DEFAULT_COUNTRY,
+  CountryProfileCode,
+} from "./country-profile.const";
 
 describe("COUNTRY_PROFILES", () => {
   it("has TR and UZ", () => {
@@ -56,6 +60,51 @@ describe("COUNTRY_PROFILES", () => {
 
   it("DEFAULT_COUNTRY exists in the map", () => {
     expect(COUNTRY_PROFILES[DEFAULT_COUNTRY]).toBeDefined();
+  });
+
+  it("names the exact provider ids the adapters register under", () => {
+    // These four strings were ALL wrong in the first draft ("generic",
+    // "hugin", "nilvera", "eskiz"). They are plain strings, so nothing but
+    // an explicit assertion catches a typo here. Task 9 adds the stronger
+    // check that walks these against the live registries.
+    const tr = COUNTRY_PROFILES.TR.capabilities;
+    expect(tr.escposBuilderId).toBe("escpos-tr");        // escpos-builder.service.ts
+    expect(tr.fiscalProviderIds).toContain("fiscal_hugin"); // hugin-fiscal-provider.ts
+    expect(tr.paymentProviderIds).toEqual(["paytr"]);    // paytr-payment-provider.ts
+    expect(tr.eDocumentAdapterId).toBe("NILVERA");       // AccountingProvider enum
+    expect(tr.smsProviderId).toBe("netgsm");             // SMS_PROVIDER value
+  });
+
+  it("lists fiscal providers as a SET, because the device is a tenant choice", () => {
+    // Turkey has four registered fiscal adapters; naming one in the country
+    // profile would silently pick a device the restaurant may not own.
+    expect(COUNTRY_PROFILES.TR.capabilities.fiscalProviderIds.length).toBeGreaterThan(1);
+  });
+
+  it("UZ declares nothing it has not built — no silent fallback to Turkish providers", () => {
+    const uz = COUNTRY_PROFILES.UZ.capabilities;
+    expect(uz.fiscalProviderIds).toEqual([]);
+    expect(uz.paymentProviderIds).toEqual([]);
+    expect(uz.eDocumentAdapterId).toBeNull();
+    expect(uz.smsProviderId).toBeNull();
+  });
+
+  it("CountryProfileCode narrows to the real keys, not to string", () => {
+    // Guards the `satisfies` form. With a Record<string, …> annotation this
+    // compiles, and every downstream task loses compile-time safety.
+    const codes: CountryProfileCode[] = ["TR", "UZ"];
+    // @ts-expect-error "XX" is not a country we have a profile for
+    const bad: CountryProfileCode = "XX";
+    expect(codes).toHaveLength(2);
+    expect(bad).toBe("XX");
+  });
+
+  it("every profile's locale fields are populated", () => {
+    for (const p of Object.values(COUNTRY_PROFILES)) {
+      expect(p.defaultLocale).toBeTruthy();
+      expect(p.intlLocale).toBeTruthy();
+      expect(p.defaultTimezone).toBeTruthy();
+    }
   });
 
   it("no profile declares a storage minor-unit exponent — storage is always x100", () => {
