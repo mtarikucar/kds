@@ -33,6 +33,7 @@ The personnel module manages your team's **working time**: who clocked in/out an
 | **Shift Templates** | Define recurring shifts (e.g. "Morning 09:00–17:00") |
 | **Schedule** | Assign templates to people/days — the weekly plan |
 | **Performance** | Staff performance metrics |
+| **Card Shift** | RFID card enrolment — one row per staff member, last 4 digits only |
 
 ## Typical usage
 
@@ -46,6 +47,27 @@ The personnel module manages your team's **working time**: who clocked in/out an
 - **Create users first:** if a staff member has no system account (from the Users screen), tracking their shifts/attendance is pointless — define the user with their role first.
 - **Template = recurring work:** instead of entering the same shift by hand every week, set up a template and assign it with one click in the schedule.
 - **Combine performance with reports:** the **Staff** tab on the Reports screen (shown by the same `personnelManagement` flag) gives sales-based performance; read the two screens together.
+
+## Clocking in with a card
+
+Requires the **Card Shift** module (`cardShift`, ₺4,000 one-time, with the
+licence as a prerequisite) **in addition to** `personnelManagement`.
+
+1. **Enrol the cards.** Team → Card Shift → "Assign card", then tap the card
+   into the focused field. Only the last four digits are ever displayed.
+2. **Open the station screen.** Sidebar → Card Shift (`/card-shift`), on the
+   tablet or PC the reader is plugged into. Leave it open.
+3. **Tapping.** The first tap of the day clocks the person in, the second
+   clocks them out, and a tap while on a break ends the break. Starting a
+   break stays in the app.
+4. **Duplicate taps.** A second tap within **10 seconds** is ignored — some
+   readers write one card twice.
+5. **Unrecognised cards.** A card that belongs to nobody (or to a deactivated
+   person) shows "Card not recognised". The number is never echoed on screen
+   or written to a log.
+
+Revoking a card keeps every past attendance record, including the fact that it
+was stamped with a card.
 
 ## Related screens
 

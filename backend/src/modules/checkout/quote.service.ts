@@ -110,6 +110,7 @@ export class QuoteService {
               periodStart: p.periodStart.toISOString(),
               periodEnd: p.periodEnd.toISOString(),
               requiresLicense: addOn.requiresLicense,
+              deps: addOn.deps,
             },
           });
         } else if (addOn.billing !== "oneTime") {
@@ -139,6 +140,7 @@ export class QuoteService {
               kind: addOn.kind,
               branchId: "branchId" in item ? item.branchId : undefined,
               requiresLicense: addOn.requiresLicense,
+              deps: addOn.deps,
               ...(addOn.creditKind
                 ? {
                     creditKind: addOn.creditKind,

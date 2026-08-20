@@ -271,6 +271,7 @@
         "posAccess": "نقطة البيع / شاشة المبيعات",
         "reservationSystem": "نظام الحجز",
         "personnelManagement": "إدارة الموظفين",
+        "cardShift": "تسجيل الدخول/الخروج بالبطاقة",
         "deliveryIntegration": "منصات التوصيل",
         "externalDisplay": "شاشة بعيدة و واجهة API للشركاء",
         "multiLocation": "تعدد الفروع",

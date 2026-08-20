@@ -137,6 +137,9 @@ const ReportsAnalyticsPage = lazyWithReload(
   () => import("./pages/admin/ReportsAnalyticsPage"),
 );
 const StockPage = lazyWithReload(() => import("./pages/admin/StockPage"));
+const CardShiftStationPage = lazyWithReload(
+  () => import("./pages/personnel/CardShiftStationPage"),
+);
 const FinancePage = lazyWithReload(() => import("./pages/admin/FinancePage"));
 const ReservationsPage = lazyWithReload(
   () => import("./pages/admin/ReservationsPage"),
@@ -463,6 +466,24 @@ function App() {
             <Route
               path="/admin/users"
               element={<Navigate to="/admin/team" replace />}
+            />
+            {/* Kartlı Vardiya kiosk — runs on the same ADMIN/MANAGER session
+            (no device-token rail yet, §9/1); the page locks itself on idle. */}
+            <Route
+              path="/card-shift"
+              element={
+                <FeatureGate
+                  feature="cardShift"
+                  fallback={
+                    <UpsellCard
+                      addOnCode="module_personnel_card_shift"
+                      featureKey="cardShift"
+                    />
+                  }
+                >
+                  <CardShiftStationPage />
+                </FeatureGate>
+              }
             />
             <Route path="/admin/qr-codes" element={<QRManagementPage />} />
             {/* Page-root FeatureGate: direct URL access shows an upsell

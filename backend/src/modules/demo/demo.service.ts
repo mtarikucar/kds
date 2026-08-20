@@ -72,6 +72,10 @@ export class DemoService {
     personnelManagement: true,
     deliveryIntegration: true,
     posAccess: true,
+    // Card Shift: the demo must be able to open /card-shift like every other
+    // screen. The demo owns no products, so the projector has nothing to
+    // suppress — this mirror is the only thing that grants it.
+    cardShift: true,
     // Drift fix: aiContentGeneration was missing from this mirror, and the
     // DEMO plan's AI limits were left at the schema default (0) — a demo
     // visitor could never open the AI menu studio, contradicting "every

@@ -213,6 +213,11 @@ export class LicensingController {
         creditKind: true,
         creditUnits: true,
         requiresLicense: true,
+        // The storefront needs the prerequisite graph to build a legal basket.
+        // Without it the first module→module dependency in the catalog
+        // (module_personnel_card_shift → module_personnel) produces a cart
+        // checkout's assertDeps rejects, killing every other line with it.
+        deps: true,
         sortOrder: true,
         i18n: true,
       },
@@ -232,6 +237,7 @@ export class LicensingController {
           creditKind: r.creditKind,
           creditUnits: r.creditUnits,
           requiresLicense: r.requiresLicense,
+          deps: r.deps,
           sortOrder: r.sortOrder,
         };
       }),

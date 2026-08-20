@@ -37,7 +37,20 @@ const DOWN_SQL = join(
  * alone. Comparing against the base alone would make any legitimate reprice
  * impossible without rewriting an already-applied migration, which is the one
  * thing a migration may never do. Add a file here whenever a new migration
- * changes a catalog price or retires a product.
+ * changes a catalog price, retires a product, or introduces one.
+ *
+ * RECOGNISED SHAPES (this is not a ban list — extend the folder, never lower
+ * the expectation):
+ *   - a partial `UPDATE … SET "priceCents" = …` reprices        → parseRepricing
+ *   - `UPDATE … SET "status" = 'archived'` retires              → parseArchived
+ *   - a FULL-row `INSERT … ON CONFLICT ("code") DO UPDATE` in the P1
+ *     generator's exact line shape introduces a product          → parseUpserts
+ *
+ * A rule saying "only full-row upserts are allowed" must NOT be written, and
+ * neither must a test enforcing it: the one applied follow-up
+ * (20260820120000_reprice_licence_and_stock) violates exactly that ban at :38
+ * and :47, is checksummed by `prisma migrate deploy`, and therefore cannot be
+ * edited. Such a test would be born red.
  */
 const FOLLOW_UP_SQL = [
   // ALWAYS ordered by migration folder stamp. Insert, never append: the fold
@@ -45,6 +58,7 @@ const FOLLOW_UP_SQL = [
   // the composed state disagree with what `prisma migrate deploy` produces.
   "20260820120000_reprice_licence_and_stock/migration.sql",
   "20260820140000_delivery_platforms_bundle/migration.sql",
+  "20260820160000_card_shift_catalog/migration.sql",
 ].map((rel) => join(__dirname, "../../../prisma/migrations", rel));
 
 // Addressed BY NAME, never by index. `FOLLOW_UP_SQL[1]` points at a different
@@ -239,6 +253,60 @@ describe("à-la-carte catalog migration", () => {
     expect(downOnly).not.toMatch(/"MarketplaceAddOn"|"TenantAddOn"|"Tenant"/);
     expect(sqlOnly).toContain('"marketplace_addons"');
     expect(downOnly).toContain('"tenant_addons"');
+  });
+
+  it("keeps a paid row alive in the new product's down", () => {
+    // A follow-up is found BY NAME, never by index: a file that lands between
+    // them later (the delivery bundle, or any future catalog migration) would
+    // silently point an indexed assertion at a different file and the test
+    // would start lying.
+    const upPath = FOLLOW_UP_SQL.find((p) => p.includes("card_shift_catalog"))!;
+    expect(upPath).toBeDefined();
+    const cardDown = executableSql(
+      readFileSync(upPath.replace("migration.sql", "down.sql"), "utf8"),
+    );
+    expect(cardDown).toMatch(
+      /DELETE FROM "marketplace_addons"[\s\S]*NOT EXISTS[\s\S]*"tenant_addons"/,
+    );
+    // The hardware half has the same duty towards a placed order.
+    expect(cardDown).toMatch(
+      /DELETE FROM "hardware_products"[\s\S]*NOT EXISTS[\s\S]*"hardware_order_items"/,
+    );
+  });
+
+  it("uses snake_case mapped table names in both card-shift migrations", () => {
+    // A hand-written migration that says "MarketplaceAddOn" takes 42P01 in
+    // production and passes every test that runs against a db-push database.
+    const dirs = [
+      "20260820150000_card_shift_schema",
+      "20260820160000_card_shift_catalog",
+    ];
+    for (const dir of dirs) {
+      for (const file of ["migration.sql", "down.sql"]) {
+        const body = executableSql(
+          readFileSync(
+            join(__dirname, "../../../prisma/migrations", dir, file),
+            "utf8",
+          ),
+        );
+        expect(body).not.toMatch(
+          /"MarketplaceAddOn"|"TenantAddOn"|"Tenant"|"User"|"Attendance"|"HardwareProduct"|"HardwareInventory"/,
+        );
+      }
+    }
+  });
+
+  it("declares @doctor:idempotent on both new migration ups", () => {
+    for (const dir of [
+      "20260820150000_card_shift_schema",
+      "20260820160000_card_shift_catalog",
+    ]) {
+      const head = readFileSync(
+        join(__dirname, "../../../prisma/migrations", dir, "migration.sql"),
+        "utf8",
+      ).split("\n")[0];
+      expect(head).toMatch(/^-- @doctor:idempotent verified=/);
+    }
   });
 
   it("has a down that restores every pre-3.3 code and guards paid deletes", () => {

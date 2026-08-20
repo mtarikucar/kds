@@ -271,6 +271,7 @@
         "posAccess": "POS / Экран продаж",
         "reservationSystem": "Система бронирования",
         "personnelManagement": "Управление персоналом",
+        "cardShift": "Отметка прихода/ухода по карте",
         "deliveryIntegration": "Платформы доставки",
         "externalDisplay": "Удалённый экран и Partner API",
         "multiLocation": "Несколько локаций",

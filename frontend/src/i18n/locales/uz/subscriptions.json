@@ -271,6 +271,7 @@
         "posAccess": "POS / Sotuv ekrani",
         "reservationSystem": "Bronlash tizimi",
         "personnelManagement": "Xodimlarni boshqarish",
+        "cardShift": "Karta bilan kelish-ketish qaydi",
         "deliveryIntegration": "Yetkazib berish platformalari",
         "externalDisplay": "Masofaviy ekran va Partner API",
         "multiLocation": "Bir nechta filial",

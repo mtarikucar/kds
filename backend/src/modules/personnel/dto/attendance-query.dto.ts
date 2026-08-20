@@ -9,7 +9,10 @@ import {
   Max,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { AttendanceStatus } from "../constants/personnel.enum";
+import {
+  AttendanceSource,
+  AttendanceStatus,
+} from "../constants/personnel.enum";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 
 export class AttendanceQueryDto {
@@ -34,6 +37,13 @@ export class AttendanceQueryDto {
   @IsOptional()
   @IsEnum(AttendanceStatus)
   status?: AttendanceStatus;
+
+  // Declared explicitly because ValidationPipe runs with whitelist:true — an
+  // undeclared query field is silently stripped and the filter never arrives.
+  @ApiPropertyOptional({ enum: AttendanceSource })
+  @IsOptional()
+  @IsEnum(AttendanceSource)
+  source?: AttendanceSource;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

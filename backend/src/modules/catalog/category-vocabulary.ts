@@ -20,6 +20,10 @@ export const HARDWARE_CATEGORIES: CatalogCategory[] = [
   { value: "kds_screen", labelTr: "KDS Ekranı" },
   { value: "tablet", labelTr: "Tablet" },
   { value: "scanner", labelTr: "Barkod Okuyucu" },
+  // Staff RFID card reader (13.56 MHz Mifare, USB HID). NOT `scanner`: that
+  // value renders as "Barkod Okuyucu" in the storefront filter, which would be
+  // a lie on a product that reads no barcodes.
+  { value: "card_reader", labelTr: "Kart Okuyucu" },
   { value: "caller_id", labelTr: "Arayan Numara" },
   { value: "cash_drawer", labelTr: "Para Çekmecesi" },
   { value: "bridge", labelTr: "Network Bridge" },

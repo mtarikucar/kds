@@ -607,6 +607,7 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
               <option value="yazarkasa">yazarkasa</option>
               <option value="bridge">bridge</option>
               <option value="scanner">scanner</option>
+              <option value="card_reader">card_reader</option>
               <option value="caller_id">caller_id</option>
               <option value="other">other</option>
             </select>

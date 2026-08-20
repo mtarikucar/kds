@@ -1089,6 +1089,10 @@ export interface PlanFeatures {
   reservationSystem: boolean;
   /** Paid — "Personel" module (`module_personnel`). */
   personnelManagement: boolean;
+  /** Paid — "Kartlı Vardiya" module (`module_personnel_card_shift`, ₺4.000
+   *  one-time). RFID card clock-in; rides ON TOP of personnelManagement, so
+   *  both flags must be live for the card surfaces to open. */
+  cardShift: boolean;
   /** Paid — set by any delivery-platform integration product (Yemeksepeti,
    *  Getir, Trendyol Yemek). Which vendors are actually connected lives in
    *  `EffectiveFeatures.integrations.delivery`, not here. */
@@ -1701,6 +1705,12 @@ export interface Attendance {
   isLate: boolean;
   lateMinutes: number;
   notes?: string;
+  /** manual | card — mirrored by hand from the backend AttendanceSource enum.
+   *  Deliberately a plain string, not a union: check-contract-drift.mjs does
+   *  not cover this enum, so an unknown value must degrade to the "App" badge
+   *  rather than break a type. */
+  clockInSource: string;
+  clockOutSource?: string;
   shiftAssignmentId?: string;
   shiftAssignment?: ShiftAssignment;
   userId: string;
@@ -1763,6 +1773,28 @@ export interface AttendanceSummary {
   totalOvertimeMinutes: number;
   lateDays: number;
   totalLateMinutes: number;
+  /** How many of totalDays were clocked in with a card. */
+  cardClockIns: number;
+}
+
+/** One staff member's card enrolment. The API returns the last 4 digits and
+ *  nothing else — never the hash, never the ciphertext, never the raw UID. */
+export interface CardAssignment {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  last4: string | null;
+  assignedAt: string | null;
+  assignedById: string | null;
+}
+
+/** What POST /personnel/attendance/card-tap answers. `ignored` is the 10s
+ *  debounce swallowing a reader's duplicate write, not an error. */
+export interface CardTapResponse {
+  action: 'clockIn' | 'clockOut' | 'breakEnd' | 'ignored';
+  user: { id: string; firstName: string; lastName: string; role: string };
+  attendance: Attendance | null;
 }
 
 export interface PerformanceMetrics {

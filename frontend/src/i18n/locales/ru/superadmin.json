@@ -178,6 +178,7 @@
       "kdsIntegration": "KDS Integration",
       "reservationSystem": "Reservation System",
       "personnelManagement": "Personnel Management",
+      "cardShift": "Смена по карте (отметка RFID)",
       "deliveryIntegration": "Интеграция доставки",
       "externalDisplay": "Внешний дисплей (партнёрский)",
       "posAccess": "Доступ к POS"

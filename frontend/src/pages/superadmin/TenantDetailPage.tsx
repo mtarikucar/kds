@@ -54,6 +54,7 @@ const FEATURE_LABELS: Record<string, string> = {
   kdsIntegration: 'KDS Integration',
   reservationSystem: 'Reservation System',
   personnelManagement: 'Personnel Management',
+  cardShift: 'Card Shift (RFID clock-in)',
   deliveryIntegration: 'Delivery Integration',
   externalDisplay: 'External Display (Partner Display)',
   posAccess: 'POS Access',

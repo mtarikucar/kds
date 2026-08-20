@@ -84,6 +84,7 @@ Kullanıcı, masa, ürün, kategori ve **aylık sipariş sayısı sınırsızdı
 | Stok & Maliyet Yönetimi | modül / yıllık | ₺3.900 |
 | Rezervasyon Sistemi | modül / yıllık | ₺990 |
 | Personel Yönetimi | modül / yıllık | ₺990 |
+| Kartlı Vardiya (RFID kart ile giriş-çıkış) | modül / tek seferlik | ₺4.000 |
 | AI Menü Stüdyosu | modül / yıllık | ₺1.990 |
 | API & Webhook Erişimi | modül / yıllık | ₺2.490 |
 | Partner Ekran API | modül / yıllık | ₺1.990 |
@@ -215,7 +216,8 @@ Garson, kasiyer, mutfak personeli için vardiya, mola, mesai takibi. **Personel 
 
 - **Çalışan kaydı**: ad-soyad, TC, telefon, pozisyon, başlama tarihi, saat ücreti
 - **Vardiya planlama**: haftalık/aylık vardiya grid'i, çakışma kontrolü
-- **Giriş-çıkış (clock-in/out)**: personel kendi şifresi ile veya QR/NFC kart ile damgalar
+- **Giriş-çıkış (clock-in/out)**: personel kendi hesabıyla uygulama üzerinden damgalar (Personel Yönetimi modülü)
+- **RFID kart ile damgalama**: **Kartlı Vardiya** modülü (₺4.000 tek seferlik) ile personel, ucuz bir USB kart okuyucuya kartını okutarak giriş-çıkış yapar. QR ile damgalama **yoktur**
 - **Mola takibi**: yasal mola süresi, fazla mesai otomatik hesabı
 - **Personel takas (swap consent)**: vardiya değişikliği iki çalışanın onayı ile, audit log'a yazılır
 - **Mesai raporu**: ay-sonu toplam mesai, ücretlendirme tablosu

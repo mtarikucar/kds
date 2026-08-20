@@ -8,6 +8,8 @@ import type { PaginatedResponse } from '../../types';
 import type {
   Attendance,
   AttendanceSummary,
+  CardAssignment,
+  CardTapResponse,
   ShiftTemplate,
   ShiftAssignment,
   ShiftSwapRequest,
@@ -165,6 +167,80 @@ export const useEndBreak = () => {
     onError: (error: any) => {
       toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
     },
+  });
+};
+
+// ========================================
+// CARD SHIFT
+// ========================================
+
+export const useCardAssignments = () => {
+  return useQuery<CardAssignment[]>({
+    // Enrolment is tenant-wide (a card follows the person, not the branch), so
+    // the key carries no branchId.
+    queryKey: ['personnel', 'cards'],
+    queryFn: async () => {
+      const response = await api.get<CardAssignment[]>('/personnel/cards');
+      return response.data;
+    },
+  });
+};
+
+export const useAssignCard = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, cardUid }: { userId: string; cardUid: string }) => {
+      const response = await api.post<CardAssignment>(`/personnel/cards/${userId}`, {
+        cardUid,
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', 'cards'] });
+      toast.success(i18n.t('personnel:cardShift.assigned'));
+    },
+    onError: (error: any) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
+    },
+  });
+};
+
+export const useRevokeCard = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await api.delete<{ userId: string; revoked: true }>(
+        `/personnel/cards/${userId}`,
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personnel', 'cards'] });
+      toast.success(i18n.t('personnel:cardShift.revoked'));
+    },
+    onError: (error: any) => {
+      toast.error(getApiErrorMessage(error, i18n.t('common:notifications.operationFailed')));
+    },
+  });
+};
+
+export const useCardTap = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cardUid }: { cardUid: string }) => {
+      const response = await api.post<CardTapResponse>(
+        '/personnel/attendance/card-tap',
+        { cardUid },
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      // A tap writes an attendance row; every attendance view must re-read.
+      // No toast: the station screen renders the outcome itself, in large type.
+      queryClient.invalidateQueries({ queryKey: ['personnel', 'attendance'] });
+    },
+    // Deliberately no onError toast either — the station shows the error on
+    // the card, where the person tapping is actually looking.
   });
 };
 

@@ -358,6 +358,48 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
       ],
     ),
   },
+  {
+    code: "module_personnel_card_shift",
+    name: "Kartlı Vardiya",
+    description:
+      "Personel giriş-çıkışını RFID kart okutarak damgalar. Ucuz USB kart okuyucularla çalışır; puantaj, mola ve fazla mesai hesabı Personel Yönetimi modülündeki kayıtların üstüne yazılır. Tek seferlik satın alma — yenileme ücreti yoktur, lisansınız aktif olduğu sürece geçerlidir.",
+    kind: "module",
+    // oneTime is legal for a module: catalog-validation.ts pins a cadence only
+    // for license/credit/service. The lock is permanent — purchase() leaves
+    // currentPeriodEnd NULL, the sweeper only scans `not: null`, and the
+    // projector writes validUntil = null.
+    billing: "oneTime",
+    priceCents: 400_000,
+    grants: { "feature.cardShift": true },
+    // The catalog's FIRST module→module dependency. The storefront projects
+    // deps (licensing.controller.ts) and provisioning sorts on them
+    // (checkout/provision-order.ts) precisely so this row is sellable.
+    deps: ["module_personnel"],
+    requiresLicense: true,
+    sortOrder: 18,
+    i18n: t(
+      [
+        "Kartlı Vardiya",
+        "Personel giriş-çıkışını RFID kart okutarak damgalar. Ucuz USB kart okuyucularla çalışır; puantaj, mola ve fazla mesai hesabı Personel Yönetimi modülündeki kayıtların üstüne yazılır. Tek seferlik satın alma — yenileme ücreti yoktur, lisansınız aktif olduğu sürece geçerlidir.",
+      ],
+      [
+        "Card Shift",
+        "Staff clock in and out by tapping an RFID card. It works with inexpensive USB readers; attendance, breaks and overtime are written onto the records of the Staff Management module. One-time purchase — there is no renewal fee, and it stays available for as long as your licence is active.",
+      ],
+      [
+        "Смена по карте",
+        "Сотрудники отмечают приход и уход, прикладывая RFID-карту. Работает с недорогими USB-считывателями; учёт времени, перерывы и сверхурочные пишутся поверх записей модуля «Управление персоналом». Разовая покупка — плата за продление отсутствует, доступ сохраняется, пока действует ваша лицензия.",
+      ],
+      [
+        "الوردية بالبطاقة",
+        "يسجّل الموظفون الدخول والخروج بتمرير بطاقة RFID. يعمل مع قارئات USB غير المكلفة؛ تُكتب سجلات الحضور والاستراحات والعمل الإضافي فوق سجلات وحدة إدارة الموظفين. شراء لمرة واحدة — لا توجد رسوم تجديد، ويظل متاحًا ما دام ترخيصك ساريًا.",
+      ],
+      [
+        "Karta bilan smena",
+        "Xodimlar RFID kartani o'qitib kelish-ketishni qayd etadi. Arzon USB o'quvchilar bilan ishlaydi; davomat, tanaffus va qo'shimcha ish vaqti Xodimlarni boshqarish moduli yozuvlari ustiga yoziladi. Bir martalik xarid — yangilash to'lovi yo'q, litsenziyangiz faol bo'lgunicha amal qiladi.",
+      ],
+    ),
+  },
   // `priority_support` (₺1.990) lived here until v3.6.7. It is now part of the
   // licence, which grants `feature.prioritySupport` directly.
 

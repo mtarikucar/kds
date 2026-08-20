@@ -234,6 +234,7 @@
         "posAccess": "POS / Satış ekranı",
         "reservationSystem": "Rezervasyon sistemi",
         "personnelManagement": "Personel yönetimi",
+        "cardShift": "Kart ile giriş-çıkış",
         "deliveryIntegration": "Yemek platformu entegrasyonu",
         "externalDisplay": "Uzak ekran & Partner API",
         "multiLocation": "Çoklu şube",

@@ -88,6 +88,13 @@ export interface PricedLineMeta {
   periodEnd?: string;
   /** Whether an active licence gates this product. */
   requiresLicense?: boolean;
+  /**
+   * Catalog prerequisites of this add-on, forwarded from the SAME catalog read
+   * the price came from. Carried on the line so provisioning can be ordered
+   * without opening another query inside the Serializable transaction.
+   * Never persisted: tenant-invoice.service.ts:107-125 reads named fields only.
+   */
+  deps?: string[];
   // --- credit packs ---
   creditKind?: string;
   /** Units to mint, ALREADY multiplied by the line quantity. */

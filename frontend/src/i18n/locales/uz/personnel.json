@@ -1,6 +1,38 @@
 {
   "title": "Xodimlar boshqaruvi",
   "description": "Xodimlar davomati, smenalar, jadval va samaradorlikni boshqarish",
+  "cardShift": {
+    "title": "Karta bilan smena",
+    "tapPrompt": "Kartangizni o‘qiting",
+    "assign": "Karta biriktirish",
+    "assigned": "Karta biriktirildi",
+    "revoke": "Kartani bekor qilish",
+    "revoked": "Karta bekor qilindi",
+    "revokeConfirm": "{{name}} kartasi bekor qilinsinmi? Oldingi davomat yozuvlari saqlanadi.",
+    "noCard": "Karta yo‘q",
+    "cardLast4": "Karta (oxirgi 4)",
+    "assignedAt": "Biriktirilgan sana",
+    "assignedBy": "Biriktirgan",
+    "sourceCard": "Karta",
+    "sourceManual": "Ilova",
+    "cardClockIns": "Karta bilan kirishlar",
+    "openStation": "Stansiya ekranini ochish",
+    "errors": {
+      "notRecognised": "Karta tanilmadi — rahbaringizga murojaat qiling",
+      "invalidUid": "Karta raqami yaroqsiz",
+      "alreadyClockedOut": "Bugun chiqish allaqachon qayd etilgan"
+    },
+    "station": {
+      "title": "Karta bilan smena stansiyasi",
+      "welcome": "Xush kelibsiz, {{name}} — kirish {{time}}",
+      "goodbye": "Xayr, {{name}} — chiqish {{time}}",
+      "breakEnded": "Tanaffus tugadi, {{name}} — {{time}}",
+      "ignored": "Karta hozirgina o‘qitildi",
+      "lock": "Seansni qulflash",
+      "locked": "Ekran qulflangan",
+      "unlock": "Davom etish uchun teging"
+    }
+  },
   "tabs": {
     "attendance": "Davomat",
     "shiftTemplates": "Smena shablonlari",

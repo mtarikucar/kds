@@ -301,6 +301,23 @@ export const PRODUCTS = [
     stockStatus: "in_stock",
   },
 
+  // ── RFID Personel Kart Okuyucu ───────────────────────────────────────
+  {
+    sku: "card-reader-rfid-usb-hid",
+    category: "card_reader",
+    name: "RFID Personel Kart Okuyucu (USB HID) + 10 Kart",
+    description:
+      "Masaüstü 13.56 MHz (Mifare) USB kart okuyucu. Bilgisayara klavye gibi bağlanır, sürücü gerektirmez: kartı okuttuğunuzda numarayı ekrandaki alana yazar. Kartlı Vardiya modülü ile personel giriş-çıkışı için 10 adet personel kartı dahildir.",
+    specs: {
+      headlineSpecs: ["13.56 MHz Mifare", "USB HID — sürücüsüz", "10 kart dahil"],
+    },
+    compat: { requiredAddOn: ["module_personnel_card_shift"] },
+    priceCents: 129_000,
+    warrantyMonths: 12,
+    images: [],
+    stockStatus: "in_stock",
+  },
+
   // ── Caller ID (Arayan Numara) ────────────────────────────────────────
   {
     sku: "caller-id-cidshow-cid602",
