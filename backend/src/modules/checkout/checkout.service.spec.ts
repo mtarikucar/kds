@@ -140,4 +140,50 @@ describe("CheckoutService.confirmAndProvision (Wave-4)", () => {
     // 3rd arg is the transaction client → grant commits atomically with the cart.
     expect(tenantMarketplace.purchase.mock.calls[0][2]).toBe(tx);
   });
+
+  it("provisions a dependent module after its parent regardless of cart order", async () => {
+    // The unit-level proof is provision-order.spec.ts; this pins that
+    // confirmAndProvision actually USES it. Cart order is click order, so the
+    // customer decides it.
+    quoteSvc.quote.mockResolvedValue(
+      makeQuote({
+        lines: [
+          {
+            type: "addon",
+            code: "module_personnel_card_shift",
+            name: "Kartlı Vardiya",
+            qty: 1,
+            unitCents: 400_000,
+            subtotalCents: 400_000,
+            meta: { kind: "module", deps: ["module_personnel"] },
+          },
+          {
+            type: "addon",
+            code: "module_personnel",
+            name: "Personel Yönetimi",
+            qty: 1,
+            unitCents: 99_000,
+            subtotalCents: 99_000,
+            meta: { kind: "module", deps: [] },
+          },
+        ],
+        subtotalCents: 415_833,
+        taxCents: 83_167,
+        shippingCents: 0,
+        totalCents: 499_000,
+      }),
+    );
+    prisma.checkoutIntent.findFirst.mockResolvedValue({
+      status: "succeeded",
+      cartJson: { branchId: undefined },
+      amountCents: 499_000,
+    });
+
+    await svc.confirmAndProvision(TENANT, {} as any, PAYMENT_REF);
+
+    const codes = tenantMarketplace.purchase.mock.calls.map(
+      (c: any[]) => c[1].addOnCode,
+    );
+    expect(codes).toEqual(["module_personnel", "module_personnel_card_shift"]);
+  });
 });

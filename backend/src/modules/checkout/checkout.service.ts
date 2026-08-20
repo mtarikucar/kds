@@ -13,6 +13,7 @@ import { OutboxService } from "../outbox/outbox.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
 import { TenantInvoiceService } from "./tenant-invoice.service";
+import { orderAddOnLinesForProvisioning } from "./provision-order";
 import { EventTypes } from "../outbox/event-types";
 import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
@@ -441,19 +442,11 @@ export class CheckoutService {
         //     and purchase()'s dep check reads ACTIVE ownership rows, so the
         //     module has to land before the pack that depends on it.
         // A stable rank over the catalog kind gives both.
-        const KIND_RANK: Record<string, number> = {
-          license: 0,
-          module: 1,
-          integration: 1,
-          capacity: 2,
-          service: 3,
-          credit: 4,
-        };
-        const orderedAddOnLines = [...addOnLines].sort(
-          (a, b) =>
-            (KIND_RANK[a.meta?.kind ?? ""] ?? 9) -
-            (KIND_RANK[b.meta?.kind ?? ""] ?? 9),
-        );
+        //
+        // Rank alone tied `module` with `integration`, and a stable sort then
+        // preserved the cart order — provisioning a dependent before its
+        // parent. See provision-order.ts for the money bug this closes.
+        const orderedAddOnLines = orderAddOnLinesForProvisioning(addOnLines);
 
         for (const l of orderedAddOnLines) {
           const branchId = l.meta?.branchId;
