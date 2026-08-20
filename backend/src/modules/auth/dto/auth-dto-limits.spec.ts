@@ -55,7 +55,7 @@ describe("Auth DTO length caps (iter-43)", () => {
       password: "Passw0rd1",
       firstName: "X",
       lastName: "Y",
-      // phone is now required (PayTR checkout needs it); NormalizePhone("TR")
+      // phone is now required (PayTR checkout needs it); NormalizePhone()
       // lands a natural TR number as E.164.
       phone: "0555 123 45 67",
       restaurantName: "Z",

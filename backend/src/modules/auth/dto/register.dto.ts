@@ -49,7 +49,7 @@ export class RegisterDto {
 
   // Phone is REQUIRED at registration so PayTR checkout (which mandates
   // user_phone) always has a number — without it the buyer hit
-  // "buyer.phone should not be empty" at checkout. NormalizePhone("TR")
+  // "buyer.phone should not be empty" at checkout. NormalizePhone()
   // accepts any natural format ("0555 123 45 67", "+90 555 …") and lands it
   // as E.164 ("+905551234567"); the regex rejects anything unparseable.
   // Mirrors CheckoutBuyerDto exactly.
