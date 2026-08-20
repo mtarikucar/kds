@@ -7,7 +7,9 @@ import PlatformCard from '../../components/delivery-platforms/PlatformCard';
 import PlatformLogViewer from '../../components/delivery-platforms/PlatformLogViewer';
 import type { DeliveryPlatformConfig } from '../../types';
 
-const ALL_PLATFORMS = ['GETIR', 'YEMEKSEPETI', 'TRENDYOL', 'MIGROS'];
+// SEMT last, deliberately: it is the one card you cannot connect yet, so it
+// sits after the four working platforms instead of interrupting them.
+const ALL_PLATFORMS = ['GETIR', 'YEMEKSEPETI', 'TRENDYOL', 'MIGROS', 'SEMT'];
 
 const DeliveryPlatformsSettingsPage = () => {
   const { t } = useTranslation('settings');

@@ -45,7 +45,20 @@ describe('DeliveryPlatformsSettingsPage', () => {
     render(<DeliveryPlatformsSettingsPage />);
     const cards = screen.getAllByTestId('platform-card');
     const platforms = cards.map((c) => c.getAttribute('data-platform'));
-    expect(platforms).toEqual(['GETIR', 'YEMEKSEPETI', 'TRENDYOL', 'MIGROS']);
+    expect(platforms).toEqual(['GETIR', 'YEMEKSEPETI', 'TRENDYOL', 'MIGROS', 'SEMT']);
+  });
+
+  it('passes SEMT through with no config row', () => {
+    // Deliberately NOT named "renders the coming-soon card": this suite stubs
+    // PlatformCard (see the vi.mock above, which only emits data-testid /
+    // data-platform / data-has-config), so nothing about the badge or the
+    // disabled toggle is observable from here. Those live in PlatformCard.test.
+    render(<DeliveryPlatformsSettingsPage />);
+    const cards = screen.getAllByTestId('platform-card');
+    const platforms = cards.map((c) => c.getAttribute('data-platform'));
+    expect(platforms).toContain('SEMT');
+    const semt = cards.find((c) => c.getAttribute('data-platform') === 'SEMT')!;
+    expect(semt.getAttribute('data-has-config')).toBe('false');
   });
 
   it('maps the fetched config onto the matching platform card', () => {

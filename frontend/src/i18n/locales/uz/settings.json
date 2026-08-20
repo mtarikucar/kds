@@ -185,7 +185,12 @@
       "GETIR": "So'rovga (polling) asoslangan integratsiya (har 15 soniyada)",
       "YEMEKSEPETI": "Webhook asosidagi integratsiya (real vaqtda)",
       "TRENDYOL": "Webhook + so'rov (polling) integratsiyasi",
-      "MIGROS": "So'rovga (polling) asoslangan integratsiya (har 20 soniyada)"
+      "MIGROS": "So'rovga (polling) asoslangan integratsiya (har 20 soniyada)",
+      "SEMT": "Semt buyurtmalari POS va oshxonaga tushadi. Integratsiya tez orada."
+    },
+    "availability": {
+      "comingSoon": "Tez orada · Bepul",
+      "comingSoonNote": "Bu platformani hozircha ulab bo'lmaydi. Tayyor bo'lganda bepul yoqiladi."
     },
     "aria": {
       "enablePlatform": "{{name}} integratsiyasini yoqish",
