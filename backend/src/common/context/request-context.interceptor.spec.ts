@@ -146,4 +146,30 @@ describe("RequestContextInterceptor country resolution", () => {
     await runRequest("t-1", handle);
     expect(handle).toHaveBeenCalledTimes(2);
   });
+
+  it("still runs the request when country resolution fails — a DB blip must not 500 every route", async () => {
+    // Before the cache, this interceptor was fully synchronous and could not
+    // fail this way. Right after a process restart the cache is empty for
+    // EVERY tenant, so a DB hiccup during warm-up would 500 the first
+    // request of any tenant — Turkish ones included. Country is a
+    // nice-to-have; the request handler (an order, a payment) is not.
+    (prisma.tenant.findUnique as any).mockRejectedValue(new Error("connection reset"));
+
+    const handled = await runRequest("t-1");
+
+    expect(handled).toBe("handled"); // the route ran — request did not 500
+    expect(RequestContext.get()?.countryCode).toBeUndefined(); // degraded, not wrong
+  });
+
+  it("a failed resolution does not poison the cache — the next request retries", async () => {
+    (prisma.tenant.findUnique as any).mockRejectedValueOnce(new Error("connection reset"));
+
+    await runRequest("t-1");
+    expect(country.cachedCodeFor("t-1")).toBeNull();
+
+    // Second request: prisma now succeeds (default mock from beforeEach).
+    await runRequest("t-1");
+    expect(country.cachedCodeFor("t-1")).toBe("UZ");
+    expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(2); // retried, not stuck
+  });
 });

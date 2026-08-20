@@ -85,15 +85,19 @@ describe("RequestContext", () => {
 });
 
 describe("RequestContext.countryCode", () => {
-  it("carries a country through the async continuation", async () => {
-    await RequestContext.run({ tenantId: "t1", countryCode: "UZ" }, async () => {
+  // Not "seeded via run() survives an await" (that's just object-spread —
+  // true for every field, proves nothing about the Step 0a set() fix). This
+  // exercises the interceptor's ACTUAL shape: set() is called synchronously,
+  // then the continuation (a switchMap projector calling next.handle(),
+  // which runs the real route handler) resumes after an await. If set()
+  // still hand-listed fields and silently dropped countryCode, this reads
+  // undefined here.
+  it("a country set via set() survives across an await — not just the initial seed", async () => {
+    await RequestContext.run({ tenantId: "t1" }, async () => {
+      RequestContext.set({ countryCode: "UZ" });
       await Promise.resolve();
       expect(RequestContext.get()?.countryCode).toBe("UZ");
     });
-  });
-
-  it("is undefined outside a request", () => {
-    expect(RequestContext.get()?.countryCode).toBeUndefined();
   });
 
   it("set() merges a country resolved after the guards ran", () => {

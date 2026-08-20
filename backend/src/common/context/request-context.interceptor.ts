@@ -2,10 +2,11 @@ import {
   CallHandler,
   ExecutionContext,
   Injectable,
+  Logger,
   NestInterceptor,
 } from "@nestjs/common";
 import { from, Observable } from "rxjs";
-import { switchMap } from "rxjs/operators";
+import { catchError, switchMap } from "rxjs/operators";
 import { RequestContext } from "./request-context";
 import { CountryService } from "../country/country.service";
 
@@ -33,6 +34,8 @@ import { CountryService } from "../country/country.service";
  */
 @Injectable()
 export class RequestContextInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(RequestContextInterceptor.name);
+
   constructor(private readonly country: CountryService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -60,6 +63,20 @@ export class RequestContextInterceptor implements NestInterceptor {
     return from(this.country.forTenant(tenantId)).pipe(
       switchMap((profile) => {
         RequestContext.set({ countryCode: profile.code });
+        return next.handle();
+      }),
+      // Country is a nice-to-have; the request is not. Before the cache
+      // existed this interceptor was fully synchronous and could not fail
+      // here — the cache makes a DB round-trip reachable on this path, and
+      // right after a process restart it is empty for EVERY tenant, so a
+      // hiccup during warm-up would 500 the first request of any tenant
+      // (Turkish ones included) if left uncaught. Degrade to no countryCode
+      // (ambient() falls back to the default profile) rather than fail the
+      // request the same way the anonymous branch above already does.
+      catchError((err) => {
+        this.logger.warn(
+          `Country resolution failed for tenant ${tenantId}, continuing without it: ${err?.message ?? err}`,
+        );
         return next.handle();
       }),
     );
