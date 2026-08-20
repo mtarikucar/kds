@@ -22,11 +22,15 @@ export interface RequestContextStore {
   branchId?: string;
   userId?: string;
   /**
-   * ISO-3166-1 alpha-2 for the tenant in flight. Typed here so
-   * CountryService.ambient() compiles; nothing populates it yet — that is
-   * Task 3's job (wiring it from the resolved tenant, mirroring how
-   * tenantId/branchId/userId are set today). Until then this is always
-   * undefined and ambient() resolves to the default profile.
+   * ISO-3166-1 alpha-2 for the tenant in flight, filled by
+   * RequestContextInterceptor once the guard chain has resolved tenantId.
+   *
+   * This exists so SYNCHRONOUS code — class-transformer decorators,
+   * formatters — can reach the country without a database read. Nest runs
+   * interceptors before pipes, so a DTO transform sees this already set.
+   * Outside a request (cron, bootstrap) or before the interceptor runs, this
+   * is undefined and CountryService.ambient() falls back to the default
+   * profile.
    */
   countryCode?: string;
 }
@@ -69,6 +73,7 @@ export const RequestContext = {
     if (patch.tenantId !== undefined) store.tenantId = patch.tenantId;
     if (patch.branchId !== undefined) store.branchId = patch.branchId;
     if (patch.userId !== undefined) store.userId = patch.userId;
+    if (patch.countryCode !== undefined) store.countryCode = patch.countryCode;
   },
 
   /**

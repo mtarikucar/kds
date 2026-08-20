@@ -15,6 +15,13 @@ import { RequestContext } from "../context/request-context";
 export class CountryService {
   private readonly logger = new Logger(CountryService.name);
 
+  // Process-lifetime cache of resolved country codes, keyed by tenantId. A
+  // tenant's country never changes in practice, so this misses exactly once
+  // per tenant per process — see cachedCodeFor()/invalidate() below, which
+  // exist so RequestContextInterceptor (a global APP_INTERCEPTOR on every
+  // HTTP request) has a synchronous fast path instead of a query per request.
+  private readonly codeCache = new Map<string, string>();
+
   constructor(private readonly prisma: PrismaService) {}
 
   forCode(code: string | null | undefined): CountryProfile {
@@ -37,7 +44,9 @@ export class CountryService {
       where: { id: tenantId },
       select: { countryCode: true },
     });
-    return this.forCode(t?.countryCode);
+    const profile = this.forCode(t?.countryCode);
+    this.codeCache.set(tenantId, profile.code);
+    return profile;
   }
 
   /** Currency is DERIVED. Tenant.currency is a written mirror, never the truth. */
@@ -52,5 +61,25 @@ export class CountryService {
    */
   ambient(): CountryProfile {
     return this.forCode(RequestContext.get()?.countryCode);
+  }
+
+  /**
+   * Synchronous peek for the request hot path (RequestContextInterceptor).
+   * Null means "not yet resolved this process" — the caller falls back to
+   * the async forTenant() once, which populates the cache for every
+   * subsequent request.
+   */
+  cachedCodeFor(tenantId: string): string | null {
+    return this.codeCache.get(tenantId) ?? null;
+  }
+
+  /**
+   * Called wherever Tenant.countryCode is written, so the cache cannot go
+   * stale. Nothing does that today besides tenant creation (which always
+   * writes the default), but a future superadmin edit must call this or a
+   * tenant's country would be stuck at whatever the process first cached.
+   */
+  invalidate(tenantId: string): void {
+    this.codeCache.delete(tenantId);
   }
 }

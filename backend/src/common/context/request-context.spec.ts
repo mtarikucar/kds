@@ -39,6 +39,13 @@ describe("RequestContext", () => {
     });
   });
 
+  it("set() actually forwards countryCode — it hand-lists fields and silently dropped it", () => {
+    RequestContext.run({ tenantId: "t1" }, () => {
+      RequestContext.set({ countryCode: "UZ" });
+      expect(RequestContext.get()?.countryCode).toBe("UZ");
+    });
+  });
+
   it("enrich() prepends correlation fields without clobbering explicit meta", () => {
     RequestContext.run({ requestId: "r1", tenantId: "t-1" }, () => {
       const meta = RequestContext.enrich({ orderId: "o-9", tenantId: "explicit" });
@@ -74,5 +81,26 @@ describe("RequestContext", () => {
       ),
     ]);
     expect(seen.sort()).toEqual(["A", "B"]);
+  });
+});
+
+describe("RequestContext.countryCode", () => {
+  it("carries a country through the async continuation", async () => {
+    await RequestContext.run({ tenantId: "t1", countryCode: "UZ" }, async () => {
+      await Promise.resolve();
+      expect(RequestContext.get()?.countryCode).toBe("UZ");
+    });
+  });
+
+  it("is undefined outside a request", () => {
+    expect(RequestContext.get()?.countryCode).toBeUndefined();
+  });
+
+  it("set() merges a country resolved after the guards ran", () => {
+    RequestContext.run({ tenantId: "t1" }, () => {
+      expect(RequestContext.get()?.countryCode).toBeUndefined();
+      RequestContext.set({ countryCode: "UZ" });
+      expect(RequestContext.get()?.countryCode).toBe("UZ");
+    });
   });
 });
