@@ -95,6 +95,11 @@ const RULES: EnvRule[] = [
   // Production-only
   { key: "CORS_ORIGIN", required: true, prodOnly: true },
   { key: "SENTRY_DSN", required: false, prodOnly: true },
+  // v3.7.0 — 3D baskı üretim ortağının sitesi. OPSİYONEL: boş bırakılırsa kod
+  // varsayılanı (https://figurunica.com) kullanılır. Yalnızca ticari taraf
+  // değişirse doldurulur; VITE_ değişkeni bundle'a gömüleceği ve platform-üstü
+  // bir ayar tablosu olmadığı için değer backend'de durur.
+  { key: "PRINT3D_PARTNER_URL", required: false },
   // PayTR's five REQUIRED credentials moved to
   // PAYMENT_PROVIDER_ENV_REQUIREMENTS["paytr"] above — required only when
   // DEPLOYMENT_COUNTRIES resolves to a country whose profile names "paytr"
