@@ -362,54 +362,55 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
   // licence, which grants `feature.prioritySupport` directly.
 
   // ----------------------------------------------------------- INTEGRATIONS
-  ...(
-    [
-      ["delivery_yemeksepeti", "Yemeksepeti", "yemeksepeti", 20],
-      ["delivery_getir", "Getir", "getir", 21],
-      ["delivery_trendyol_yemek", "Trendyol Yemek", "trendyol_yemek", 22],
-    ] as const
-  ).map(
-    ([code, label, vendor, sortOrder]): AlaCarteProduct => ({
-      code,
-      name: `${label} Entegrasyonu`,
-      description: `${label} siparişlerinin otomatik olarak POS ve mutfağa düşmesi.`,
-      kind: "integration",
-      billing: "annual",
-      priceCents: 249_000,
-      // The domain flag rides along with the vendor grant: owning ANY delivery
-      // platform must light up the delivery UI, and `feature.*` folds with OR
-      // so buying a second platform is idempotent.
-      grants: {
-        "integration.delivery": [vendor],
-        "feature.deliveryIntegration": true,
-      },
-      deps: [],
-      requiresLicense: true,
-      sortOrder,
-      i18n: t(
-        [
-          `${label} Entegrasyonu`,
-          `${label} siparişleri otomatik olarak POS ve mutfağa düşer.`,
-        ],
-        [
-          `${label} Integration`,
-          `${label} orders flow automatically into the POS and the kitchen.`,
-        ],
-        [
-          `Интеграция ${label}`,
-          `Заказы ${label} автоматически поступают в POS и на кухню.`,
-        ],
-        [
-          `تكامل ${label}`,
-          `تصل طلبات ${label} تلقائيًا إلى نقطة البيع والمطبخ.`,
-        ],
-        [
-          `${label} integratsiyasi`,
-          `${label} buyurtmalari avtomatik ravishda POS va oshxonaga tushadi.`,
-        ],
-      ),
-    }),
-  ),
+  {
+    code: "delivery_platforms",
+    name: "Paket Servis Entegrasyonları",
+    description:
+      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişlerinin otomatik olarak POS ve mutfağa düşmesi.",
+    kind: "integration",
+    billing: "annual",
+    // Selling ₺2.490 PER PLATFORM was fiction: the delivery route gate is
+    // domain-wide (@RequiresIntegration("delivery") on the controller class,
+    // carrying no provider), so a tenant who bought one platform could already
+    // use all four. One package is the honest shape — and it now includes
+    // Migros, whose adapter has shipped and worked all along without ever
+    // having a SKU.
+    priceCents: 249_900,
+    grants: {
+      "integration.delivery": [
+        "yemeksepeti",
+        "getir",
+        "trendyol_yemek",
+        "migros",
+      ],
+      "feature.deliveryIntegration": true,
+    },
+    deps: [],
+    requiresLicense: true,
+    sortOrder: 20,
+    i18n: t(
+      [
+        "Paket Servis Entegrasyonları",
+        "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri otomatik olarak POS ve mutfağa düşer. Tek pakette dört platform.",
+      ],
+      [
+        "Delivery Platform Integrations",
+        "Yemeksepeti, Getir, Trendyol Yemek and Migros Yemek orders flow automatically into the POS and the kitchen. Four platforms in one package.",
+      ],
+      [
+        "Интеграции служб доставки",
+        "Заказы Yemeksepeti, Getir, Trendyol Yemek и Migros Yemek автоматически поступают в POS и на кухню. Четыре платформы в одном пакете.",
+      ],
+      [
+        "تكاملات منصات التوصيل",
+        "تصل طلبات Yemeksepeti وGetir وTrendyol Yemek وMigros Yemek تلقائيًا إلى نقطة البيع والمطبخ. أربع منصات في باقة واحدة.",
+      ],
+      [
+        "Yetkazib berish platformalari integratsiyasi",
+        "Yemeksepeti, Getir, Trendyol Yemek va Migros Yemek buyurtmalari avtomatik ravishda POS va oshxonaga tushadi. Bitta paketda to'rtta platforma.",
+      ],
+    ),
+  },
   // `fiscal_efatura` (₺1.990) lived here until v3.6.7. It is now part of the
   // licence, which grants `integration.fiscal: ["efatura"]` directly. That
   // grant folds with UNION, so `fiscal_hugin` below still adds "hugin"
@@ -762,6 +763,16 @@ export const RETIRED_ADDON_CODES = [
   "extra_tablet",
   "priority_support",
   "fiscal_efatura",
+  // v3.6.8: the three per-platform delivery SKUs folded into the single
+  // `delivery_platforms` package. ARCHIVED, never deleted — `code` is not
+  // reusable and TenantAddOn.addOnId is onDelete: Restrict. The projector
+  // reads TenantAddOn without consulting the catalog row's status, so an
+  // existing owner keeps the grant mid-cycle; the migration additionally
+  // MOVES ownership onto the package row so the renewal invoice does not
+  // silently lose the line at the anniversary.
+  "delivery_yemeksepeti",
+  "delivery_getir",
+  "delivery_trendyol_yemek",
 ] as const;
 
 export const ALACARTE_CATALOG_BY_CODE: ReadonlyMap<string, AlaCarteProduct> =
