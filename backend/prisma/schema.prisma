@@ -279,7 +279,7 @@ model User {
   avatar     String?
   phone      String?
   // Hourly pay rate for labor-cost / prime-cost reporting. Null = not set.
-  hourlyRate Decimal?  @db.Decimal(10, 2)
+  hourlyRate Decimal?  @db.Decimal(14, 2)
   // Preferred UI language (e.g. "tr", "en") — set on the onboarding page so a
   // user's language follows them across devices. Falls back to the SPA's
   // client-side i18n when null.
@@ -420,12 +420,12 @@ model Product {
   // Customer-facing "içindekiler" (contents/ingredients) shown on the QR menu.
   // Distinct from the internal Recipe (stock-item deduction, not customer-facing).
   ingredients String?
-  price       Decimal     @db.Decimal(10, 2)
+  price       Decimal     @db.Decimal(14, 2)
   // Unit COST of the finished product (what it costs to make/buy), distinct
   // from `price` (retail sell price). Drives at-cost inventory valuation,
   // gross margin and menu engineering for products WITHOUT a recipe (recipe
   // products derive cost from plate costing). Nullable: unset = "no cost basis".
-  costPrice   Decimal?    @db.Decimal(10, 2)
+  costPrice   Decimal?    @db.Decimal(14, 2)
   image       String? // Legacy field, kept for backwards compatibility
 
   // 3D / AR (menu AI-AR feature, Phase 2). A dish photo can be turned into a
@@ -463,7 +463,7 @@ model Product {
   // discounted price; null = no campaign. Window is optional (null start = now,
   // null end = forever). resolveEffectivePrice() is the SINGLE source of truth
   // read by both order pricing rails AND the public menu (shown = charged).
-  campaignPrice   Decimal?  @db.Decimal(10, 2)
+  campaignPrice   Decimal?  @db.Decimal(14, 2)
   campaignLabel   String?   @db.VarChar(40)
   campaignStartAt DateTime?
   campaignEndAt   DateTime?
@@ -531,7 +531,7 @@ model ComboGroup {
 model ComboGroupItem {
   id           String  @id @default(uuid())
   quantity     Int     @default(1)
-  priceDelta   Decimal @default(0) @db.Decimal(10, 2)
+  priceDelta   Decimal @default(0) @db.Decimal(14, 2)
   isDefault    Boolean @default(false)
   displayOrder Int     @default(0)
 
@@ -709,7 +709,7 @@ model Modifier {
   name            String // Internal name (e.g., "ranch_sauce")
   displayName     String // Display name (e.g., "Ranch Sos", "Ranch Sauce")
   description     String?
-  priceAdjustment Decimal @default(0) @db.Decimal(10, 2) // Price change (can be positive or negative)
+  priceAdjustment Decimal @default(0) @db.Decimal(14, 2) // Price change (can be positive or negative)
   isAvailable     Boolean @default(true)
   displayOrder    Int     @default(0)
 
@@ -907,10 +907,10 @@ model Order {
   type        String // DINE_IN, TAKEAWAY, DELIVERY, COUNTER
   status      String @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
 
-  totalAmount Decimal @db.Decimal(10, 2)
-  discount    Decimal @default(0) @db.Decimal(10, 2)
-  finalAmount Decimal @db.Decimal(10, 2)
-  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
+  finalAmount Decimal @db.Decimal(14, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2)
 
   notes        String?
   customerName String?
@@ -1009,11 +1009,11 @@ model Order {
 model OrderItem {
   id            String  @id @default(uuid())
   quantity      Int
-  unitPrice     Decimal @db.Decimal(10, 2)
-  subtotal      Decimal @db.Decimal(10, 2)
-  modifierTotal Decimal @default(0) @db.Decimal(10, 2) // Total cost of modifiers
+  unitPrice     Decimal @db.Decimal(14, 2)
+  subtotal      Decimal @db.Decimal(14, 2)
+  modifierTotal Decimal @default(0) @db.Decimal(14, 2) // Total cost of modifiers
   taxRate       Int     @default(10)
-  taxAmount     Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount     Decimal @default(0) @db.Decimal(14, 2)
   notes         String?
   status        String  @default("PENDING") // PENDING, PREPARING, READY
 
@@ -1024,7 +1024,7 @@ model OrderItem {
   parentOrderItemId String?
   parent            OrderItem?  @relation("ComboChildren", fields: [parentOrderItemId], references: [id], onDelete: Cascade)
   children          OrderItem[] @relation("ComboChildren")
-  listUnitPrice     Decimal?    @db.Decimal(10, 2)
+  listUnitPrice     Decimal?    @db.Decimal(14, 2)
 
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1049,7 +1049,7 @@ model OrderItem {
 model OrderItemModifier {
   id              String  @id @default(uuid())
   quantity        Int     @default(1) // How many of this modifier (e.g., 2x extra cheese)
-  priceAdjustment Decimal @db.Decimal(10, 2) // Price at the time of order
+  priceAdjustment Decimal @db.Decimal(14, 2) // Price at the time of order
 
   orderItemId String
   orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
@@ -1070,11 +1070,11 @@ model OrderItemModifier {
 
 model Payment {
   id        String   @id @default(uuid())
-  amount    Decimal  @db.Decimal(10, 2)
+  amount    Decimal  @db.Decimal(14, 2)
   // Tip recorded with this payment (cash declared or card tip). Informational:
   // NOT part of `amount`'s goods-total reconciliation — it drives the tips
   // report + payroll, kept separate so the fiş/Z tender math is untouched.
-  tipAmount Decimal? @db.Decimal(10, 2)
+  tipAmount Decimal? @db.Decimal(14, 2)
   method    String // CASH, CARD, DIGITAL, MULTINET, SODEXO, EDENRED, SETCARD, METROPOL, HOUSE
   status    String   @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
@@ -1168,7 +1168,7 @@ model OrderItemPayment {
 
   // Snapshot of this allocation's contribution to Payment.amount. Stored,
   // not derived, so refund accounting and audits stay stable.
-  amount Decimal @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(14, 2)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1204,7 +1204,7 @@ model PendingSelfPayment {
   // [{ orderId, items: [{ orderItemId, quantity }] }, ...]
   itemsByOrder Json
 
-  amount        Decimal @db.Decimal(10, 2)
+  amount        Decimal @db.Decimal(14, 2)
   status        String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, EXPIRED
   failureReason String?
   paytrToken    String?
@@ -1281,8 +1281,8 @@ model SubscriptionPlan {
   description String?
 
   // Pricing
-  monthlyPrice Decimal @db.Decimal(10, 2)
-  yearlyPrice  Decimal @db.Decimal(10, 2)
+  monthlyPrice Decimal @db.Decimal(14, 2)
+  yearlyPrice  Decimal @db.Decimal(14, 2)
   currency     String  @default("TRY")
 
   // Trial settings
@@ -1400,7 +1400,7 @@ model Subscription {
   trialEnd      DateTime?
 
   // Pricing at time of subscription
-  amount   Decimal @db.Decimal(10, 2)
+  amount   Decimal @db.Decimal(14, 2)
   currency String  @default("TRY")
 
   // Manual-renewal model: tenant explicitly checkouts each cycle.
@@ -1438,7 +1438,7 @@ model SubscriptionPayment {
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   // Payment details
-  amount          Decimal @db.Decimal(10, 2)
+  amount          Decimal @db.Decimal(14, 2)
   currency        String  @default("TRY")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
   paymentProvider String // PAYTR, EMAIL
@@ -1543,9 +1543,9 @@ model Invoice {
   status        String @default("DRAFT") // DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE
 
   // Amounts
-  subtotal Decimal @db.Decimal(10, 2)
-  tax      Decimal @default(0) @db.Decimal(10, 2)
-  total    Decimal @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(14, 2)
+  tax      Decimal @default(0) @db.Decimal(14, 2)
+  total    Decimal @db.Decimal(14, 2)
   currency String  @default("TRY")
 
   // Billing period
@@ -1940,8 +1940,8 @@ model Customer {
 
   // Statistics
   totalOrders  Int     @default(0)
-  totalSpent   Decimal @default(0) @db.Decimal(10, 2)
-  averageOrder Decimal @default(0) @db.Decimal(10, 2)
+  totalSpent   Decimal @default(0) @db.Decimal(14, 2)
+  averageOrder Decimal @default(0) @db.Decimal(14, 2)
 
   // Birthday & Marketing
   birthday    DateTime?
@@ -2092,7 +2092,7 @@ model LoyaltyTransaction {
   // Order reference (if applicable)
   orderId     String?
   orderNumber String?
-  orderAmount Decimal? @db.Decimal(10, 2)
+  orderAmount Decimal? @db.Decimal(14, 2)
 
   // Referral tracking
   referredCustomerId String? // Customer who was referred (for referral bonuses)
@@ -2352,42 +2352,42 @@ model ZReport {
   terminalId String?
 
   // Sales Summary
-  totalSales    Decimal @db.Decimal(10, 2)
+  totalSales    Decimal @db.Decimal(14, 2)
   totalOrders   Int
-  totalDiscount Decimal @default(0) @db.Decimal(10, 2)
-  totalRefunds  Decimal @default(0) @db.Decimal(10, 2)
-  netSales      Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
-  totalTax      Decimal @default(0) @db.Decimal(10, 2)
+  totalDiscount Decimal @default(0) @db.Decimal(14, 2)
+  totalRefunds  Decimal @default(0) @db.Decimal(14, 2)
+  netSales      Decimal @db.Decimal(14, 2) // totalSales - totalRefunds
+  totalTax      Decimal @default(0) @db.Decimal(14, 2)
   taxBreakdown  Json?
 
   // Order Type Breakdown
-  dineInSales    Decimal @default(0) @db.Decimal(10, 2)
+  dineInSales    Decimal @default(0) @db.Decimal(14, 2)
   dineInOrders   Int     @default(0)
-  takeawaySales  Decimal @default(0) @db.Decimal(10, 2)
+  takeawaySales  Decimal @default(0) @db.Decimal(14, 2)
   takeawayOrders Int     @default(0)
-  deliverySales  Decimal @default(0) @db.Decimal(10, 2)
+  deliverySales  Decimal @default(0) @db.Decimal(14, 2)
   deliveryOrders Int     @default(0)
 
   // Payment Method Summary
-  cashPayments        Decimal @default(0) @db.Decimal(10, 2)
+  cashPayments        Decimal @default(0) @db.Decimal(14, 2)
   cashPaymentCount    Int     @default(0)
-  cardPayments        Decimal @default(0) @db.Decimal(10, 2)
+  cardPayments        Decimal @default(0) @db.Decimal(14, 2)
   cardPaymentCount    Int     @default(0)
-  digitalPayments     Decimal @default(0) @db.Decimal(10, 2)
+  digitalPayments     Decimal @default(0) @db.Decimal(14, 2)
   digitalPaymentCount Int     @default(0)
 
   // Cash Drawer Summary
-  openingCash    Decimal @db.Decimal(10, 2)
-  expectedCash   Decimal @db.Decimal(10, 2)
-  countedCash    Decimal @db.Decimal(10, 2)
-  cashDifference Decimal @db.Decimal(10, 2) // countedCash - expectedCash
-  cashInOut      Decimal @default(0) @db.Decimal(10, 2) // Non-sales movements
+  openingCash    Decimal @db.Decimal(14, 2)
+  expectedCash   Decimal @db.Decimal(14, 2)
+  countedCash    Decimal @db.Decimal(14, 2)
+  cashDifference Decimal @db.Decimal(14, 2) // countedCash - expectedCash
+  cashInOut      Decimal @default(0) @db.Decimal(14, 2) // Non-sales movements
 
   // Refunds & Cancellations
   cancelledOrders       Int     @default(0)
-  cancelledOrdersAmount Decimal @default(0) @db.Decimal(10, 2)
+  cancelledOrdersAmount Decimal @default(0) @db.Decimal(14, 2)
   refundedPayments      Int     @default(0)
-  refundedAmount        Decimal @default(0) @db.Decimal(10, 2)
+  refundedAmount        Decimal @default(0) @db.Decimal(14, 2)
 
   // Staff Performance (stored as JSON for flexibility)
   staffPerformance Json? // Array of {staffId, staffName, sales, orders, refunds}
@@ -2400,7 +2400,7 @@ model ZReport {
 
   // System Status
   openChecks       Int     @default(0) // Should be 0 for successful closing
-  openChecksAmount Decimal @default(0) @db.Decimal(10, 2)
+  openChecksAmount Decimal @default(0) @db.Decimal(14, 2)
 
   // Metadata
   notes           String? @db.Text
@@ -2447,7 +2447,7 @@ model ZReport {
 model CashDrawerMovement {
   id     String  @id @default(uuid())
   type   String // OPENING, CLOSING, CASH_IN, CASH_OUT, ADJUSTMENT
-  amount Decimal @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(14, 2)
   reason String?
   notes  String? @db.Text
 
@@ -2507,15 +2507,15 @@ model CashierSession {
   branchId     String
   userId       String // the cashier who owns the shift
   status       String  @default("OPEN") // OPEN, CLOSED
-  openingFloat Decimal @db.Decimal(10, 2)
+  openingFloat Decimal @db.Decimal(14, 2)
 
   // Populated at close.
-  countedCash           Decimal? @db.Decimal(10, 2) // physically counted (or derived from denominations)
-  expectedCash          Decimal? @db.Decimal(10, 2) // openingFloat + cashSales + cashIn − cashOut
-  overShort             Decimal? @db.Decimal(10, 2) // countedCash − expectedCash (negative = short)
-  cashSales             Decimal? @db.Decimal(10, 2)
-  cashIn                Decimal? @db.Decimal(10, 2)
-  cashOut               Decimal? @db.Decimal(10, 2)
+  countedCash           Decimal? @db.Decimal(14, 2) // physically counted (or derived from denominations)
+  expectedCash          Decimal? @db.Decimal(14, 2) // openingFloat + cashSales + cashIn − cashOut
+  overShort             Decimal? @db.Decimal(14, 2) // countedCash − expectedCash (negative = short)
+  cashSales             Decimal? @db.Decimal(14, 2)
+  cashIn                Decimal? @db.Decimal(14, 2)
+  cashOut               Decimal? @db.Decimal(14, 2)
   denominationBreakdown Json? // {"200":3,"100":5,...} at close
 
   notes    String?
@@ -2851,9 +2851,9 @@ model TableAnalytics {
   avgIdleDuration    Float? // Average idle time after dining (minutes)
 
   // Revenue metrics
-  revenueGenerated Decimal  @default(0) @db.Decimal(10, 2)
+  revenueGenerated Decimal  @default(0) @db.Decimal(14, 2)
   ordersCount      Int      @default(0)
-  avgOrderValue    Decimal? @db.Decimal(10, 2)
+  avgOrderValue    Decimal? @db.Decimal(14, 2)
   revenuePerMinute Decimal? @db.Decimal(10, 4) // Revenue efficiency
 
   // Utilization score (0-100)
@@ -3463,7 +3463,7 @@ model PurchaseOrderTemplateItem {
   template    PurchaseOrderTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   stockItemId String
   quantity    Decimal               @db.Decimal(10, 3)
-  unitPrice   Decimal               @db.Decimal(10, 2)
+  unitPrice   Decimal               @db.Decimal(14, 2)
 
   @@index([templateId])
   @@map("purchase_order_template_items")
@@ -4110,15 +4110,15 @@ model LeadOffer {
   /// Soft data — nullable; planId stays the canonical (soft) reference.
   planCode         String?
   planName         String?
-  planMonthlyPrice Decimal? @db.Decimal(10, 2)
+  planMonthlyPrice Decimal? @db.Decimal(14, 2)
   planCurrency     String?
 
-  customPrice Decimal?  @db.Decimal(10, 2)
+  customPrice Decimal?  @db.Decimal(14, 2)
   // v2.8.97 — was Decimal(5, 2) which capped the discount at 999.99
   // TRY. Sales reps offering a four-digit lira discount on enterprise
   // tiers would have hit a silent precision overflow. Aligned with
-  // every other money column in the schema (Decimal(10, 2)).
-  discount    Decimal?  @db.Decimal(10, 2)
+  // every other money column in the schema (Decimal(14, 2)).
+  discount    Decimal?  @db.Decimal(14, 2)
   trialDays   Int?
   notes       String?   @db.Text
   status      String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
@@ -4144,7 +4144,7 @@ model LeadOffer {
 
 model Commission {
   id       String  @id @default(uuid())
-  amount   Decimal @db.Decimal(10, 2)
+  amount   Decimal @db.Decimal(14, 2)
   type     String // SIGNUP, RENEWAL, UPSELL
   status   String  @default("PENDING") // PENDING, APPROVED, PAID
   period   String // "2026-04" (YYYY-MM format)
@@ -4431,7 +4431,7 @@ model SalesInvoice {
   originalInvoiceId    String?
   // KDV tevkifatı (VAT withholding): amount withheld by the buyer + the GİB
   // tevkifat code (e.g. "601"). Null = no withholding. Reduces the payable.
-  withholdingTaxAmount Decimal? @db.Decimal(10, 2)
+  withholdingTaxAmount Decimal? @db.Decimal(14, 2)
   withholdingCode      String?
 
   customerName      String?
@@ -4452,10 +4452,10 @@ model SalesInvoice {
   sellerPhone     String?
   sellerEmail     String?
 
-  subtotal    Decimal @db.Decimal(10, 2)
-  taxAmount   Decimal @db.Decimal(10, 2)
-  totalAmount Decimal @db.Decimal(10, 2)
-  discount    Decimal @default(0) @db.Decimal(10, 2)
+  subtotal    Decimal @db.Decimal(14, 2)
+  taxAmount   Decimal @db.Decimal(14, 2)
+  totalAmount Decimal @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2)
   currency    String  @default("TRY")
 
   taxBreakdown Json?
@@ -4508,11 +4508,11 @@ model SalesInvoiceItem {
   id          String  @id @default(uuid())
   description String
   quantity    Int
-  unitPrice   Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(14, 2)
   taxRate     Int     @default(10)
-  taxAmount   Decimal @db.Decimal(10, 2)
-  subtotal    Decimal @db.Decimal(10, 2)
-  total       Decimal @db.Decimal(10, 2)
+  taxAmount   Decimal @db.Decimal(14, 2)
+  subtotal    Decimal @db.Decimal(14, 2)
+  total       Decimal @db.Decimal(14, 2)
 
   invoiceId String
   invoice   SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
