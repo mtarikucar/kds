@@ -3,6 +3,7 @@ import {
   mockPrismaClient,
   MockPrismaClient,
 } from "../../../common/test/prisma-mock.service";
+import { AttendanceSource } from "../constants/personnel.enum";
 
 /**
  * deep-review H6/M7 regression: the Attendance.date column is `@db.Date`,
@@ -221,12 +222,12 @@ describe("AttendanceService branch-scope reads (track-1)", () => {
 
     // Header is attendance/hours only — no wage/pay/salary/cost columns.
     expect(lines[0]).toBe(
-      "Staff,Role,Total Days,Worked Minutes,Overtime Minutes,Break Minutes,Late Days,Late Minutes",
+      "Staff,Role,Total Days,Worked Minutes,Overtime Minutes,Break Minutes,Late Days,Late Minutes,Card Clock-ins",
     );
     expect(csv.toLowerCase()).not.toMatch(/wage|salary|pay|cost|rate/);
 
     // Data row carries the real worked/overtime numbers.
-    expect(lines[1]).toBe("Ada Lovelace,WAITER,1,480,60,30,1,15");
+    expect(lines[1]).toBe("Ada Lovelace,WAITER,1,480,60,30,1,15,0");
   });
 
   it("neutralizes CSV/formula injection in a user-controlled staff name", async () => {
@@ -263,6 +264,78 @@ describe("AttendanceService branch-scope reads (track-1)", () => {
     expect(where.branchId).toBeUndefined();
     expect(where.tenantId).toBe("t-1");
     expect(where.userId).toBe("u-1");
+  });
+
+  it("counts card clock-ins separately in the summary", async () => {
+    (prisma.attendance.findMany as any).mockResolvedValue([
+      {
+        userId: "u-1",
+        user: { id: "u-1", firstName: "Ada", lastName: "Lovelace", role: "WAITER" },
+        totalWorkedMinutes: 480,
+        totalBreakMinutes: 30,
+        overtimeMinutes: 0,
+        isLate: false,
+        lateMinutes: 0,
+        clockInSource: "card",
+      },
+      {
+        userId: "u-1",
+        user: { id: "u-1", firstName: "Ada", lastName: "Lovelace", role: "WAITER" },
+        totalWorkedMinutes: 480,
+        totalBreakMinutes: 30,
+        overtimeMinutes: 0,
+        isLate: false,
+        lateMinutes: 0,
+        clockInSource: "manual",
+      },
+    ]);
+
+    const [row] = await svc.getAttendanceSummary(scope, {} as any);
+
+    expect(row.totalDays).toBe(2);
+    expect(row.cardClockIns).toBe(1);
+  });
+
+  it("defaults clockInSource to manual for an app clock-in", async () => {
+    // The 82 existing call sites pass no source. If the default were 'card',
+    // every app punch would be reported as a card punch.
+    prisma.tenant.findUnique.mockResolvedValue({
+      timezone: "Europe/Istanbul",
+    } as any);
+    prisma.attendance.findFirst.mockResolvedValue(null);
+    prisma.shiftAssignment.findFirst.mockResolvedValue(null);
+    prisma.user.findUnique.mockResolvedValue({
+      primaryBranchId: "branch-1",
+    } as any);
+    (prisma.attendance.create as any).mockResolvedValue({
+      id: "a-1",
+      branchId: "branch-1",
+    });
+
+    await svc.clockIn("t-1", "u-1");
+
+    const data = (prisma.attendance.create as any).mock.calls[0][0].data;
+    expect(data.clockInSource).toBe("manual");
+  });
+
+  it("stamps clockOutSource from the source argument", async () => {
+    (prisma.attendance.findFirst as any).mockResolvedValue({
+      id: "a-1",
+      status: "CLOCKED_IN",
+      clockIn: new Date(Date.now() - 60 * 60 * 1000),
+      totalBreakMinutes: 0,
+      shiftAssignment: null,
+    });
+    (prisma.attendance.updateMany as any).mockResolvedValue({ count: 1 });
+    (prisma.attendance.findUniqueOrThrow as any).mockResolvedValue({
+      id: "a-1",
+      branchId: "branch-1",
+    });
+
+    await svc.clockOut("t-1", "u-1", AttendanceSource.CARD);
+
+    const data = (prisma.attendance.updateMany as any).mock.calls[0][0].data;
+    expect(data.clockOutSource).toBe("card");
   });
 });
 

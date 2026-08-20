@@ -5,7 +5,10 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { KdsGateway } from "../../kds/kds.gateway";
-import { AttendanceStatus } from "../constants/personnel.enum";
+import {
+  AttendanceSource,
+  AttendanceStatus,
+} from "../constants/personnel.enum";
 import {
   AttendanceQueryDto,
   AttendanceSummaryQueryDto,
@@ -95,7 +98,14 @@ export class AttendanceService {
     return new Date(midnight.getTime() + (hour * 60 + minute) * 60000);
   }
 
-  async clockIn(tenantId: string, userId: string, notes?: string) {
+  async clockIn(
+    tenantId: string,
+    userId: string,
+    notes?: string,
+    // Defaulted so the 82 existing call sites (controller, tests) keep their
+    // meaning: anything that does not say otherwise is an in-app punch.
+    source: AttendanceSource = AttendanceSource.MANUAL,
+  ) {
     const timezone = await this.tenantTimezone(tenantId);
     const today = this.tenantDateOnly(new Date(), timezone);
 
@@ -174,6 +184,7 @@ export class AttendanceService {
           isLate,
           lateMinutes,
           notes,
+          clockInSource: source,
           shiftAssignmentId: shiftAssignment?.id,
           userId,
           tenantId,
@@ -197,7 +208,11 @@ export class AttendanceService {
     }
   }
 
-  async clockOut(tenantId: string, userId: string) {
+  async clockOut(
+    tenantId: string,
+    userId: string,
+    source: AttendanceSource = AttendanceSource.MANUAL,
+  ) {
     // Find the user's OPEN attendance record by STATUS, newest first — NOT
     // by today's date. An overnight shift clocked in before midnight has
     // `date = yesterday` (tenant-local, @db.Date), so the old `date: today`
@@ -260,6 +275,7 @@ export class AttendanceService {
         status: AttendanceStatus.CLOCKED_OUT,
         totalWorkedMinutes,
         overtimeMinutes,
+        clockOutSource: source,
       },
     });
     if (claim.count === 0) {
@@ -439,6 +455,7 @@ export class AttendanceService {
 
     if (query.userId) where.userId = query.userId;
     if (query.status) where.status = query.status;
+    if (query.source) where.clockInSource = query.source;
     if (query.startDate || query.endDate) {
       where.date = {};
       if (query.startDate) where.date.gte = new Date(query.startDate);
@@ -509,6 +526,10 @@ export class AttendanceService {
           totalOvertimeMinutes: 0,
           lateDays: 0,
           totalLateMinutes: 0,
+          // "Card-based attendance reporting" is only possible if the source
+          // is distinguishable. Counted on clock-IN because that is the punch
+          // the card rail always owns (a shift can be closed from the app).
+          cardClockIns: 0,
         });
       }
       const summary = userMap.get(a.userId);
@@ -516,6 +537,7 @@ export class AttendanceService {
       summary.totalWorkedMinutes += a.totalWorkedMinutes;
       summary.totalBreakMinutes += a.totalBreakMinutes;
       summary.totalOvertimeMinutes += a.overtimeMinutes;
+      if (a.clockInSource === AttendanceSource.CARD) summary.cardClockIns++;
       if (a.isLate) {
         summary.lateDays++;
         summary.totalLateMinutes += a.lateMinutes;
@@ -546,6 +568,8 @@ export class AttendanceService {
       "Break Minutes",
       "Late Days",
       "Late Minutes",
+      // Attendance/hours only — still no wage/pay/salary/cost/rate column.
+      "Card Clock-ins",
     ];
 
     const escape = (value: unknown): string => {
@@ -575,6 +599,7 @@ export class AttendanceService {
           escape(r.totalBreakMinutes),
           escape(r.lateDays),
           escape(r.totalLateMinutes),
+          escape(r.cardClockIns ?? 0),
         ].join(","),
       );
     }
