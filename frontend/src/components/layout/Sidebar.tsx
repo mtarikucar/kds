@@ -164,6 +164,17 @@ const SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.MANAGER],
       },
       {
+        // The station tablet's ONLY navigation entry. The sidebar is the app's
+        // single navigation record; without this line the kiosk is reachable
+        // only by typing the URL.
+        to: '/card-shift',
+        icon: CreditCard,
+        labelKey: 'navigation.cardShift',
+        labelFallback: 'Kartlı Vardiya',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'cardShift' },
+      },
+      {
         to: '/admin/stock',
         icon: Package,
         labelKey: 'navigation.stock',
