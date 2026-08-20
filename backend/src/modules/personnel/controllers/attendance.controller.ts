@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Response } from "express";
+import { Throttle } from "@nestjs/throttler";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { TenantGuard } from "../../auth/guards/tenant.guard";
@@ -20,7 +21,9 @@ import { UserRole } from "../../../common/constants/roles.enum";
 import { CurrentScope } from "../../auth/decorators/current-scope.decorator";
 import { BranchScope } from "../../../common/scoping/branch-scope";
 import { AttendanceService } from "../services/attendance.service";
+import { CardShiftService } from "../services/card-shift.service";
 import { ClockInDto } from "../dto/clock-in.dto";
+import { CardTapDto } from "../dto/card-shift.dto";
 import {
   AttendanceQueryDto,
   AttendanceSummaryQueryDto,
@@ -32,7 +35,10 @@ import {
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @RequiresFeature(PlanFeature.PERSONNEL_MANAGEMENT)
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly cardShiftService: CardShiftService,
+  ) {}
 
   @Post("clock-in")
   @Roles(
@@ -45,6 +51,24 @@ export class AttendanceController {
   @ApiOperation({ summary: "Clock in for today" })
   clockIn(@Request() req, @Body() dto: ClockInDto) {
     return this.attendanceService.clockIn(req.tenantId, req.user.id, dto.notes);
+  }
+
+  /**
+   * The kiosk endpoint. The station tablet runs on an ADMIN/MANAGER session
+   * (there is no device-token rail yet — §9/1), so the roles are theirs.
+   *
+   * BOTH flags in ONE call: the guard uses getAllAndOverride, so writing
+   * @RequiresFeature here OVERRIDES the class-level personnelManagement
+   * requirement instead of adding to it. Listing only cardShift would sell the
+   * card rail to a tenant with no attendance module underneath it.
+   */
+  @Post("card-tap")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.PERSONNEL_MANAGEMENT, PlanFeature.CARD_SHIFT)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: "Clock in/out by tapping an RFID staff card" })
+  cardTap(@Request() req, @Body() dto: CardTapDto) {
+    return this.cardShiftService.tap(req.tenantId, dto);
   }
 
   @Post("clock-out")

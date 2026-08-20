@@ -1,6 +1,7 @@
 import { AttendanceController } from "./attendance.controller";
 import { AttendanceService } from "../services/attendance.service";
 import { BranchScope } from "../../../common/scoping/branch-scope";
+import { REQUIRE_ENTITLEMENT_KEY } from "../../entitlements/require-entitlement.decorator";
 
 /**
  * Long-tail forwarding spec for the personnel attendance controller. Load-
@@ -25,7 +26,10 @@ describe("AttendanceController", () => {
       getAttendanceHistory: jest.fn().mockResolvedValue([]),
       getAttendanceSummary: jest.fn().mockResolvedValue({}),
     };
-    ctrl = new AttendanceController(svc as unknown as AttendanceService);
+    ctrl = new AttendanceController(
+      svc as unknown as AttendanceService,
+      { tap: jest.fn().mockResolvedValue({}) } as any,
+    );
   });
 
   it("clockIn identifies the actor and passes the notes", () => {
@@ -53,5 +57,28 @@ describe("AttendanceController", () => {
     ctrl.getTodayAttendance(scope);
     expect(svc.getMyStatus).toHaveBeenCalledWith(scope);
     expect(svc.getTodayAttendance).toHaveBeenCalledWith(scope);
+  });
+
+  it("card-tap requires BOTH personnelManagement and cardShift", () => {
+    // K15. @RequiresFeature on a METHOD overrides the class-level decorator
+    // (entitlement.guard.ts:62-66) instead of adding to it. Listing only
+    // cardShift here would open the card rail on a tenant that never bought
+    // the attendance module the rows are written onto.
+    const meta = Reflect.getMetadata(
+      REQUIRE_ENTITLEMENT_KEY,
+      AttendanceController.prototype.cardTap,
+    );
+    expect(meta).toEqual([
+      { feature: "feature.personnelManagement" },
+      { feature: "feature.cardShift" },
+    ]);
+  });
+
+  it("card-tap forwards the tenant and the body, never req.user.id", () => {
+    // The tap identifies the person by CARD. Using the logged-in actor would
+    // clock the manager in every time a waiter taps.
+    const cardShift = (ctrl as any).cardShiftService;
+    ctrl.cardTap({ tenantId: "t1", user: { id: "u1" } }, { cardUid: "04A2" } as any);
+    expect(cardShift.tap).toHaveBeenCalledWith("t1", { cardUid: "04A2" });
   });
 });
