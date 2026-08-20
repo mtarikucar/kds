@@ -67,8 +67,13 @@ export class CreateHardwareProductDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[a-z0-9][a-z0-9-]{2,63}$/, {
-    message: "sku must be lowercase, alphanumeric + hyphen, 3-64 chars",
+  // v3.7.0 — alt çizgi eklendi. Onaylı print3d SKU'ları (print3d_base /
+  // print3d_item) alt çizgi taşıyor; eski regex onları reddettiği için o iki
+  // satır superadmin katalog API'sinden yönetilemiyordu. Genişletme geriye
+  // dönük uyumlu: mevcut her SKU hâlâ eşleşir (hardware-sku-regex.spec.ts).
+  @Matches(/^[a-z0-9][a-z0-9_-]{2,63}$/, {
+    message:
+      "sku must be lowercase, alphanumeric + hyphen/underscore, 3-64 chars",
   })
   sku: string;
 

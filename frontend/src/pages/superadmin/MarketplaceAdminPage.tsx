@@ -609,6 +609,11 @@ function ProductEditorModal({ onSubmit, onClose }: ProductEditorProps) {
               <option value="scanner">scanner</option>
               <option value="card_reader">card_reader</option>
               <option value="caller_id">caller_id</option>
+              {/* v3.7.0 — hizmet satırları (print3d_base / print3d_item) bu
+                  formdan yönetilebilsin. Bu <select> sözlükten (catalog/
+                  category-vocabulary.ts) TÜREMİYOR ve zaten drift'te; burada
+                  yalnız KENDİ değerimizi ekliyoruz. Sözlükten besleme ayrı iş. */}
+              <option value="service">service</option>
               <option value="other">other</option>
             </select>
           </Field>
