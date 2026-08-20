@@ -1,4 +1,5 @@
 import { INestApplication } from "@nestjs/common";
+import { ThrottlerStorage, ThrottlerStorageRecord } from "@nestjs/throttler";
 import request from "supertest";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { bootHttpApp, resetDb, seedLiveTenant, loginAs } from "./helpers/e2e-db";
@@ -11,6 +12,86 @@ import {
 import { TenantMarketplaceService } from "../src/modules/marketplace/tenant-marketplace.service";
 import { TenantAddOnSweeperService } from "../src/modules/marketplace/tenant-addon-sweeper.service";
 import { cardUidHash, cardUidLast4, normalizeCardUid } from "../src/modules/personnel/card-uid";
+
+/**
+ * A `ThrottlerStorage` that can be wiped between tests without crashing.
+ *
+ * card-tap carries a real rate limit (route-level `default` 30/60s, plus the
+ * untouched global short/medium/long profiles — see
+ * common/config/throttler.config.ts), and this suite calls it ~10 times
+ * across its `it`s, all from the same tracker (one supertest client, one IP)
+ * against the same route+tracker bucket (the library keys storage by
+ * class+handler+throttler-name+tracker, so other routes never touch this
+ * bucket — see ThrottlerGuard.generateKey). Landed close enough together in
+ * wall-clock time — exactly what a fast e2e run does, more so under CI load —
+ * the short 10-req/1s bucket blows the licence-lapse assertion below with an
+ * unrelated 429: the test ends up measuring the rate limiter instead of the
+ * licence-gate property it is named for.
+ *
+ * The obvious fix — reach into the library's own ThrottlerStorageService and
+ * `.storage.clear()` it between tests — crashes: that service schedules a
+ * `setTimeout` per hit to decrement the count on expiry, and clearing the Map
+ * out from under a still-pending timeout throws
+ * ("Cannot destructure property 'totalHits' of undefined") the next time one
+ * of those orphaned timers fires. There is no public API to cancel them.
+ *
+ * So this is a from-scratch, timer-free implementation of the same
+ * `ThrottlerStorage` contract the guard talks to — real limit/ttl/block-
+ * duration accounting (a genuinely runaway route would still trip it), just
+ * with a `reset()` that is safe to call between tests because nothing is
+ * scheduled outside the Map itself.
+ */
+class ResettableThrottlerStorage implements ThrottlerStorage {
+  private readonly records = new Map<
+    string,
+    {
+      totalHits: Map<string, number>;
+      expiresAt: number;
+      blockExpiresAt: number;
+      isBlocked: boolean;
+    }
+  >();
+
+  async increment(
+    key: string,
+    ttl: number,
+    limit: number,
+    blockDuration: number,
+    throttlerName: string,
+  ): Promise<ThrottlerStorageRecord> {
+    const now = Date.now();
+    let record = this.records.get(key);
+    if (!record || record.expiresAt <= now) {
+      record = {
+        totalHits: new Map(),
+        expiresAt: now + ttl,
+        blockExpiresAt: 0,
+        isBlocked: false,
+      };
+      this.records.set(key, record);
+    }
+    if (record.isBlocked && record.blockExpiresAt <= now) {
+      record.isBlocked = false;
+      record.totalHits.set(throttlerName, 0);
+    }
+    const totalHits = (record.totalHits.get(throttlerName) ?? 0) + 1;
+    record.totalHits.set(throttlerName, totalHits);
+    if (totalHits > limit && !record.isBlocked) {
+      record.isBlocked = true;
+      record.blockExpiresAt = now + blockDuration;
+    }
+    return {
+      totalHits,
+      timeToExpire: Math.ceil((record.expiresAt - now) / 1000),
+      isBlocked: record.isBlocked,
+      timeToBlockExpire: Math.ceil((record.blockExpiresAt - now) / 1000),
+    };
+  }
+
+  reset(): void {
+    this.records.clear();
+  }
+}
 
 /**
  * The card rail, end to end.
@@ -28,12 +109,15 @@ describe("Card shift (HTTP, real DB, real guards)", () => {
   let prisma: PrismaService;
   let tenant: Awaited<ReturnType<typeof seedLiveTenant>>;
   let token: string;
+  const throttlerStorage = new ResettableThrottlerStorage();
 
   const TAP = "/api/personnel/attendance/card-tap";
   const UID = "04:A2:2B:9C";
 
   beforeAll(async () => {
-    ({ app, prisma } = await bootHttpApp());
+    ({ app, prisma } = await bootHttpApp((builder) =>
+      builder.overrideProvider(ThrottlerStorage).useValue(throttlerStorage),
+    ));
     await resetDb(prisma);
     tenant = await seedLiveTenant(prisma);
     await project(app, tenant.tenantId);
@@ -45,6 +129,9 @@ describe("Card shift (HTTP, real DB, real guards)", () => {
   });
 
   beforeEach(async () => {
+    // Each `it` gets a fresh budget — see ResettableThrottlerStorage above for
+    // why this suite needs its own storage to reset safely between tests.
+    throttlerStorage.reset();
     await prisma.attendance.deleteMany({ where: { tenantId: tenant.tenantId } });
     await prisma.tenantAddOn.deleteMany({ where: { tenantId: tenant.tenantId } });
     await prisma.user.update({

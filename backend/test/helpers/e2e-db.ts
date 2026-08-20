@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
+import { Test, TestingModuleBuilder } from "@nestjs/testing";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import * as bcrypt from "bcryptjs";
 import request from "supertest";
@@ -129,14 +129,27 @@ export async function seedTenantBranchUser(
  * cookie-parser, the same ValidationPipe, and the HttpExceptionFilter. Use this
  * (over bootE2EApp) when a spec drives real HTTP requests through the full guard
  * chain (Jwt → Roles → Tenant → Branch → SubscriptionStatus).
+ *
+ * `configure` is an optional hook into the `TestingModuleBuilder` before
+ * `.compile()` — e.g. a spec that hammers one throttled route many times
+ * (a kiosk-style endpoint tapped repeatedly across `it`s) can override the
+ * `ThrottlerStorage` provider with its own resettable stand-in so the route's
+ * real rate limiting still runs, without accumulating hits across unrelated
+ * tests. Omit it and boot is identical to before this parameter existed.
  */
-export async function bootHttpApp(): Promise<{
+export async function bootHttpApp(
+  configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+): Promise<{
   app: INestApplication;
   prisma: PrismaService;
 }> {
-  const mod = await Test.createTestingModule({
+  let builder = Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  });
+  if (configure) {
+    builder = configure(builder);
+  }
+  const mod = await builder.compile();
   const app = mod.createNestApplication();
   app.setGlobalPrefix("api");
   app.use(cookieParser());
