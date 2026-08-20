@@ -337,7 +337,7 @@ Bunu **atılabilir bir Postgres'te** doğrula, geliştirme veritabanında değil
 ```bash
 cd /home/tarik/Projects/kds/backend
 DB=multicountry_migtest
-PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d postgres -c "DROP DATABASE IF EXISTS $DB" 2>/dev/null || true
+PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d template1 -c "DROP DATABASE IF EXISTS $DB" 2>/dev/null || true
 DATABASE_URL="postgresql://tarik:Merhabalar06@localhost:5432/$DB?schema=public" npx prisma db push --skip-generate
 PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d $DB -f prisma/migrations/<ver>_tenant_country_code/down.sql
 PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d $DB -f prisma/migrations/<ver>_tenant_country_code/migration.sql
@@ -992,7 +992,7 @@ grep -n "Decimal(10, 2)" prisma/schema.prisma | tee /tmp/decimal-sites.txt | wc 
 
 Atılabilir bir veritabanında 100.000.000 so'm'luk bir toplamın saklanabildiğini iddia eden bir test; genişletmeden önce numeric overflow ile düşer.
 
-- [ ] **Step 3-5:** genişlet (`Decimal(14, 2)`), up→down→up turunu atılabilir Postgres'te doğrula, commit.
+- [ ] **Step 3-5:** genişlet (`Decimal(14, 2)`), up→down→up turunu atılabilir Postgres'te doğrula (Task 2'deki komut bloğunun aynısı — bakım veritabanı `template1`, `postgres` diye bir DB **yok**), commit.
 
 ---
 
