@@ -65,7 +65,21 @@ export class AttendanceController {
   @Post("card-tap")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @RequiresFeature(PlanFeature.PERSONNEL_MANAGEMENT, PlanFeature.CARD_SHIFT)
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  // 90/dk, 30 değil. Tek bir RFID okuyucu fiziksel olarak dakikada ~30-40
+  // okutma yapabiliyor (kart okutma + okuma + geri bildirim ~1,5-2 sn), yani
+  // 30'luk sınır tam o tavana oturuyordu: bir yanlış okumaya, ikinci bir
+  // tablete veya vardiya değişiminde kümelenen kuyruğa payı yoktu.
+  //
+  // Asıl tehlike "bir çalışan tekrar dener" değil: blockDuration ayarlanmadığı
+  // için ttl'e eşit oluyor, yani sınır dolduğunda TÜM KİOSK 60 saniye boyunca
+  // HERKESİ okutamaz hâle geliyor — tam da vardiya değişimi telaşında.
+  //
+  // Gevşetmek DoS hesabını değiştirmiyor: ThrottlerGuard global APP_GUARD
+  // olarak auth zincirinden ÖNCE çalışıyor, yani bu bütçeyi kimlik doğrulama
+  // korumuyor zaten; kimliksiz bir sel 30'u da 90'ı da aynı kolaylıkta tüketir.
+  // short (10/1sn) ve medium (50/10sn) globalleri dokunulmadan duruyor ve
+  // betiklenmiş bir sele karşı asıl backstop onlar.
+  @Throttle({ default: { limit: 90, ttl: 60_000 } })
   @ApiOperation({ summary: "Clock in/out by tapping an RFID staff card" })
   cardTap(@Request() req, @Body() dto: CardTapDto) {
     return this.cardShiftService.tap(req.tenantId, dto);
