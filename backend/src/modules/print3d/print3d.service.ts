@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
@@ -9,6 +13,10 @@ import {
   PRINT3D_PARTNER_LABEL,
   PRINT3D_PARTNER_URL_DEFAULT,
 } from "./print3d.const";
+import {
+  UpdatePrint3dJobItemDto,
+  UpdatePrint3dJobStatusDto,
+} from "./dto/print3d-ops.dto";
 
 /**
  * Yalnızca `http(s)://` ile başlayan bir değeri yayınla.
@@ -127,5 +135,117 @@ export class Print3dService {
     });
     if (!row) throw new NotFoundException("3D baskı işi bulunamadı");
     return row;
+  }
+
+  /**
+   * İzinli geçişler. `produced` ve `cancelled` TERMİNAL: bir işi "geri almak"
+   * üretim gerçeğini değiştirmez, yeni bir sipariş gerektirir.
+   */
+  private static readonly TRANSITIONS: Record<string, readonly string[]> = {
+    queued: ["in_production", "cancelled"],
+    in_production: ["produced", "cancelled"],
+    produced: [],
+    cancelled: [],
+  };
+
+  /**
+   * Kuyruk satırlarına kiracı adını ekler.
+   *
+   * `include: { tenant: … }` KULLANILAMAZ: Print3dJob'ta `tenantId` düz bir
+   * kolon, Tenant ilişkisi TANIMLI DEĞİL (InstallationRequest da aynı) —
+   * Prisma böyle bir include'u reddeder. Adlar ayrı bir sorguyla eşlenir.
+   */
+  private async withTenantNames<T extends { tenantId: string }>(rows: T[]) {
+    const ids = [...new Set(rows.map((r) => r.tenantId))];
+    const tenants = await this.prisma.tenant.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(tenants.map((t) => [t.id, t.name]));
+    return rows.map((r) => ({
+      ...r,
+      tenantName: nameById.get(r.tenantId) ?? null,
+    }));
+  }
+
+  async listQueue(filters: { status?: string; partner?: string } = {}) {
+    const rows = await this.prisma.print3dJob.findMany({
+      where: {
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.partner ? { partner: filters.partner } : {}),
+      },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+      include: { items: { orderBy: { position: "asc" } } },
+    });
+    return this.withTenantNames(rows);
+  }
+
+  async getJob(id: string) {
+    const row = await this.prisma.print3dJob.findUnique({
+      where: { id },
+      include: {
+        items: { orderBy: { position: "asc" } },
+        hwOrder: {
+          select: {
+            id: true,
+            status: true,
+            shippingAddress: true,
+            shipments: true,
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException("3D baskı işi bulunamadı");
+    return (await this.withTenantNames([row]))[0];
+  }
+
+  async updateStatus(id: string, dto: UpdatePrint3dJobStatusDto) {
+    const job = await this.prisma.print3dJob.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    if (!job) throw new NotFoundException("3D baskı işi bulunamadı");
+    const allowed = Print3dService.TRANSITIONS[job.status] ?? [];
+    if (!allowed.includes(dto.status)) {
+      throw new BadRequestException({
+        code: "PRINT3D_INVALID_TRANSITION",
+        from: job.status,
+        to: dto.status,
+        message: `'${job.status}' durumundan '${dto.status}' durumuna geçilemez.`,
+      });
+    }
+    return this.prisma.print3dJob.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        ...(dto.partnerRef !== undefined ? { partnerRef: dto.partnerRef } : {}),
+        ...(dto.opsNote !== undefined ? { opsNote: dto.opsNote } : {}),
+        ...(dto.status === "produced" ? { producedAt: new Date() } : {}),
+        ...(dto.status === "cancelled" ? { cancelledAt: new Date() } : {}),
+      },
+    });
+  }
+
+  async updateItem(
+    jobId: string,
+    itemId: string,
+    dto: UpdatePrint3dJobItemDto,
+  ) {
+    // Bileşik arama: bir itemId'nin BU işe ait olduğu doğrulanmadan
+    // güncellenmesi, operatörün yanlış siparişin kalemini "basıldı"
+    // işaretlemesine yol açardı.
+    const item = await this.prisma.print3dJobItem.findFirst({
+      where: { id: itemId, jobId },
+      select: { id: true },
+    });
+    if (!item) throw new NotFoundException("3D baskı kalemi bulunamadı");
+    return this.prisma.print3dJobItem.update({
+      where: { id: itemId },
+      data: {
+        status: dto.status,
+        ...(dto.opsNote !== undefined ? { opsNote: dto.opsNote } : {}),
+      },
+    });
   }
 }

@@ -146,3 +146,133 @@ describe("Print3dService — tenant reads", () => {
     );
   });
 });
+
+describe("Print3dService — production queue + transitions", () => {
+  let prisma: any;
+  let svc: Print3dService;
+  let updated: any;
+
+  const job = (status: string) => ({ id: "job-1", status, tenantId: "t-1" });
+
+  beforeEach(() => {
+    updated = null;
+    prisma = {
+      hardwareProduct: { findMany: jest.fn() },
+      // withTenantNames ayrı bir sorgu atıyor (Print3dJob'ta Tenant ilişkisi
+      // yok); mock'ta olmazsa listQueue "findMany of undefined" ile patlar.
+      tenant: { findMany: jest.fn().mockResolvedValue([]) },
+      print3dJob: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(async (args: any) => {
+          updated = args.data;
+          return { id: "job-1", ...args.data };
+        }),
+      },
+      print3dJobItem: {
+        findFirst: jest.fn().mockResolvedValue({ id: "item-1", jobId: "job-1" }),
+        update: jest.fn(async (args: any) => args.data),
+      },
+    };
+    svc = new Print3dService(prisma, { get: jest.fn() } as any);
+  });
+
+  it("allows queued -> in_production -> produced and refuses produced -> queued", async () => {
+    prisma.print3dJob.findUnique.mockResolvedValue(job("queued"));
+    await svc.updateStatus("job-1", { status: "in_production" });
+    expect(updated.status).toBe("in_production");
+
+    prisma.print3dJob.findUnique.mockResolvedValue(job("in_production"));
+    await svc.updateStatus("job-1", { status: "produced" });
+    expect(updated.status).toBe("produced");
+
+    prisma.print3dJob.findUnique.mockResolvedValue(job("produced"));
+    await expect(
+      svc.updateStatus("job-1", { status: "queued" }),
+    ).rejects.toMatchObject({
+      response: { code: "PRINT3D_INVALID_TRANSITION", from: "produced", to: "queued" },
+    });
+  });
+
+  it("allows cancelling from queued and in_production but not from produced", async () => {
+    for (const from of ["queued", "in_production"]) {
+      prisma.print3dJob.findUnique.mockResolvedValue(job(from));
+      await svc.updateStatus("job-1", { status: "cancelled" });
+      expect(updated.status).toBe("cancelled");
+    }
+    prisma.print3dJob.findUnique.mockResolvedValue(job("produced"));
+    await expect(
+      svc.updateStatus("job-1", { status: "cancelled" }),
+    ).rejects.toMatchObject({
+      response: { code: "PRINT3D_INVALID_TRANSITION" },
+    });
+  });
+
+  it("stamps producedAt / cancelledAt on the terminal transitions", async () => {
+    prisma.print3dJob.findUnique.mockResolvedValue(job("in_production"));
+    await svc.updateStatus("job-1", { status: "produced" });
+    expect(updated.producedAt).toBeInstanceOf(Date);
+    expect(updated.cancelledAt).toBeUndefined();
+
+    prisma.print3dJob.findUnique.mockResolvedValue(job("queued"));
+    await svc.updateStatus("job-1", { status: "cancelled", opsNote: "iptal" });
+    expect(updated.cancelledAt).toBeInstanceOf(Date);
+    expect(updated.opsNote).toBe("iptal");
+  });
+
+  it("throws NotFound for an unknown job id", async () => {
+    prisma.print3dJob.findUnique.mockResolvedValue(null);
+    await expect(
+      svc.updateStatus("nope", { status: "in_production" }),
+    ).rejects.toThrow("3D baskı işi bulunamadı");
+  });
+
+  it("listQueue filters by status and partner and spans every tenant", async () => {
+    await svc.listQueue({ status: "queued", partner: "figurunica" });
+    expect(prisma.print3dJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "queued", partner: "figurunica" },
+      }),
+    );
+  });
+
+  it("updateItem refuses an itemId that belongs to another job", async () => {
+    prisma.print3dJobItem.findFirst.mockResolvedValue(null);
+    await expect(
+      svc.updateItem("job-1", "item-of-another-job", { status: "printed" }),
+    ).rejects.toThrow("3D baskı kalemi bulunamadı");
+  });
+
+  it("refuses a repeated same-status transition instead of silently re-applying it", async () => {
+    // Bir operatörün çift-tıklaması ya da retry'ı AYNI durumu tekrar
+    // gönderebilir. TRANSITIONS haritasında self-loop yok — sessizce
+    // "başarılı" dönüp producedAt/cancelledAt'i yeniden damgalamak yerine
+    // reddedilmeli.
+    prisma.print3dJob.findUnique.mockResolvedValue(job("in_production"));
+    await expect(
+      svc.updateStatus("job-1", { status: "in_production" }),
+    ).rejects.toMatchObject({
+      response: {
+        code: "PRINT3D_INVALID_TRANSITION",
+        from: "in_production",
+        to: "in_production",
+      },
+    });
+    expect(prisma.print3dJob.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses any further transition once a job is in a terminal status", async () => {
+    for (const terminal of ["produced", "cancelled"]) {
+      for (const to of ["queued", "in_production", "produced", "cancelled"]) {
+        prisma.print3dJob.findUnique.mockResolvedValue(job(terminal));
+        await expect(
+          svc.updateStatus("job-1", { status: to as any }),
+        ).rejects.toMatchObject({
+          response: { code: "PRINT3D_INVALID_TRANSITION", from: terminal, to },
+        });
+      }
+    }
+    expect(prisma.print3dJob.update).not.toHaveBeenCalled();
+  });
+});
