@@ -339,10 +339,38 @@ model User {
   branchAssignments        UserBranchAssignment[]
   grantedBranchAssignments UserBranchAssignment[] @relation("UserBranchAssignmentGrantor")
 
+  // --- Kartlı vardiya (v3.6.8) ---
+  // The card UID is an identity-like identifier: it is NEVER stored in clear.
+  // What is stored is an HMAC-SHA256 under a pepper derived from
+  // ENCRYPTION_MASTER_KEY, with tenantId mixed into the input so the SAME
+  // physical card hashes differently in two tenants (no cross-tenant
+  // correlation). A bare sha256 would not do: a typical card UID carries 32
+  // bits of entropy and falls in seconds.
+  staffCardUidHash      String?
+  /// AES-256-GCM copy of the normalised UID (`encryptString`, "v2:" form,
+  /// AAD = "staffcard:v1:<tenantId>:<userId>"). It exists ONLY so an
+  /// ENCRYPTION_MASTER_KEY rotation can "decrypt → re-HMAC" (K22): without it
+  /// a rotation would kill every card in the field at once. Never read on the
+  /// tap path, never returned by any endpoint, never logged. TEXT because
+  /// encryptString returns one compact string.
+  staffCardUidEnc       String?
+  /// Hash scheme version. The rotation job finds rows on an old version.
+  staffCardHashVersion  Int       @default(1)
+  /// The ONLY display affordance for matching a physical card to a person.
+  staffCardLast4        String?
+  staffCardAssignedAt   DateTime?
+  staffCardAssignedById String?
+  staffCardAssignedBy   User?     @relation("StaffCardAssigner", fields: [staffCardAssignedById], references: [id], onDelete: SetNull)
+  staffCardAssignments  User[]    @relation("StaffCardAssigner")
+
   @@index([tenantId])
   @@index([tenantId, primaryBranchId])
   @@index([email])
   @@index([approvedById])
+  // NULLs are distinct in Postgres, so an unlimited number of card-less staff
+  // coexist; within one tenant two people cannot carry the same card.
+  @@unique([tenantId, staffCardUidHash])
+  @@index([staffCardAssignedById])
   @@map("users")
 }
 
@@ -3784,6 +3812,13 @@ model Attendance {
   isLate      Boolean @default(false)
   lateMinutes Int     @default(0)
   notes       String?
+
+  /// manual | card — which rail stamped this punch. Clock-in and clock-out can
+  /// come from different rails (tap in, clock out from the app), so they are
+  /// two columns rather than one. No new index: reports already narrow by
+  /// tenantId + branchId + date, and this column has cardinality 2.
+  clockInSource  String  @default("manual")
+  clockOutSource String?
 
   shiftAssignmentId String?
   shiftAssignment   ShiftAssignment? @relation(fields: [shiftAssignmentId], references: [id], onDelete: SetNull)
