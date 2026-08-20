@@ -8,6 +8,26 @@ import {
 import { RequestContext } from "../context/request-context";
 
 /**
+ * Pure code → profile fallback, shared by CountryService.forCode() (which
+ * adds the unknown-code warning log below) and the handful of call sites
+ * that cannot reach the DI container: class-validator `registerDecorator`
+ * validators run their `validate()` outside Nest's injector, and a couple of
+ * plain parsing helpers (menu import) are called from inside a request but
+ * are not themselves injectable. Both still need the tenant's ambient
+ * country, so they read RequestContext directly and resolve through this —
+ * never by indexing COUNTRY_PROFILES themselves — so there is exactly one
+ * implementation of "what a code resolves to" in the whole codebase.
+ */
+export function resolveCountryProfile(
+  code: string | null | undefined,
+): CountryProfile {
+  const profile = code
+    ? COUNTRY_PROFILES[code as keyof typeof COUNTRY_PROFILES]
+    : undefined;
+  return profile ?? COUNTRY_PROFILES[DEFAULT_COUNTRY];
+}
+
+/**
  * The one door to a country profile. Nothing else may index COUNTRY_PROFILES
  * directly — that keeps the fallback behaviour and the logging in one place.
  */

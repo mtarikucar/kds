@@ -3,6 +3,7 @@ import {
   mockPrismaClient,
   MockPrismaClient,
 } from "../../../common/test/prisma-mock.service";
+import { RequestContext } from "../../../common/context/request-context";
 
 jest.mock("axios");
 import axios from "axios";
@@ -135,6 +136,34 @@ describe("MenuImportService", () => {
       expect(draft.categories[0].products[0].taxRate).toBeUndefined();
     });
 
+    it("drops a Turkish-only taxRate (20) from the model's answer under a UZ tenant", async () => {
+      mockAnthropic(
+        JSON.stringify({
+          categories: [{ name: "X", products: [{ name: "Y", price: 30000, taxRate: 20 }] }],
+        }),
+      );
+      const draft = await RequestContext.run({ countryCode: "UZ" }, () =>
+        svc.parseMenuPhotos("t1", [
+          { buffer: Buffer.from("img"), mimetype: "image/webp" },
+        ]),
+      );
+      expect(draft.categories[0].products[0].taxRate).toBeUndefined();
+    });
+
+    it("ACCEPTS 12 (QQS) from the model's answer under a UZ tenant — impossible before", async () => {
+      mockAnthropic(
+        JSON.stringify({
+          categories: [{ name: "X", products: [{ name: "Y", price: 30000, taxRate: 12 }] }],
+        }),
+      );
+      const draft = await RequestContext.run({ countryCode: "UZ" }, () =>
+        svc.parseMenuPhotos("t1", [
+          { buffer: Buffer.from("img"), mimetype: "image/webp" },
+        ]),
+      );
+      expect(draft.categories[0].products[0].taxRate).toBe(12);
+    });
+
     it("throws a friendly error when no JSON object is present", async () => {
       mockAnthropic("Sorry, I could not read the image.");
       await expect(
@@ -169,9 +198,27 @@ describe("MenuImportService", () => {
       expect(summary.categoriesMatched).toBe(0);
       expect(summary.productsCreated).toBe(3);
       expect(summary.failures).toEqual([]);
-      // Product create defaults taxRate to 10 (fiscal correctness).
+      // Product create defaults taxRate to the AMBIENT country's
+      // defaultTaxRate (fiscal correctness) — no request context here, so
+      // it falls back to TR's default of 10, same as before this change.
       expect(products.create).toHaveBeenCalledWith(
         expect.objectContaining({ name: "Adana", taxRate: 10, categoryId: "cat-Ana Yemekler" }),
+        TENANT,
+      );
+    });
+
+    it("defaults an omitted taxRate to the UZ profile's own default (12), not Turkey's 10", async () => {
+      categories.create.mockImplementation(async ({ name }: any) => ({
+        id: `cat-${name}`,
+      }));
+      products.create.mockResolvedValue({ id: "p" });
+
+      await RequestContext.run({ countryCode: "UZ" }, () =>
+        svc.commitDraft(draft as any, TENANT),
+      );
+
+      expect(products.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Adana", taxRate: 12 }),
         TENANT,
       );
     });

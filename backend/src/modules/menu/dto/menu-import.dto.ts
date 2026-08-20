@@ -15,6 +15,8 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { IsCountryTaxRate } from "../../../common/country/country-tax-rate.validator";
+import { COUNTRY_PROFILES } from "../../../common/country/country-profile.const";
 
 /**
  * A single product parsed from a menu photo. Mirrors the fields
@@ -40,12 +42,16 @@ export class MenuImportProductDraftDto {
   @Max(10_000_000)
   price: number;
 
-  // KDV rate (0/1/10/20). Left optional; commit defaults it to 10 like
-  // ProductsService.create so the fiscal math stays correct.
-  @ApiProperty({ required: false, enum: [0, 1, 10, 20] })
+  // KDV/QQS rate, validated against the tenant's OWN country the same way
+  // CreateProductDto.taxRate is (@IsCountryTaxRate) — a CSV/XLSX or photo
+  // import for a UZ tenant can carry 12/6, not just TR's 0/1/10/20. Left
+  // optional; commit defaults it to the country's own defaultTaxRate like
+  // ProductsService.create so the fiscal math stays correct. The Swagger
+  // `enum` documents the TR default only, not the runtime constraint.
+  @ApiProperty({ required: false, enum: COUNTRY_PROFILES.TR.taxRates })
   @IsOptional()
   @IsInt()
-  @IsIn([0, 1, 10, 20])
+  @IsCountryTaxRate()
   taxRate?: number;
 
   /**

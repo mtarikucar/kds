@@ -1,9 +1,29 @@
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
-import { CountryService } from "./country.service";
+import { CountryService, resolveCountryProfile } from "./country.service";
 import { mockPrismaClient, MockPrismaClient } from "../test/prisma-mock.service";
 import { PrismaService } from "../../prisma/prisma.service";
+
+describe("resolveCountryProfile (non-DI pure resolver)", () => {
+  // Used by code that cannot reach the DI container — class-validator
+  // decorators and a couple of plain menu-import parsing helpers — and it
+  // MUST agree with CountryService.forCode()'s fallback behaviour, or a
+  // validator and the injectable service could disagree about which
+  // country a tenant is in.
+  it("resolves a known code", () => {
+    expect(resolveCountryProfile("UZ").currency).toBe("UZS");
+  });
+
+  it("falls back to TR for an unknown code", () => {
+    expect(resolveCountryProfile("XX").code).toBe("TR");
+  });
+
+  it("falls back to TR for undefined/null (outside any request)", () => {
+    expect(resolveCountryProfile(undefined).code).toBe("TR");
+    expect(resolveCountryProfile(null).code).toBe("TR");
+  });
+});
 
 describe("CountryService", () => {
   let prisma: MockPrismaClient;

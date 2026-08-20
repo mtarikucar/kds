@@ -124,4 +124,70 @@ describe("BillingService", () => {
       expect(data.voidedAt).toBeInstanceOf(Date);
     });
   });
+
+  /**
+   * Pins a DECISION, not a gap: this is HummyTummy's (a Turkish company)
+   * invoice TO the restaurant for its licence — platform billing — which is
+   * legally distinct from the restaurant's OWN tax on its diners
+   * (Product.taxRate / OrderItem.taxRate, which DOES vary by the
+   * restaurant's country — see country-tax-rate.validator.ts). Selling a
+   * Turkish SaaS licence cross-border is zero-rated for Turkish VAT, and
+   * certainly not the buyer's own country's VAT/QQS, which HummyTummy is
+   * not registered to collect or remit. This test exists so a future
+   * "multi-country" pass does not wire the customer's country into this
+   * invoice's tax the way it correctly was wired into product tax bands.
+   */
+  describe("createInvoice — platform billing tax is Turkey-only, never the customer's country", () => {
+    function makeTx() {
+      return {
+        invoiceCounter: {
+          upsert: jest.fn().mockResolvedValue({ scope: "202608", seq: 1 }),
+        },
+        invoice: {
+          create: jest.fn(({ data }: any) =>
+            Promise.resolve({ ...data, id: "inv-1" }),
+          ),
+        },
+        subscription: {
+          findUnique: jest.fn().mockResolvedValue({ tenant: { taxId: null } }),
+        },
+      } as any;
+    }
+
+    it("does NOT charge a non-TRY (e.g. a UZ tenant billed in USD) invoice the customer country's VAT/QQS", async () => {
+      const { svc } = makeService();
+      const tx = makeTx();
+
+      const invoice = await svc.createInvoice(
+        tx,
+        "sub-1",
+        null,
+        100,
+        "USD",
+        new Date("2026-08-01"),
+        new Date("2026-09-01"),
+      );
+
+      expect(new Prisma.Decimal(invoice.tax as any).toNumber()).toBe(0);
+      expect(new Prisma.Decimal(invoice.total as any).toNumber()).toBe(100);
+      expect(new Prisma.Decimal(invoice.subtotal as any).toNumber()).toBe(100);
+    });
+
+    it("still charges Turkish KDV on a TRY invoice — unchanged TR behaviour", async () => {
+      const { svc } = makeService();
+      const tx = makeTx();
+
+      const invoice = await svc.createInvoice(
+        tx,
+        "sub-2",
+        null,
+        120,
+        "TRY",
+        new Date("2026-08-01"),
+        new Date("2026-09-01"),
+      );
+
+      expect(new Prisma.Decimal(invoice.tax as any).toNumber()).toBeGreaterThan(0);
+    });
+  });
 });

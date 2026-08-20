@@ -1,4 +1,5 @@
 import { guessColumnMap, rowsToDraft, parsePrice } from "./menu-tabular-mapper";
+import { RequestContext } from "../../../common/context/request-context";
 
 describe("parsePrice", () => {
   it("reads Turkish decimal commas and thousands dots", () => {
@@ -66,5 +67,45 @@ describe("rowsToDraft", () => {
   it("skips rows with no name", () => {
     const d = rowsToDraft(headers, [["", "25", "X"], ["Ayran", "25", "X"]], map);
     expect(d.categories[0].products).toHaveLength(1);
+  });
+
+  describe("taxRate column is country-scoped", () => {
+    const headersWithTax = ["Ad", "Fiyat", "KDV"];
+    const mapWithTax = { name: "Ad", price: "Fiyat", taxRate: "KDV" };
+
+    it("keeps a Turkish band value (10) under a TR tenant", () => {
+      const d = RequestContext.run({ countryCode: "TR" }, () =>
+        rowsToDraft(headersWithTax, [["Ayran", "25", "10"]], mapWithTax),
+      );
+      expect(d.categories[0].products[0].taxRate).toBe(10);
+    });
+
+    it("drops a Turkish-only value (20) under a UZ tenant — not a valid QQS band", () => {
+      const d = RequestContext.run({ countryCode: "UZ" }, () =>
+        rowsToDraft(headersWithTax, [["Ayran", "25", "20"]], mapWithTax),
+      );
+      expect(d.categories[0].products[0].taxRate).toBeUndefined();
+    });
+
+    it("ACCEPTS 12 (QQS) from the sheet under a UZ tenant — impossible before", () => {
+      const d = RequestContext.run({ countryCode: "UZ" }, () =>
+        rowsToDraft(headersWithTax, [["Kabob", "30000", "12"]], mapWithTax),
+      );
+      expect(d.categories[0].products[0].taxRate).toBe(12);
+    });
+
+    it("accepts the UZ catering rate of 6", () => {
+      const d = RequestContext.run({ countryCode: "UZ" }, () =>
+        rowsToDraft(headersWithTax, [["Kabob", "30000", "6"]], mapWithTax),
+      );
+      expect(d.categories[0].products[0].taxRate).toBe(6);
+    });
+
+    it("falls back to the Turkish band outside any request context", () => {
+      const d = rowsToDraft(headersWithTax, [["Ayran", "25", "10"]], mapWithTax);
+      expect(d.categories[0].products[0].taxRate).toBe(10);
+      const d2 = rowsToDraft(headersWithTax, [["Ayran", "25", "12"]], mapWithTax);
+      expect(d2.categories[0].products[0].taxRate).toBeUndefined();
+    });
   });
 });

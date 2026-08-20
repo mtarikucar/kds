@@ -314,6 +314,17 @@ export class QuoteService {
     // every checkout/PayTR purchase versus the displayed price AND versus the
     // havale rail (which charges the stored price as gross).
     const grossLines = lines.reduce((acc, l) => acc + l.subtotalCents, 0);
+    // Deliberate, not a per-jurisdiction-VAT gap: this quotes HummyTummy's
+    // OWN sale to the restaurant (licence/add-on/hardware — see the
+    // CatalogService/AddOnCatalogService/LicensingService imports above),
+    // never the restaurant's sale to its diners. HummyTummy is a Turkish
+    // company; TR_KDV_RATE applies to TRY invoices, and a non-TRY
+    // (cross-border) sale is zero-rated for Turkish VAT — it is NOT the
+    // buyer's own country's VAT/QQS, which HummyTummy is not registered to
+    // collect or remit. Mirrors billing.service.ts's isTurkish branch;
+    // pinned by BillingService's "does NOT charge the customer country's
+    // VAT" test. The restaurant→diner tax rate DOES vary by country — see
+    // country-tax-rate.validator.ts — this one does not.
     const taxRate = currency === "TRY" ? TR_KDV_RATE : 0;
     const netCents =
       taxRate > 0 ? Math.round(grossLines / (1 + taxRate)) : grossLines;

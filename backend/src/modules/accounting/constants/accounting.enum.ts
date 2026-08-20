@@ -1,3 +1,15 @@
+import { COUNTRY_PROFILES } from "../../../common/country/country-profile.const";
+
+/**
+ * TR-ONLY named tax bands. These read nicely at existing TR-scoped call
+ * sites (invoice line items, receipts), but they are NOT the source of
+ * truth for which rates are legal, and they do NOT apply to a non-Turkish
+ * tenant. That source of truth is `COUNTRY_PROFILES.TR.taxRates` in
+ * backend/src/common/country/country-profile.const.ts — a UZ tenant's
+ * product tax band is validated against `COUNTRY_PROFILES.UZ.taxRates`
+ * (0/6/12) via `@IsCountryTaxRate`/`CountryService`, never against this
+ * enum. See country-tax-rate.validator.ts.
+ */
 export enum TaxRate {
   ZERO = 0,
   ONE = 1,
@@ -5,7 +17,9 @@ export enum TaxRate {
   TWENTY = 20,
 }
 
-export const DEFAULT_TAX_RATE = TaxRate.TEN;
+// Derived from the country profile rather than a second hardcoded 10 — one
+// source of truth for "Turkey's default VAT rate".
+export const DEFAULT_TAX_RATE = COUNTRY_PROFILES.TR.defaultTaxRate as TaxRate;
 
 export enum InvoiceStatus {
   DRAFT = "DRAFT",
