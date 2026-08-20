@@ -1,9 +1,10 @@
 import { EscPosBuilderService } from "./escpos-builder.service";
 import { EscPosBuilderRegistry } from "./escpos-builder.registry";
-import type {
-  ReceiptSnapshotV1,
-  KitchenTicketSnapshotV1,
-} from "../orders/services/receipt-snapshot.builder";
+import type { KitchenTicketSnapshotV1 } from "../orders/services/receipt-snapshot.builder";
+import {
+  TR_GOLDEN_RECEIPT_FIXTURE,
+  TR_GOLDEN_RECEIPT_BASE64,
+} from "./__fixtures__/tr-golden-receipt.fixture";
 
 /**
  * Spec for the cloud-side ESC/POS byte builder (the REAL impl behind the
@@ -19,47 +20,10 @@ import type {
  */
 describe("EscPosBuilderService", () => {
   // ── Fixtures ────────────────────────────────────────────────────────────
-  const receipt: ReceiptSnapshotV1 = {
-    version: 1,
-    restaurant: { name: "Çiğ Köfteci Ömer", currency: "TRY" },
-    order: {
-      id: "order-1",
-      orderNumber: "A-007",
-      type: "DINE_IN",
-      tableNumber: "5",
-      notes: null,
-    },
-    items: [
-      {
-        name: "Adana Kebap",
-        quantity: 2,
-        unitPrice: "30.00",
-        totalPrice: "60.00",
-        modifiers: ["Acılı"],
-        notes: null,
-      },
-      {
-        name: "Pide",
-        quantity: 1,
-        unitPrice: "40.00",
-        totalPrice: "40.00",
-        modifiers: [],
-        notes: "tuzsuz",
-      },
-    ],
-    totals: {
-      subtotal: "100.00",
-      tax: "18.00",
-      discount: "0.00",
-      total: "118.00",
-    },
-    payment: {
-      method: "CASH",
-      transactionId: null,
-      paidAt: "2026-04-27T10:30:00.000Z",
-    },
-    printedAt: "2026-04-27T10:30:00.000Z",
-  };
+  // Shared with tr-unchanged.spec.ts (Task 14) via TR_GOLDEN_RECEIPT_FIXTURE
+  // — see that fixture file's doc comment for why this is imported rather
+  // than redefined here.
+  const receipt = TR_GOLDEN_RECEIPT_FIXTURE;
 
   const kitchen: KitchenTicketSnapshotV1 = {
     version: 1,
@@ -290,8 +254,7 @@ describe("EscPosBuilderService", () => {
     // failure no unit test written AFTER the fact could catch. This one
     // can, because it was captured BEFORE.
     const GOLDEN = {
-      receipt:
-        "G0AbdBMbYQEbRQEdIRGAaacgS5RmdGVjaSCZbWVyCh0hABtFAEFEmFNZT04gLyBGmJ4KG2EALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCkZpnyBObyA6IEEtMDA3ClSBciAgICA6IE1hc2FkYQpNYXNhICAgOiA1ClRhcmloICA6IDI3LjA0LjIwMjYgMTM6MzAKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCjIgeCBBZGFuYSBLZWJhcCAgICAgICAgICAgICAgICAgICA2MCwwMCBUTAogICArIEFjjWyNCjEgeCBQaWRlICAgICAgICAgICAgICAgICAgICAgICAgICA0MCwwMCBUTAogICBub3Q6IHR1enN1egotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KQXJhIFRvcGxhbSAgICAgICAgICAgICAgICAgICAgICAgMTAwLDAwIFRMCktEViAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAxOCwwMCBUTAobRQEdIQFUT1BMQU0gICAgICAxMTgsMDAgVEwKHSEAG0UALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCplkZW1lICA6IE5ha2l0Ci0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQobYQFCaXppIHRlcmNpaCBldHRpp2luaXogaYdpbgp0ZZ9la2uBciBlZGVyaXouChthAAoKCh1WQgA=",
+      receipt: TR_GOLDEN_RECEIPT_BASE64,
       receiptWithOptions:
         "G0AbdBMbYQEbRQEdIRGAaacgS5RmdGVjaSCZbWVyCh0hABtFAEFEmFNZT04gLyBGmJ4KG2EALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCkZpnyBObyA6IEEtMDA3ClSBciAgICA6IE1hc2FkYQpNYXNhICAgOiA1ClRhcmloICA6IDI3LjA0LjIwMjYgMTM6MzAKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCjIgeCBBZGFuYSBLZWJhcCAgICAgICAgICAgICAgICAgICA2MCwwMCBUTAogICArIEFjjWyNCjEgeCBQaWRlICAgICAgICAgICAgICAgICAgICAgICAgICA0MCwwMCBUTAogICBub3Q6IHR1enN1egotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KQXJhIFRvcGxhbSAgICAgICAgICAgICAgICAgICAgICAgMTAwLDAwIFRMCktEViAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAxOCwwMCBUTAobRQEdIQFUT1BMQU0gICAgICAxMTgsMDAgVEwKHSEAG0UALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCplkZW1lICA6IE5ha2l0Ci0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQobYQFDdXN0b20gZm9vdGVyChthABtwABn6CgoKG2EBHShrBAAxQTIAHShrAwAxQwYdKGsDADFFMR0oax8AMVAwaHR0cHM6Ly92ZXJpZnkuZXhhbXBsZS9BLTAwNx0oawMAMVEwG2EAHVZCAA==",
       kitchen:
