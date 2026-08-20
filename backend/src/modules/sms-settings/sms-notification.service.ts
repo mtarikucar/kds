@@ -214,7 +214,12 @@ export class SmsNotificationService {
         }
       }
 
-      this.smsService.send(phone, message).catch(async (err) => {
+      // Task 11: this call runs inside a fire-and-forget .catch() and can
+      // be reached from non-request paths (order/reservation lifecycle
+      // events) — pass tenantId explicitly (already in scope) rather than
+      // depending on the ambient RequestContext surviving into this
+      // continuation.
+      this.smsService.send(phone, message, tenantId).catch(async (err) => {
         this.logger.error(
           `SMS send failed for ${maskPhone(phone)}: ${err.message}`,
         );

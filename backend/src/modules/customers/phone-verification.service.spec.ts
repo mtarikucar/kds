@@ -125,4 +125,28 @@ describe('PhoneVerificationService.sendOTP phone format gate (T5)', () => {
       svc.sendOTP('+905551234567', 'sess-1', 'tenant-1'),
     ).resolves.toBeDefined();
   });
+
+  // Task 11: sendOTP already has tenantId in scope — it must forward it to
+  // sendVerificationCode so SmsService can resolve THIS tenant's country
+  // SMS provider (NetGSM for TR, refused for UZ) rather than depending on
+  // an ambient RequestContext that may not carry the right tenant.
+  it('forwards tenantId to sendVerificationCode for per-tenant SMS provider routing', async () => {
+    const prisma = mockPrismaClient();
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue(null);
+    (prisma.phoneVerification.count as any).mockResolvedValue(0);
+    (prisma.phoneVerification.create as any).mockResolvedValue({ id: 'v-1' });
+    const sms: any = {
+      sendVerificationCode: jest.fn().mockResolvedValue(true),
+      isServiceEnabled: () => true,
+    };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await svc.sendOTP('+905551234567', 'sess-1', 'tenant-42');
+
+    expect(sms.sendVerificationCode).toHaveBeenCalledWith(
+      '+905551234567',
+      expect.any(String),
+      'tenant-42',
+    );
+  });
 });

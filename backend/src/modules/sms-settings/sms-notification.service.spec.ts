@@ -108,6 +108,22 @@ describe('SmsNotificationService', () => {
     expect(smsSettingsService.findByTenant).toHaveBeenCalledWith(tenantId);
   });
 
+  // Task 11: this call runs inside a fire-and-forget .catch() and is
+  // reachable from non-request paths (order/reservation lifecycle events),
+  // where SmsService can't rely on the ambient RequestContext to know which
+  // tenant's SMS provider to use. tenantId is already in scope here
+  // (sendIfEnabled's own parameter) — it must be forwarded explicitly
+  // rather than dropped.
+  it('forwards tenantId to smsService.send so per-tenant provider routing works outside a request', async () => {
+    await svc.notifyReservationCreated(tenantId, resData);
+
+    expect(smsService.send).toHaveBeenCalledWith(
+      resData.customerPhone,
+      expect.any(String),
+      tenantId,
+    );
+  });
+
   // --- FIRE-AND-FORGET / RESILIENCE --------------------------------------
 
   it('does not reject the caller when the underlying send() rejects (fire-and-forget)', async () => {

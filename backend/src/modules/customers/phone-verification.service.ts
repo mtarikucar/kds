@@ -127,7 +127,16 @@ export class PhoneVerificationService {
       },
     });
 
-    const smsSent = await this.smsService.sendVerificationCode(phone, code);
+    // Task 11: tenantId is already in scope here — pass it explicitly
+    // rather than relying on ambient RequestContext, so this resolves the
+    // correct per-tenant SMS provider even if this method is ever called
+    // from outside an HTTP request (queue/cron) where no ambient context
+    // exists.
+    const smsSent = await this.smsService.sendVerificationCode(
+      phone,
+      code,
+      tenantId,
+    );
     if (!smsSent && this.smsService.isServiceEnabled()) {
       this.logger.warn(`SMS delivery failed for ${maskPhone(phone)}`);
     }
