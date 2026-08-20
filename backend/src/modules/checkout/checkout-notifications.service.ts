@@ -78,7 +78,7 @@ export class CheckoutNotificationsService implements OnModuleInit {
   ): Promise<void> {
     const order = await this.prisma.hardwareOrder.findFirst({
       where: { id: payload.hardwareOrderId, tenantId: payload.tenantId },
-      include: { items: true },
+      include: { items: true, print3dJob: { include: { items: true } } },
     });
     if (!order) {
       this.logger.warn(
@@ -127,6 +127,21 @@ export class CheckoutNotificationsService implements OnModuleInit {
       qty: it.qty,
       lineTotal: fmt(it.unitCents * it.qty),
     }));
+
+    // v3.7.0 — yalnız-hizmet print3d siparişinde order.items BOŞ olur
+    // (hizmet satırları HardwareOrderItem üretmiyor), yani alıcı sıfır-olmayan
+    // toplamın yanında boş bir kalem tablosu görürdü. Sentetik tek satır.
+    //
+    // Genel "hizmet satırları e-postada görünmüyor" boşluğu ayrı bir iştir;
+    // burada yalnız print3d kapatılıyor.
+    const p3d = order.print3dJob;
+    if (p3d) {
+      items.push({
+        name: `3D baskı figür — ${p3d.itemCount} ürün (üretim ortağı: Figurunica)`,
+        qty: p3d.itemCount,
+        lineTotal: fmt(p3d.totalCents),
+      });
+    }
 
     // Pull the address out of the Json column. The shape isn't strict
     // (v2.8.84 lands the form) so render it conservatively — strings
