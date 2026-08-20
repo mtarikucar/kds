@@ -3,6 +3,40 @@ export enum DeliveryPlatform {
   GETIR = "GETIR",
   TRENDYOL = "TRENDYOL",
   MIGROS = "MIGROS",
+  /** Bağımsız teslimat platformu. Adaptörü YOK — availability ile kapalı. */
+  SEMT = "SEMT",
+}
+
+export type PlatformAvailability = "available" | "coming_soon";
+
+/**
+ * Whether a platform has a WORKING adapter. Every `coming_soon` platform is
+ * REFUSED on every write/execute path: being in the enum means "appears in the
+ * shop window", not "a config can be opened".
+ */
+export const PLATFORM_AVAILABILITY: Readonly<
+  Record<DeliveryPlatform, PlatformAvailability>
+> = Object.freeze({
+  [DeliveryPlatform.YEMEKSEPETI]: "available",
+  [DeliveryPlatform.GETIR]: "available",
+  [DeliveryPlatform.TRENDYOL]: "available",
+  [DeliveryPlatform.MIGROS]: "available",
+  [DeliveryPlatform.SEMT]: "coming_soon",
+});
+
+export const AVAILABLE_DELIVERY_PLATFORMS: readonly DeliveryPlatform[] =
+  Object.values(DeliveryPlatform).filter(
+    (p) => PLATFORM_AVAILABILITY[p] === "available",
+  );
+
+/**
+ * NOTE: returns false for an UNKNOWN string too (`undefined !== "available"`).
+ * That is deliberate, but callers must not confuse it with "coming soon" — the
+ * factory gate narrows with `platform in PLATFORM_AVAILABILITY` for exactly
+ * this reason.
+ */
+export function isPlatformAvailable(platform: string): boolean {
+  return PLATFORM_AVAILABILITY[platform as DeliveryPlatform] === "available";
 }
 
 export enum PlatformLogDirection {
