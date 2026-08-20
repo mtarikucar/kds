@@ -830,7 +830,7 @@ satırı bir tenant tarafından satın alınmışsa geri **alınmamalı**; tek d
 | # | Dizin | Sahibi |
 |---|---|---|
 | 0 | `20260820120000_reprice_licence_and_stock` | Change 0 — **ağaçta zaten var** (başka bir oturumun v3.6.7 işi) |
-| 1 | `20260820130000_delivery_platforms_bundle` | Change 1 — teslimat paketi |
+| 1 | `20260820140000_delivery_platforms_bundle` | Change 1 — teslimat paketi |
 | **2a** | **`20260820150000_card_shift_schema`** | **Change 2 — BU SPEC (§6.1)** |
 | **2b** | **`20260820160000_card_shift_catalog`** | **Change 2 — BU SPEC (§6.2)** |
 | 3 | `20260820170000_print3d_service` | Change 3 — 3D baskı hizmeti |
@@ -1114,7 +1114,7 @@ const introduced = parsed
 
 > **`FOLLOW_UP_SQL` ASLA indeksle okunmaz.** Yeni iddialar girdiyi **adıyla** bulur —
 > `FOLLOW_UP_SQL.find((p) => p.includes("card_shift_catalog"))` — çünkü araya sonradan girecek bir
-> dosya (teslimat paketi `20260820130000_delivery_platforms_bundle`, ya da ileride başka bir
+> dosya (teslimat paketi `20260820140000_delivery_platforms_bundle`, ya da ileride başka bir
 > katalog migration'ı) indeksli bir iddiayı sessizce başka dosyaya yöneltir ve test yalan
 > söylemeye başlar. **3D baskı bu diziye giriş EKLEMEZ** (satırları `hardware_products`'ta,
 > `marketplace_addons`'ta değil).

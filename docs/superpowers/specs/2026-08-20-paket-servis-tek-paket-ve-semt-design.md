@@ -439,8 +439,8 @@ SPA → `POST /v1/checkout/intent` → `QuoteService` (yetkili fiyat) → `Check
 - [ ] **B1.** `backend/src/modules/marketplace/alacarte-catalog.const.ts`
       — satır 364-412 map bloğu → tek `delivery_platforms` nesnesi (§4.1);
       `RETIRED_ADDON_CODES` (759-765) üç kodla genişler.
-- [ ] **B2.** `backend/prisma/migrations/20260820130000_delivery_platforms_bundle/migration.sql` **YENİ** (§6)
-- [ ] **B3.** `backend/prisma/migrations/20260820130000_delivery_platforms_bundle/down.sql` **YENİ** (§6)
+- [ ] **B2.** `backend/prisma/migrations/20260820140000_delivery_platforms_bundle/migration.sql` **YENİ** (§6)
+- [ ] **B3.** `backend/prisma/migrations/20260820140000_delivery_platforms_bundle/down.sql` **YENİ** (§6)
 - [ ] **B4.** `backend/src/modules/marketplace/alacarte-catalog-migration.spec.ts`
       — `FOLLOW_UP_SQL`'e (satır 42-44) yeni migration **timestamp sırasına
       GÖRE EKLENİR** (append değil, insert: dizi her zaman migration klasör
@@ -702,7 +702,7 @@ SPA → `POST /v1/checkout/intent` → `QuoteService` (yetkili fiyat) → `Check
 
 ## 6. Migration
 
-**Klasör:** `backend/prisma/migrations/20260820130000_delivery_platforms_bundle/`
+**Klasör:** `backend/prisma/migrations/20260820140000_delivery_platforms_bundle/`
 
 **Bu daldaki BAĞLAYICI migration zinciri.** `feat/multi-country-architecture`
 üzerinde dört değişiklik aynı anda migration yazıyor. Damgalar çakışmayacak
@@ -712,7 +712,7 @@ kendi başına seçilmez:
 | # | Klasör | Sahip |
 |---|---|---|
 | 0 | `20260820120000_reprice_licence_and_stock` | v3.6.7 yeniden fiyatlama (**ağaçta zaten var**, başka oturum) |
-| **1** | **`20260820130000_delivery_platforms_bundle`** | **BU DEĞİŞİKLİK** |
+| **1** | **`20260820140000_delivery_platforms_bundle`** | **BU DEĞİŞİKLİK** |
 | 2a | `20260820150000_card_shift_schema` | kartlı vardiya |
 | 2b | `20260820160000_card_shift_catalog` | kartlı vardiya |
 | 3 | `20260820170000_print3d_service` | 3D baskı |
@@ -835,18 +835,18 @@ SELECT gen_random_uuid()::text,
        'UPDATE',
        'MARKETPLACE_ADDON',
        m."id",
-       'migration:20260820130000_delivery_platforms_bundle',
+       'migration:20260820140000_delivery_platforms_bundle',
        'migration@system.local',
        jsonb_build_object('migratedPriorStatus', m."status"),
        jsonb_build_object('status', 'archived'),
-       jsonb_build_object('migration', '20260820130000_delivery_platforms_bundle',
+       jsonb_build_object('migration', '20260820140000_delivery_platforms_bundle',
                           'code', m."code"),
        NOW()
   FROM "marketplace_addons" m
  WHERE m."code" IN ('delivery_yemeksepeti', 'delivery_getir', 'delivery_trendyol_yemek')
    AND NOT EXISTS (
          SELECT 1 FROM "audit_logs" a
-          WHERE a."actorId" = 'migration:20260820130000_delivery_platforms_bundle'
+          WHERE a."actorId" = 'migration:20260820140000_delivery_platforms_bundle'
             AND a."entityId" = m."id"
        );
 
@@ -1024,7 +1024,7 @@ UPDATE "marketplace_addons" m
    SET "status" = a."previousData" ->> 'migratedPriorStatus',
        "updatedAt" = NOW()
   FROM "audit_logs" a
- WHERE a."actorId" = 'migration:20260820130000_delivery_platforms_bundle'
+ WHERE a."actorId" = 'migration:20260820140000_delivery_platforms_bundle'
    AND a."entityId" = m."id"
    AND m."code" IN ('delivery_yemeksepeti', 'delivery_getir', 'delivery_trendyol_yemek')
    AND (a."previousData" ->> 'migratedPriorStatus') IS NOT NULL
@@ -1035,7 +1035,7 @@ UPDATE "marketplace_addons" m
 --     bir "önceki statü" geri yazılır. Kapsam actorId ile bu migration'a çakılıdır;
 --     başka hiçbir audit satırına dokunulmaz. İkinci çalıştırmada 0 satır siler.
 DELETE FROM "audit_logs"
- WHERE "actorId" = 'migration:20260820130000_delivery_platforms_bundle';
+ WHERE "actorId" = 'migration:20260820140000_delivery_platforms_bundle';
 
 -- 4. Paket satırı silinir — ama ASLA bir satın almayı sahipsiz bırakmadan.
 --    (2. adım başarısız olduysa NOT EXISTS bu DELETE'i no-op yapar: fail-safe.)
@@ -1091,7 +1091,7 @@ Sonra sırayla, her adımda `psql` doğrulaması:
 | 6 | `psql -f migration.sql` (yeniden up) | 1. adımdaki duruma birebir döner |
 | 7 | Çift-satır koruması: kiracıya **hem** bir `delivery_platforms` `active` satırı **hem** bir `delivery_getir` `active` satırı ekle, up'ı çalıştır | Kiracıda **tam olarak bir** `active` paket satırı kalır; eski satır taşınmaz (`NOT EXISTS` koruması) — yenileme sepeti ₺2.499'u iki kez yazmaz. |
 | 8 | Yıl dönümü geçmiş döngü: `anniversaryAt = NOW() - INTERVAL '2 days'`, `status='open'`, `paymentRef IS NULL`, sepetinde `delivery_getir` olan bir `renewal_cycles` satırı ekle, up'ı çalıştır | Satır **hâlâ durur** (silinmemiş). Silinseydi ne fatura ne de `lapseUnpaidCycles` tetiklenirdi. |
-| 9 | Statü damgası sadakati (taze DB): `psql -c "UPDATE marketplace_addons SET status='archived' WHERE code='delivery_getir'"` → `psql -f migration.sql` → `psql -f down.sql` | `delivery_getir` **hâlâ `archived`** (up öncesi statüsüne döndü, `published` OLMADI); diğer iki kod `published`. Ardından `psql -c "SELECT count(*) FROM audit_logs WHERE \"actorId\"='migration:20260820130000_delivery_platforms_bundle'"` → **0** (damga temizlendi). down'ı ikinci kez çalıştır → 0 satır etkilenir. |
+| 9 | Statü damgası sadakati (taze DB): `psql -c "UPDATE marketplace_addons SET status='archived' WHERE code='delivery_getir'"` → `psql -f migration.sql` → `psql -f down.sql` | `delivery_getir` **hâlâ `archived`** (up öncesi statüsüne döndü, `published` OLMADI); diğer iki kod `published`. Ardından `psql -c "SELECT count(*) FROM audit_logs WHERE \"actorId\"='migration:20260820140000_delivery_platforms_bundle'"` → **0** (damga temizlendi). down'ı ikinci kez çalıştır → 0 satır etkilenir. |
 
 `docker rm -f mig-probe` ile temizle. **Bu tablonun tamamı yeşil olmadan
 migration "bitti" sayılmaz** (standing kullanıcı kuralı: her migration ve seed
@@ -1157,7 +1157,7 @@ katalogda **olmamalı**), `"carries copy in all five supported locales"`,
      // Her zaman migration klasör damgasına göre SIRALI. Ekleme yaparken
      // araya gir, sona atma: katlamada sonraki satır öncekini ezer.
      "20260820120000_reprice_licence_and_stock/migration.sql",
-     "20260820130000_delivery_platforms_bundle/migration.sql",
+     "20260820140000_delivery_platforms_bundle/migration.sql",
    ].map((rel) => join(__dirname, "../../../prisma/migrations", rel));
    ```
    Bu değişikliğin dosyalarına **asla indeksle** erişilmez (`FOLLOW_UP_SQL[1]`
@@ -1533,7 +1533,7 @@ Bağlayıcı kurallar:
 
 1. **Migration damgaları tahsis edildi** (§6 tablosu):
    `20260820120000_reprice_licence_and_stock` →
-   **`20260820130000_delivery_platforms_bundle`** →
+   **`20260820140000_delivery_platforms_bundle`** →
    `20260820150000_card_shift_schema` →
    `20260820160000_card_shift_catalog` →
    `20260820170000_print3d_service`.

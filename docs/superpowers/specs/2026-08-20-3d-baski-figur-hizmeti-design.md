@@ -1081,7 +1081,7 @@ temiz dönmeli.
 | Sıra | Dizin | Değişiklik |
 |---|---|---|
 | 1 | `20260820120000_reprice_licence_and_stock` | CHANGE 0 — ağaçta, başka bir oturumun işi (dokunulmaz) |
-| 2 | `20260820130000_delivery_platforms_bundle` | CHANGE 1 |
+| 2 | `20260820140000_delivery_platforms_bundle` | CHANGE 1 |
 | 3 | `20260820150000_card_shift_schema` | CHANGE 2a |
 | 4 | `20260820160000_card_shift_catalog` | CHANGE 2b |
 | 5 | **`20260820170000_print3d_service`** | **CHANGE 3 — BU BELGE** |
@@ -1323,7 +1323,10 @@ DROP TABLE IF EXISTS "print3d_jobs";
 
 ### Idempotans + gidiş-dönüş kanıt planı
 
-Tek seferlik atılabilir Postgres üzerinde (`docker run --rm -e POSTGRES_PASSWORD=x -p 55432:5432 postgres:16`),
+Tek seferlik atılabilir Postgres üzerinde
+(`docker run --rm -d --name print3d-migtest -e POSTGRES_PASSWORD=probe -p 55433:5432 postgres:16`),
+**55433** portunda — teslimat paketi değişikliğinin `mig-probe` konteyneri 55432'yi kullanıyor
+ve iki kanıt aynı anda koşabilmeli:
 `scripts/`'e **eklenmeyen** geçici bir kabuk oturumunda:
 
 1. `prisma migrate deploy` → up uygulanır.
