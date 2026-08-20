@@ -106,3 +106,43 @@ describe("sanitizePartnerUrl", () => {
     expect(sanitizePartnerUrl(undefined)).toBeNull();
   });
 });
+
+describe("Print3dService — tenant reads", () => {
+  let prisma: any;
+  let svc: Print3dService;
+
+  beforeEach(() => {
+    prisma = {
+      hardwareProduct: { findMany: jest.fn() },
+      print3dJob: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
+      print3dJobItem: { update: jest.fn(), findFirst: jest.fn() },
+    };
+    svc = new Print3dService(prisma, { get: jest.fn() } as any);
+  });
+
+  it("listMine is tenant-fenced", async () => {
+    await svc.listMine("t-1");
+    expect(prisma.print3dJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: "t-1" } }),
+    );
+  });
+
+  it("getMine uses a composite tenant+id WHERE, never a bare id lookup", async () => {
+    prisma.print3dJob.findFirst.mockResolvedValue({ id: "job-1", items: [] });
+    await svc.getMine("t-1", "job-1");
+    expect(prisma.print3dJob.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "job-1", tenantId: "t-1" } }),
+    );
+  });
+
+  it("getMine throws NotFound for another tenant's job", async () => {
+    prisma.print3dJob.findFirst.mockResolvedValue(null);
+    await expect(svc.getMine("t-1", "job-of-t2")).rejects.toThrow(
+      "3D baskı işi bulunamadı",
+    );
+  });
+});

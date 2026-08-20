@@ -55,3 +55,99 @@ describe('HardwareOrdersService', () => {
     await expect(svc.getMine('t1', 'missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+/**
+ * v3.7.0 — service rows (print3d) never produce HardwareOrderItem rows, so
+ * a paid ₺2.000 print3d order used to come back with `items: []` and a
+ * non-zero total: an empty line-item table for something the customer paid
+ * for. The fix is the `print3dJob` include added to both listMine and
+ * getMine — this suite proves the query actually asks for it, and that the
+ * block (with its items) survives the round trip to the caller.
+ */
+describe('HardwareOrdersService — print3d order reads (v3.7.0)', () => {
+  let prisma: {
+    hardwareOrder: { findMany: jest.Mock; findFirst: jest.Mock };
+  };
+  let svc: HardwareOrdersService;
+
+  // A paid print3d order exactly as Postgres would shape it once the
+  // print3dJob include is present: `items` (HardwareOrderItem) is empty —
+  // service-only cart, no hardware line — while print3dJob carries the two
+  // figures the customer actually bought.
+  const paidPrint3dOrder = {
+    id: 'ho-print3d-1',
+    tenantId: 't1',
+    status: 'paid',
+    totalCents: 200_000,
+    items: [], // no HardwareOrderItem rows — service-only cart
+    print3dJob: {
+      id: 'job-1',
+      status: 'queued',
+      itemCount: 2,
+      totalCents: 200_000,
+      partner: 'figurunica',
+      items: [
+        { productName: 'Adana Kebap', productImageUrl: '/img/adana.jpg', position: 0, status: 'pending' },
+        { productName: 'Silinmiş ürün', productImageUrl: null, position: 1, status: 'pending' },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    prisma = {
+      hardwareOrder: {
+        findMany: jest.fn().mockResolvedValue([paidPrint3dOrder]),
+        findFirst: jest.fn().mockResolvedValue(paidPrint3dOrder),
+      },
+    };
+    svc = new HardwareOrdersService(prisma as any);
+  });
+
+  it('listMine asks Prisma for the print3dJob block (id, status, itemCount, totalCents, partner, items)', async () => {
+    await svc.listMine('t1');
+    const include = prisma.hardwareOrder.findMany.mock.calls[0][0].include;
+    expect(include.print3dJob).toEqual(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          id: true,
+          status: true,
+          itemCount: true,
+          totalCents: true,
+          partner: true,
+          items: expect.objectContaining({
+            select: expect.objectContaining({
+              productName: true,
+              productImageUrl: true,
+              position: true,
+              status: true,
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('getMine asks Prisma for the print3dJob block', async () => {
+    await svc.getMine('t1', 'ho-print3d-1');
+    const include = prisma.hardwareOrder.findFirst.mock.calls[0][0].include;
+    expect(include.print3dJob).toBeDefined();
+    expect(include.print3dJob.select.items.select).toEqual(
+      expect.objectContaining({ productName: true }),
+    );
+  });
+
+  it('listMine surfaces a paid print3d order with its item lines, not an empty table', async () => {
+    const [order] = await svc.listMine('t1');
+    expect(order.items).toEqual([]); // the generic reader really is empty
+    expect(order.print3dJob).toBeDefined();
+    expect(order.print3dJob.items.length).toBeGreaterThan(0);
+    expect(order.print3dJob.items[0].productName).toBe('Adana Kebap');
+  });
+
+  it('getMine surfaces a paid print3d order with its item lines, not an empty table', async () => {
+    const order = await svc.getMine('t1', 'ho-print3d-1');
+    expect(order.items).toEqual([]);
+    expect(order.print3dJob.itemCount).toBe(2);
+    expect(order.print3dJob.items).toHaveLength(2);
+  });
+});

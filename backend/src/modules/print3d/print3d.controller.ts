@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
@@ -9,9 +9,10 @@ import { Print3dService } from "./print3d.service";
 /**
  * Kiracı yüzeyi.
  *
- * @SkipBranchScope YOK ve olmamalı: /v1/checkout de şube kapsamlı ve SPA zaten
- * X-Branch-Id gönderiyor. frontend/src/lib/api.ts'teki tenant-wide önek
- * listesine de ekleme YAPILMAZ.
+ * Şube kapsamı atlanmıyor ve atlanmamalı: /v1/checkout de şube kapsamlı ve
+ * SPA zaten X-Branch-Id gönderiyor. frontend/src/lib/api.ts'teki tenant-wide
+ * önek listesine de ekleme YAPILMAZ. (Bilinçli sapma: skip-branch-scope
+ * decorator'ı buraya konulmuyor.)
  */
 @ApiTags("Print3D")
 @ApiBearerAuth()
@@ -27,5 +28,17 @@ export class Print3dController {
   })
   offer() {
     return this.print3d.getOffer();
+  }
+
+  @Get("jobs")
+  @ApiOperation({ summary: "Kiracının 3D baskı işleri (kalem + kargo dahil)" })
+  listMine(@Req() req: any) {
+    return this.print3d.listMine(req.user.tenantId);
+  }
+
+  @Get("jobs/:id")
+  @ApiOperation({ summary: "Tek 3D baskı işi" })
+  getMine(@Req() req: any, @Param("id") id: string) {
+    return this.print3d.getMine(req.user.tenantId, id);
   }
 }

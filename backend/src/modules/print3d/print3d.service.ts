@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
@@ -78,5 +78,54 @@ export class Print3dService {
           PRINT3D_PARTNER_URL_DEFAULT,
       ),
     };
+  }
+
+  /**
+   * Kalem + sipariş + kargo, kiracı ekranının tek çağrıda ihtiyacı olan her şey.
+   * `hwOrder.shipments` burada: kargo durumu Shipment'ta yaşıyor, Print3dJob
+   * yalnızca ÜRETİMİ izliyor.
+   */
+  private readonly jobInclude = {
+    items: { orderBy: { position: "asc" as const } },
+    hwOrder: {
+      select: {
+        id: true,
+        status: true,
+        totalCents: true,
+        currency: true,
+        createdAt: true,
+        shippingAddress: true,
+        shipments: {
+          select: {
+            id: true,
+            carrier: true,
+            trackingNo: true,
+            status: true,
+            shippedAt: true,
+            deliveredAt: true,
+          },
+        },
+      },
+    },
+  };
+
+  async listMine(tenantId: string) {
+    return this.prisma.print3dJob.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: this.jobInclude,
+    });
+  }
+
+  async getMine(tenantId: string, id: string) {
+    // BİLEŞİK WHERE. `findUnique({ where: { id } })` + sonradan tenant kontrolü
+    // deseni bu repoda daha önce sızıntı üretti; çit sorgunun İÇİNDE olmalı.
+    const row = await this.prisma.print3dJob.findFirst({
+      where: { id, tenantId },
+      include: this.jobInclude,
+    });
+    if (!row) throw new NotFoundException("3D baskı işi bulunamadı");
+    return row;
   }
 }
