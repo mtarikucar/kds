@@ -88,12 +88,16 @@
     "renewalNote": "Yıl dönümünde yenileme: {{amount}}/yıl",
     "thenPerYear": "sonra {{annual}}/yıl",
     "licenceAuto": "otomatik eklendi",
+    "depAutoAddedNote": "gerekli — otomatik eklendi",
     "increase": "Adedi artır",
     "decrease": "Adedi azalt",
     "pay": "Öde",
     "reviewBill": "Adisyonu gör",
     "selectedCount": "{{count}} kalem seçildi",
     "maxReached": "Azami adet",
+    "blocked": {
+      "dependencyUnavailable": "Önce {{dep}} kalemi gerekiyor, ancak şu anda satın alınamıyor."
+    },
     "semt": {
       "title": "Semt (yakında)",
       "description": "Bağımsız teslimat platformu. Entegrasyon hazır olduğunda paket servis paketine ücretsiz dahil edilecek.",

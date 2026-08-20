@@ -159,14 +159,71 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
     !(LICENCE_CODE in picked) &&
     pickedLines.some((l) => l.product.requiresLicense);
 
+  // Codes that SATISFY a dependency: ACTIVE ownership only. purchase()'s dep
+  // check is ACTIVE-only (tenant-marketplace.service.ts:229-242), so treating
+  // a past_due parent as "owned" would leave the prerequisite off the bill and
+  // the whole cart would 409 at intent.
+  const activeOwnedCodes = useMemo(
+    () =>
+      new Set(
+        (snapshot?.owned ?? [])
+          .filter((o) => o.status === 'active')
+          .map((o) => o.code),
+      ),
+    [snapshot],
+  );
+
+  /** Transitively collect the prerequisites of every ticked line. */
+  const depAutoAdded = useMemo(() => {
+    const out = new Map<string, PricingProduct>();
+    const seen = new Set<string>();
+    const walk = (code: string) => {
+      if (seen.has(code)) return;
+      seen.add(code);
+      for (const dep of byCode.get(code)?.deps ?? []) {
+        if (activeOwnedCodes.has(dep) || dep in picked || out.has(dep)) {
+          walk(dep);
+          continue;
+        }
+        const depProduct = byCode.get(dep);
+        // Putting a line the server calls unpurchasable into the cart makes
+        // the server reject the ENTIRE cart. Such a row is shown blocked
+        // instead (see dependencyBlocked below) and never auto-added.
+        if (!depProduct || blockedReason(dep)) continue;
+        out.set(dep, depProduct);
+        walk(dep);
+      }
+    };
+    for (const code of Object.keys(picked)) walk(code);
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked, byCode, activeOwnedCodes, snapshot]);
+
+  /**
+   * The dependency this product needs but cannot get — neither actively owned
+   * nor purchasable. Returning the dep CODE (not a boolean) lets the row name
+   * it in the message.
+   */
+  const dependencyBlocked = (product: PricingProduct): string | null => {
+    for (const dep of product.deps ?? []) {
+      if (activeOwnedCodes.has(dep) || dep in picked) continue;
+      if (!byCode.has(dep) || blockedReason(dep)) return dep;
+    }
+    return null;
+  };
+
   const licenceProduct = byCode.get(LICENCE_CODE);
   const billLines = useMemo(() => {
     const lines = [...pickedLines];
+    // Reading order on the receipt: licence → parent module → what was ticked.
+    for (const product of [...depAutoAdded.values()].reverse()) {
+      lines.unshift({ product, qty: 1 });
+    }
     if (licenceAutoAdded && licenceProduct) {
       lines.unshift({ product: licenceProduct, qty: 1 });
     }
     return lines;
-  }, [pickedLines, licenceAutoAdded, licenceProduct]);
+  }, [pickedLines, depAutoAdded, licenceAutoAdded, licenceProduct]);
 
   const totalCents = billLines.reduce(
     (sum, l) => sum + unitCents(l.product) * l.qty,
@@ -258,6 +315,8 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                 // `LICENSE_REQUIRED` is not one of them here: the store adds
                 // the licence itself, so those stay tickable.
                 const isOwned = !!blocked && blocked !== 'LICENSE_REQUIRED';
+                const depBlocked = dependencyBlocked(product);
+                const unbuyable = isOwned || !!depBlocked;
                 const isLicenceAuto =
                   product.code === LICENCE_CODE && licenceAutoAdded;
                 const checked = product.code in picked || isLicenceAuto;
@@ -279,7 +338,7 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                   >
                     <label
                       className={`flex items-start gap-3 p-3 sm:p-4 ${
-                        isOwned || isLicenceAuto
+                        unbuyable || isLicenceAuto
                           ? 'cursor-default'
                           : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50'
                       }`}
@@ -288,8 +347,16 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                         type="checkbox"
                         className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-60"
                         checked={isOwned || checked}
-                        disabled={isOwned || isLicenceAuto}
-                        onChange={() => toggle(product)}
+                        disabled={unbuyable || isLicenceAuto}
+                        onChange={() => {
+                          // `disabled` stops a real click, but a dispatched
+                          // change event is not gated by the DOM the same
+                          // way — without this guard a line the server would
+                          // refuse (owned, max-quantity, or an unmet
+                          // dependency) could still be forced into the cart.
+                          if (unbuyable || isLicenceAuto) return;
+                          toggle(product);
+                        }}
                         aria-label={product.name}
                       />
 
@@ -317,6 +384,13 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                           <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                             {product.description}
                           </p>
+                        )}
+                        {depBlocked && (
+                          <span className="block text-xs text-amber-600 dark:text-amber-400">
+                            {t('licensing:store.blocked.dependencyUnavailable', {
+                              dep: byCode.get(depBlocked)?.name ?? depBlocked,
+                            })}
+                          </span>
                         )}
                         {checked && repeatable && !isOwned && (
                           <div
@@ -453,6 +527,11 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
                   {line.product.code === LICENCE_CODE && licenceAutoAdded && (
                     <span className="block text-xs text-amber-600 dark:text-amber-400">
                       {t('licensing:store.licenceAuto')}
+                    </span>
+                  )}
+                  {depAutoAdded.has(line.product.code) && (
+                    <span className="block text-xs text-amber-600 dark:text-amber-400">
+                      {t('licensing:store.depAutoAddedNote')}
                     </span>
                   )}
                 </span>

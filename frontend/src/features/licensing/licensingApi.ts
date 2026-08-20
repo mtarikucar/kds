@@ -120,6 +120,8 @@ export interface PricingProduct {
   creditKind: string | null;
   creditUnits: number | null;
   requiresLicense: boolean;
+  /** Catalog codes that must be owned (ACTIVE) or in the same cart. */
+  deps: string[];
   sortOrder: number;
 }
 

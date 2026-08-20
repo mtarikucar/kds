@@ -34,7 +34,7 @@ vi.mock('../../contexts/SubscriptionContext', () => ({
   useEntitlements: () => ({
     owned,
     license: { status: licenseStatus },
-    snapshot: { offers, purchasability },
+    snapshot: { offers, purchasability, owned },
     offerFor: () => null,
   }),
 }));
@@ -73,6 +73,7 @@ const product = (over: Partial<any> = {}) => ({
   creditUnits: null,
   requiresLicense: true,
   sortOrder: 0,
+  deps: [],
   ...over,
 });
 
@@ -400,5 +401,71 @@ describe('CatalogStore — arriving from an upsell', () => {
     };
     render(<CatalogStore focusCode="module_personnel" />);
     expect(within(bill()).getByText('licensing:store.billEmpty')).toBeInTheDocument();
+  });
+});
+
+describe('CatalogStore — module dependencies', () => {
+  const CARD = product({
+    code: 'module_personnel_card_shift',
+    name: 'Kartlı Vardiya',
+    kind: 'module',
+    billing: 'oneTime',
+    priceCents: 400_000,
+    deps: ['module_personnel'],
+  });
+
+  beforeEach(() => {
+    licenseStatus = 'active';
+    products = [LICENCE, product(), CARD];
+  });
+
+  it('adds the parent module to the bill when a dependent line is ticked', () => {
+    render(<CatalogStore />);
+    tick('Kartlı Vardiya');
+
+    // 4000 + 990
+    expect(within(bill()).getByText('Personel Yönetimi')).toBeInTheDocument();
+    expect(within(bill()).getByText('₺4.990,00')).toBeInTheDocument();
+  });
+
+  it('does not re-add a parent module the tenant already owns ACTIVELY', () => {
+    owned = [{ code: 'module_personnel', status: 'active' }];
+    render(<CatalogStore />);
+    tick('Kartlı Vardiya');
+
+    expect(within(bill()).queryByText('Personel Yönetimi')).not.toBeInTheDocument();
+  });
+
+  it('does NOT treat a past_due parent as satisfying the dependency', () => {
+    // purchase()'s dep check is ACTIVE-only (tenant-marketplace.service.ts:
+    // 229-242). Counting past_due as "owned" builds a cart the server refuses.
+    owned = [{ code: 'module_personnel', status: 'past_due' }];
+    render(<CatalogStore />);
+    tick('Kartlı Vardiya');
+
+    expect(within(bill()).getByText('Personel Yönetimi')).toBeInTheDocument();
+  });
+
+  it('blocks the dependent line when the parent is unpurchasable', () => {
+    // Nothing may build a basket the server will reject. If the parent cannot
+    // be bought AND is not actively owned, the child is not tickable.
+    purchasability = { module_personnel: { ok: false, reason: 'ADDON_ALREADY_GRANTED' } };
+    render(<CatalogStore />);
+    tick('Kartlı Vardiya');
+
+    expect(within(bill()).getByText('licensing:store.billEmpty')).toBeInTheDocument();
+    expect(
+      screen.getByText(/store\.blocked\.dependencyUnavailable/),
+    ).toBeInTheDocument();
+  });
+
+  it('does not double-add when the parent is ticked by hand', () => {
+    render(<CatalogStore />);
+    tick('Personel Yönetimi');
+    tick('Kartlı Vardiya');
+
+    fireEvent.click(screen.getByRole('button', { name: /store\.payTotal/ }));
+    const codes = purchaseAsync.mock.calls[0][0].items.map((i: any) => i.code);
+    expect(codes.filter((c: string) => c === 'module_personnel')).toHaveLength(1);
   });
 });

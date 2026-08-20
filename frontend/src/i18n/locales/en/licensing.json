@@ -88,12 +88,16 @@
     "renewalNote": "Renews at {{amount}}/year on your anniversary",
     "thenPerYear": "then {{annual}}/year",
     "licenceAuto": "added automatically",
+    "depAutoAddedNote": "required — added automatically",
     "increase": "Increase quantity",
     "decrease": "Decrease quantity",
     "pay": "Pay",
     "reviewBill": "Review bill",
     "selectedCount": "{{count}} selected",
     "maxReached": "Max reached",
+    "blocked": {
+      "dependencyUnavailable": "This needs {{dep}} first, but that item cannot be purchased right now."
+    },
     "semt": {
       "title": "Semt (coming soon)",
       "description": "The independent delivery platform. When the integration is ready it will be included in the delivery package free of charge.",

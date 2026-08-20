@@ -88,12 +88,16 @@
     "renewalNote": "Yillik sanada yangilanish: {{amount}}/yil",
     "thenPerYear": "keyin {{annual}}/yil",
     "licenceAuto": "avtomatik qo‘shildi",
+    "depAutoAddedNote": "kerak — avtomatik qo‘shildi",
     "increase": "Sonini oshirish",
     "decrease": "Sonini kamaytirish",
     "pay": "To‘lash",
     "reviewBill": "Hisobni ko‘rish",
     "selectedCount": "{{count}} ta tanlandi",
     "maxReached": "Maksimalga yetdi",
+    "blocked": {
+      "dependencyUnavailable": "Avval {{dep}} kerak, ammo hozir uni sotib bo‘lmaydi."
+    },
     "semt": {
       "title": "Semt (tez orada)",
       "description": "Mustaqil yetkazib berish platformasi. Integratsiya tayyor bo'lganda yetkazib berish paketiga bepul qo'shiladi.",

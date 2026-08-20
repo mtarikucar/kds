@@ -88,12 +88,16 @@
     "renewalNote": "التجديد في ذكراك السنوية: {{amount}}/سنة",
     "thenPerYear": "ثم {{annual}}/سنة",
     "licenceAuto": "أُضيف تلقائيًا",
+    "depAutoAddedNote": "مطلوب — أُضيف تلقائيًا",
     "increase": "زيادة الكمية",
     "decrease": "إنقاص الكمية",
     "pay": "ادفع",
     "reviewBill": "عرض الفاتورة",
     "selectedCount": "تم تحديد {{count}}",
     "maxReached": "بلغ الحد الأقصى",
+    "blocked": {
+      "dependencyUnavailable": "يتطلب هذا {{dep}} أولًا، لكن لا يمكن شراؤه الآن."
+    },
     "semt": {
       "title": "Semt (قريبًا)",
       "description": "منصة التوصيل المستقلة. عندما يصبح التكامل جاهزًا سيُضاف إلى باقة التوصيل مجانًا.",
