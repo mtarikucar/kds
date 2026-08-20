@@ -504,8 +504,8 @@
       "description": "Talablarga muvofiq hisob-faktura uchun soliq raqamingizni kiriting",
       "label": "Soliq raqami",
       "placeholder": "masalan: 1234567890",
-      "help": "10 xonali korporativ soliq raqami (Vergi No) yoki 11 xonali shaxsiy raqam (TC Kimlik No). KDV talablariga mos hisob-fakturalarda ishlatiladi.",
-      "formatError": "Soliq raqami 10 (Vergi No) yoki 11 (TC Kimlik) xonali bo'lishi kerak"
+      "help": "{{names}}. Hisob-fakturalaringizda ishlatiladi.",
+      "formatError": "{{names}} formatiga mos kelishi kerak"
     }
   },
   "requireServedForDineInPayment": {
@@ -672,7 +672,7 @@
     "refundType": "Qaytarish",
     "syncSuccess": "Hisob-faktura provayderga yuborildi",
     "syncNoop": "Sinxronlash bajarilmadi — e-hujjat provayderi ulanishi sozlanmagan yoki bu hujjat yuborishga yaroqsiz.",
-    "taxIdError": "Soliq raqami 10 (VKN) yoki 11 (TCKN) xonali bo'lishi kerak",
+    "taxIdError": "Soliq raqami {{names}} formatida bo'lishi kerak",
     "nextInvoiceNumber": "Keyingi hisob-faktura raqami",
     "nextInvoiceNumberDesc": "Keyingi hisob-fakturaga beriladigan tartib raqami",
     "nextInvoiceNumberError": "1 yoki undan katta butun son kiriting",
@@ -756,5 +756,13 @@
     "reservationRejectedDesc": "Rad etilganda email yuborish.",
     "reservationCancelled": "Bekor qilinganda",
     "reservationCancelledDesc": "Bekor qilinganda email yuborish."
+  },
+  "country": {
+    "taxId": {
+      "vkn": "VKN (turk soliq raqami)",
+      "tckn": "TCKN (turk ID raqami)",
+      "stir": "STIR (soliq raqami)",
+      "pinfl": "PINFL (shaxsiy ID raqami)"
+    }
   }
 }

@@ -14,15 +14,17 @@ import {
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { E164_PATTERN } from "../../../common/phone/e164.const";
+import { IsCountryTaxId } from "../../../common/country/tax-id.validator";
 
 /**
  * Overrides for the invoice being generated from an order. All optional —
  * each field falls back to the order's own value when absent.
  *
- * Caps are sized for Turkish e-fatura: customerTaxId is exactly 10 (legal
- * entity VKN) or 11 (individual TCKN) digits — anything else would be
- * rejected by Foriba/Parasut downstream. We validate format here so the
- * operator sees the error at write time, not after sync round-trip.
+ * customerTaxId is validated against the tenant's OWN country shape
+ * (@IsCountryTaxId — TR: 10-digit VKN / 11-digit TCKN; UZ: 9-digit STIR /
+ * 14-digit PINFL); anything else would be rejected by the e-document
+ * provider downstream (Foriba/Parasut for TR). We validate format here so
+ * the operator sees the error at write time, not after sync round-trip.
  */
 export class CreateSalesInvoiceDto {
   @ApiPropertyOptional()
@@ -37,13 +39,12 @@ export class CreateSalesInvoiceDto {
   customerName?: string;
 
   @ApiPropertyOptional({
-    description: "TR VKN (10 digits) or TCKN (11 digits)",
+    description:
+      "Country-scoped tax identifier — see CountryProfile.taxIdRules (TR: VKN/TCKN, UZ: STIR/PINFL)",
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{10}(\d)?$/, {
-    message: "customerTaxId must be 10 (VKN) or 11 (TCKN) digits",
-  })
+  @IsCountryTaxId()
   customerTaxId?: string;
 
   @ApiPropertyOptional()

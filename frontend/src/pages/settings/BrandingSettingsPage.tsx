@@ -7,6 +7,7 @@ import {
   useUpdateTenantSettings,
   SUPPORTED_CURRENCIES,
 } from '../../hooks/useCurrency';
+import { useCountryProfile, isValidTaxId, taxIdMaxLength } from '../../hooks/useCountryProfile';
 import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsGroup } from '../../components/settings/SettingsSection';
@@ -18,6 +19,9 @@ const BrandingSettingsPage = () => {
   const { t } = useTranslation('settings');
   const { data: tenantSettings, isLoading } = useGetTenantSettings();
   const { mutate: updateTenantSettings, isPending: isUpdating } = useUpdateTenantSettings();
+  const { taxIdRules } = useCountryProfile();
+  const taxIdNames = taxIdRules.map((r) => r.name).join(' / ');
+  const taxIdLabel = taxIdRules.map((r) => t(r.labelKey)).join(' / ');
 
   const [currency, setCurrency] = useState('TRY');
   const [currencyStatus, setCurrencyStatus] = useState<AutoSaveStatus>('idle');
@@ -29,10 +33,10 @@ const BrandingSettingsPage = () => {
 
   const handleSaveTaxId = () => {
     setTaxIdError(null);
-    // 10 hane (Vergi No) ya da 11 hane (TC Kimlik) — boş bırakmak silmek
-    // demek. Yanlış formatta kaydedilmesin diye yerelde de doğrula.
-    if (taxId && !/^\d{10,11}$/.test(taxId)) {
-      setTaxIdError(t('brandingSettings.taxId.formatError'));
+    // Şekil ülkeye bağlı (TR: VKN/TCKN, UZ: STIR/PINFL) — boş bırakmak
+    // silmek demek. Yanlış formatta kaydedilmesin diye yerelde de doğrula.
+    if (taxId && !isValidTaxId(taxId, taxIdRules)) {
+      setTaxIdError(t('brandingSettings.taxId.formatError', { names: taxIdNames }));
       return;
     }
     setTaxIdStatus('saving');
@@ -156,13 +160,12 @@ const BrandingSettingsPage = () => {
           <SettingsGroup>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">
-                {t('brandingSettings.taxId.label')}
+                {taxIdLabel}
               </span>
               <input
                 type="text"
                 inputMode="numeric"
-                pattern="\d{10,11}"
-                maxLength={11}
+                maxLength={taxIdMaxLength(taxIdRules)}
                 value={taxId}
                 onChange={(e) => {
                   setTaxId(e.target.value.replace(/\D/g, ''));
@@ -175,7 +178,7 @@ const BrandingSettingsPage = () => {
                 <p className="mt-1 text-sm text-red-600">{taxIdError}</p>
               )}
               <p className="mt-1 text-xs text-slate-500">
-                {t('brandingSettings.taxId.help')}
+                {t('brandingSettings.taxId.help', { names: taxIdNames })}
               </p>
             </label>
           </SettingsGroup>

@@ -289,8 +289,8 @@
       "description": "KDV uyumlu fatura için vergi kimlik numaranızı girin",
       "label": "Vergi No / TC Kimlik No",
       "placeholder": "Örn. 1234567890",
-      "help": "10 haneli Vergi No (kurumsal) veya 11 haneli TC Kimlik No (bireysel). Faturanız bu numarayla düzenlenir.",
-      "formatError": "Vergi No 10 hane, TC Kimlik No 11 hane olmalı"
+      "help": "{{names}}. Faturanız bu numarayla düzenlenir.",
+      "formatError": "{{names}} formatına uymalı"
     }
   },
   "twoStepCheckout": {
@@ -672,7 +672,7 @@
     "refundType": "İade",
     "syncSuccess": "Fatura sağlayıcıya gönderildi",
     "syncNoop": "Senkronizasyon yapılmadı — e-Belge sağlayıcı bağlantısı yok veya bu belge gönderime uygun değil.",
-    "taxIdError": "Vergi numarası 10 (VKN) veya 11 (TCKN) haneli olmalıdır",
+    "taxIdError": "Vergi numarası {{names}} formatında olmalı",
     "nextInvoiceNumber": "Sıradaki Fatura Numarası",
     "nextInvoiceNumberDesc": "Bir sonraki faturaya verilecek sıra numarası",
     "nextInvoiceNumberError": "1 veya daha büyük bir tam sayı girin",
@@ -756,5 +756,13 @@
     "reservationRejectedDesc": "Yönetici reddettiğinde müşteriye e-posta gönder.",
     "reservationCancelled": "İptal edildiğinde",
     "reservationCancelledDesc": "Rezervasyon iptal edildiğinde müşteriye e-posta gönder."
+  },
+  "country": {
+    "taxId": {
+      "vkn": "VKN (Vergi No)",
+      "tckn": "TCKN (TC Kimlik No)",
+      "stir": "STIR (Özbekistan Vergi No)",
+      "pinfl": "PINFL (Özbekistan Kimlik No)"
+    }
   }
 }

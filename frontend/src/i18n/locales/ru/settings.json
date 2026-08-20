@@ -504,8 +504,8 @@
       "description": "Введите ИНН для корректного оформления счетов",
       "label": "ИНН",
       "placeholder": "напр. 1234567890",
-      "help": "10-значный ИНН организации (Vergi No) или 11-значный личный идентификатор (TC Kimlik No). Используется в счетах с НДС (KDV).",
-      "formatError": "ИНН должен содержать 10 (Vergi No) или 11 (TC Kimlik) цифр"
+      "help": "{{names}}. Используется в счетах.",
+      "formatError": "Должен соответствовать формату {{names}}"
     }
   },
   "requireServedForDineInPayment": {
@@ -672,7 +672,7 @@
     "refundType": "Возврат",
     "syncSuccess": "Счёт отправлен провайдеру",
     "syncNoop": "Синхронизация не выполнена — подключение поставщика электронных документов не настроено, либо документ не подлежит отправке.",
-    "taxIdError": "Налоговый номер должен содержать 10 (VKN) или 11 (TCKN) цифр",
+    "taxIdError": "Налоговый номер должен соответствовать формату {{names}}",
     "nextInvoiceNumber": "Следующий номер счёта",
     "nextInvoiceNumberDesc": "Порядковый номер, который получит следующий счёт",
     "nextInvoiceNumberError": "Введите целое число не меньше 1",
@@ -756,5 +756,13 @@
     "reservationRejectedDesc": "Email при отклонении.",
     "reservationCancelled": "При отмене",
     "reservationCancelledDesc": "Email при отмене."
+  },
+  "country": {
+    "taxId": {
+      "vkn": "VKN (налоговый номер)",
+      "tckn": "TCKN (тур. ID)",
+      "stir": "STIR (узб. налоговый номер)",
+      "pinfl": "PINFL (узб. ID)"
+    }
   }
 }

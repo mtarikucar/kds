@@ -121,6 +121,14 @@ export class TenantsService {
       ...tenant,
       taxRates: profile.taxRates,
       defaultTaxRate: profile.defaultTaxRate,
+      // Serialized: RegExp doesn't survive JSON, so ship the pattern SOURCE
+      // string. The frontend reconstructs it with `new RegExp(pattern)` —
+      // see isValidTaxId() in frontend/src/hooks/useCountryProfile.ts.
+      taxIdRules: profile.taxIdRules.map((r) => ({
+        name: r.name,
+        pattern: r.pattern.source,
+        labelKey: r.labelKey,
+      })),
     };
   }
 

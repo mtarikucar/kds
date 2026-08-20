@@ -504,8 +504,8 @@
       "description": "أدخل الرقم الضريبي للحصول على فواتير متوافقة",
       "label": "الرقم الضريبي",
       "placeholder": "مثال: 1234567890",
-      "help": "رقم ضريبي للشركات مكوّن من 10 أرقام (Vergi No) أو رقم شخصي مكوّن من 11 رقماً (TC Kimlik No). يُستخدم في الفواتير المتوافقة مع KDV.",
-      "formatError": "يجب أن يتكون الرقم الضريبي من 10 أرقام (Vergi No) أو 11 رقماً (TC Kimlik)"
+      "help": "{{names}}. يُستخدم في فواتيرك.",
+      "formatError": "يجب أن يتطابق مع تنسيق {{names}}"
     }
   },
   "requireServedForDineInPayment": {
@@ -672,7 +672,7 @@
     "refundType": "مرتجع",
     "syncSuccess": "تم إرسال الفاتورة إلى المزوّد",
     "syncNoop": "لم تتم المزامنة — لا يوجد اتصال بمزوّد المستندات الإلكترونية أو أن هذا المستند غير قابل للإرسال.",
-    "taxIdError": "يجب أن يتكون الرقم الضريبي من 10 أرقام (VKN) أو 11 رقمًا (TCKN)",
+    "taxIdError": "يجب أن يتطابق الرقم الضريبي مع تنسيق {{names}}",
     "nextInvoiceNumber": "رقم الفاتورة التالي",
     "nextInvoiceNumberDesc": "الرقم التسلسلي الذي ستحصل عليه الفاتورة التالية",
     "nextInvoiceNumberError": "أدخل عددًا صحيحًا بقيمة 1 أو أكثر",
@@ -756,5 +756,13 @@
     "reservationRejectedDesc": "بريد عند الرفض.",
     "reservationCancelled": "عند الإلغاء",
     "reservationCancelledDesc": "بريد عند الإلغاء."
+  },
+  "country": {
+    "taxId": {
+      "vkn": "VKN (الرقم الضريبي التركي)",
+      "tckn": "TCKN (رقم الهوية التركي)",
+      "stir": "STIR (الرقم الضريبي الأوزبكي)",
+      "pinfl": "PINFL (رقم الهوية الأوزبكي)"
+    }
   }
 }

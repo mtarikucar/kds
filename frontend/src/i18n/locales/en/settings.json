@@ -289,8 +289,8 @@
       "description": "Enter your tax ID for compliant invoicing",
       "label": "Tax ID",
       "placeholder": "e.g. 1234567890",
-      "help": "10-digit corporate tax ID (Vergi No) or 11-digit personal ID (TC Kimlik No). Used on KDV-compliant invoices.",
-      "formatError": "Tax ID must be 10 (Vergi No) or 11 (TC Kimlik) digits"
+      "help": "{{names}}. Used on your invoices.",
+      "formatError": "Must match {{names}} format"
     }
   },
   "twoStepCheckout": {
@@ -672,7 +672,7 @@
     "refundType": "Refund",
     "syncSuccess": "Invoice sent to the provider",
     "syncNoop": "Nothing was synced — no e-document provider connection is set up, or this document is not eligible for transmission.",
-    "taxIdError": "Tax ID must be 10 (VKN) or 11 (TCKN) digits",
+    "taxIdError": "Tax ID must match {{names}} format",
     "nextInvoiceNumber": "Next Invoice Number",
     "nextInvoiceNumberDesc": "Sequence number assigned to the next invoice",
     "nextInvoiceNumberError": "Enter an integer of 1 or greater",
@@ -756,5 +756,13 @@
     "reservationRejectedDesc": "Email customer when admin rejects.",
     "reservationCancelled": "On cancelled",
     "reservationCancelledDesc": "Email customer when the reservation is cancelled."
+  },
+  "country": {
+    "taxId": {
+      "vkn": "VKN (Tax No.)",
+      "tckn": "TCKN (Turkish ID No.)",
+      "stir": "STIR (Uzbek Tax No.)",
+      "pinfl": "PINFL (Uzbek ID No.)"
+    }
   }
 }

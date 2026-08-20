@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Building2, Receipt, Plug } from 'lucide-react';
 import { useGetAccountingSettings, useUpdateAccountingSettings, useTestAccountingConnection, useAccountingSyncStatus } from '../../features/accounting/accountingApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useCountryProfile, isValidTaxId, taxIdMaxLength } from '../../hooks/useCountryProfile';
 import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
 import { SettingsToggle, SettingsSelect, SettingsInput } from '../../components/settings/SettingsToggle';
@@ -40,10 +41,6 @@ interface AccountingSettingsState {
   nilveraApiUrl: string;
   nilveraApiKey: string;
 }
-
-// TR VKN = exactly 10 digits (legal entity), TCKN = 11 digits (individual).
-// Mirrors the backend CreateSalesInvoiceDto customerTaxId validation.
-const TAX_ID_RE = /^\d{10,11}$/;
 
 // Copied verbatim from UpdateAccountingSettingsDto.nilveraApiUrl @Matches.
 // The backend deliberately has NO EmptyStringToUndefined on that field, so
@@ -89,6 +86,8 @@ export const AccountingSettingsPanel = () => {
   const { data: accountingSettings, isLoading } = useGetAccountingSettings();
   const { mutateAsync: updateSettings } = useUpdateAccountingSettings();
   const { mutateAsync: testConnection, isPending: isTesting } = useTestAccountingConnection();
+  const { taxIdRules } = useCountryProfile();
+  const taxIdNames = taxIdRules.map((r) => r.name).join(' / ');
 
   const [settings, setSettings] = useState<AccountingSettingsState>(defaultSettings);
 
@@ -105,10 +104,11 @@ export const AccountingSettingsPanel = () => {
           delete payload[field];
         }
       }
-      // Never persist a half-typed VKN/TCKN — the field autosaves per
-      // keystroke, so hold it back until it's empty (clearing is fine)
-      // or a valid 10/11-digit value.
-      if (payload.companyTaxId && !TAX_ID_RE.test(payload.companyTaxId)) {
+      // Never persist a half-typed tax id — the field autosaves per
+      // keystroke, so hold it back until it's empty (clearing is fine) or
+      // matches one of the tenant's OWN shapes (@IsCountryTaxId backend
+      // side — TR: VKN/TCKN, UZ: STIR/PINFL).
+      if (payload.companyTaxId && !isValidTaxId(payload.companyTaxId, taxIdRules)) {
         delete payload.companyTaxId;
       }
       // Backend requires an integer >= 1; skip transient invalid values
@@ -133,7 +133,7 @@ export const AccountingSettingsPanel = () => {
       }
       await updateSettings(payload);
     },
-    [updateSettings]
+    [updateSettings, taxIdRules]
   );
 
   const {
@@ -240,25 +240,27 @@ export const AccountingSettingsPanel = () => {
               onChange={(val) => handleChange('companyName', val)}
             />
             <SettingsDivider />
-            {/* VKN/TCKN — digits only, 10 (VKN) or 11 (TCKN); inline error
-                while incomplete (invalid values are held back from autosave). */}
+            {/* Digits only, country-scoped shape (TR: VKN/TCKN, UZ: STIR/PINFL);
+                inline error while incomplete (invalid values are held back
+                from autosave — see saveSettings above). */}
             <div className="flex items-start justify-between gap-4 py-3 px-1">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900">{t('accounting.companyTaxId')}</p>
-                {settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId) && (
-                  <p className="text-xs text-red-600 mt-0.5">{t('accounting.taxIdError')}</p>
+                {settings.companyTaxId !== '' && !isValidTaxId(settings.companyTaxId, taxIdRules) && (
+                  <p className="text-xs text-red-600 mt-0.5">
+                    {t('accounting.taxIdError', { names: taxIdNames })}
+                  </p>
                 )}
               </div>
               <input
                 type="text"
                 inputMode="numeric"
-                maxLength={11}
-                pattern="\d{10,11}"
+                maxLength={taxIdMaxLength(taxIdRules)}
                 value={settings.companyTaxId}
                 onChange={(e) => handleChange('companyTaxId', e.target.value.replace(/\D/g, ''))}
-                aria-invalid={settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId)}
+                aria-invalid={settings.companyTaxId !== '' && !isValidTaxId(settings.companyTaxId, taxIdRules)}
                 className={`flex-shrink-0 min-w-[140px] px-3 py-1.5 text-sm border rounded-lg bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
-                  settings.companyTaxId !== '' && !TAX_ID_RE.test(settings.companyTaxId)
+                  settings.companyTaxId !== '' && !isValidTaxId(settings.companyTaxId, taxIdRules)
                     ? 'border-red-400'
                     : 'border-slate-300'
                 }`}

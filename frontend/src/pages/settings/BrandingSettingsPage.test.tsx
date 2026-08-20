@@ -59,6 +59,11 @@ vi.mock('../../components/settings/SettingsToggle', () => ({
 
 import BrandingSettingsPage from './BrandingSettingsPage';
 
+const UZ_TAX_ID_RULES = [
+  { name: 'STIR', pattern: '^\\d{9}$', labelKey: 'country.taxId.stir' },
+  { name: 'PINFL', pattern: '^\\d{14}$', labelKey: 'country.taxId.pinfl' },
+];
+
 beforeEach(() => {
   h.tenant.data = { currency: 'TRY', taxId: '' };
   h.tenant.isLoading = false;
@@ -107,5 +112,63 @@ describe('BrandingSettingsPage', () => {
       { currency: 'TRY' },
       expect.any(Object),
     );
+  });
+
+  it('does not constrain the input with a fixed HTML pattern (validation is country-dependent)', () => {
+    render(<BrandingSettingsPage />);
+    const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+    expect(input).not.toHaveAttribute('pattern');
+  });
+
+  // UZ tenant: STIR(9)/PINFL(14), NOT the Turkish VKN(10)/TCKN(11) — before
+  // this task every one of these was rejected regardless of what was typed.
+  describe('under a UZ tenant', () => {
+    beforeEach(() => {
+      h.tenant.data = {
+        currency: 'TRY',
+        taxId: '',
+        countryCode: 'UZ',
+        taxIdRules: UZ_TAX_ID_RULES,
+      };
+    });
+
+    it('widens maxLength to fit the 14-digit PINFL instead of the TR-sized 11', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText(
+        'brandingSettings.taxId.placeholder',
+      ) as HTMLInputElement;
+      expect(input.maxLength).toBe(14);
+    });
+
+    it('rejects the Turkish 10-digit shape and does not call the mutation', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '1234567890' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(screen.getByText('brandingSettings.taxId.formatError')).toBeInTheDocument();
+      expect(h.update).not.toHaveBeenCalled();
+    });
+
+    it('ACCEPTS a 9-digit STIR', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '123456789' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(h.update).toHaveBeenCalledWith(
+        { taxId: '123456789' },
+        expect.any(Object),
+      );
+    });
+
+    it('ACCEPTS a 14-digit PINFL', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '12345678901234' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(h.update).toHaveBeenCalledWith(
+        { taxId: '12345678901234' },
+        expect.any(Object),
+      );
+    });
   });
 });

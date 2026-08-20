@@ -47,9 +47,13 @@ vi.mock('../../../features/orders/ordersApi', () => ({
   useOrders: () => h.ordersResult,
 }));
 // useFormatCurrencyExtended -> useCurrency -> react-query; stub the currency
-// hook so the panel renders without a QueryClientProvider.
+// hook so the panel renders without a QueryClientProvider. useGetTenantSettings
+// backs useCountryProfile() (CreateInvoiceFromOrderModal's customerTaxId is
+// country-scoped) — returning no data falls back to the TR profile, same
+// VKN(10)/TCKN(11) shape this file's assertions already assume.
 vi.mock('../../../hooks/useCurrency', () => ({
   useCurrency: () => 'TRY',
+  useGetTenantSettings: () => ({ data: undefined }),
 }));
 vi.mock('sonner', () => ({
   toast: {
@@ -147,7 +151,7 @@ describe('InvoicesPanel — create invoice from order (D1)', () => {
       .find((el) => el.getAttribute('inputmode') === 'numeric')!;
     await userEvent.type(taxInput, '12345');
     expect(
-      modal.getByText('Tax ID must be 10 (VKN) or 11 (TCKN) digits'),
+      modal.getByText('Tax ID must match VKN / TCKN format'),
     ).toBeInTheDocument();
 
     await userEvent.click(modal.getByRole('button', { name: 'Create Invoice' }));

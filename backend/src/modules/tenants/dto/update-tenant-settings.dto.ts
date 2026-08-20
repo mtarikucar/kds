@@ -19,6 +19,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from "class-validator";
+import { IsCountryTaxId } from "../../../common/country/tax-id.validator";
 
 /**
  * Custom validator that accepts only IANA-named timezones (e.g.
@@ -252,16 +253,13 @@ export class UpdateTenantSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      "Turkish tax identifier: 10-digit Vergi No (corporate) or 11-digit TC Kimlik No (individual). Surfaced on KDV-compliant invoices. Send `null` to clear.",
+      "Country-scoped tax identifier — shape depends on the tenant's country (TR: 10-digit VKN or 11-digit TCKN; UZ: 9-digit STIR or 14-digit PINFL). See CountryProfile.taxIdRules. Surfaced on KDV-compliant invoices. Send `null` to clear.",
     example: "1234567890",
-    maxLength: 11,
   })
   @EmptyStringToUndefined()
   @ValidateIf((o) => o.taxId !== null)
   @IsString()
   @IsOptional()
-  @Matches(/^\d{10,11}$/, {
-    message: "taxId must be 10 digits (Vergi No) or 11 digits (TC Kimlik No)",
-  })
+  @IsCountryTaxId()
   taxId?: string | null;
 }

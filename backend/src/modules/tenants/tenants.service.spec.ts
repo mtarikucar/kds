@@ -279,6 +279,37 @@ describe('TenantsService.findSettings / findAllPublic', () => {
     expect(settings.defaultTaxRate).toBe(10);
   });
 
+  /**
+   * The operator-typed tax-id field (Branding/Accounting settings, the
+   * manual-invoice modal) needs the tenant's ACTUAL shape rules to render
+   * the right label and to stop guessing a client-side pattern — see
+   * useCountryProfile() on the frontend. RegExp doesn't survive JSON, so
+   * this ships the pattern SOURCE string, not a RegExp instance.
+   */
+  it("findSettings adds taxIdRules serialized (pattern as a source string) from the TR profile", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxIdRules).toEqual([
+      { name: 'VKN', pattern: '^\\d{10}$', labelKey: 'country.taxId.vkn' },
+      { name: 'TCKN', pattern: '^\\d{11}$', labelKey: 'country.taxId.tckn' },
+    ]);
+  });
+
+  it("findSettings adds the UZ tenant's OWN taxIdRules (STIR/PINFL), not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxIdRules).toEqual([
+      { name: 'STIR', pattern: '^\\d{9}$', labelKey: 'country.taxId.stir' },
+      { name: 'PINFL', pattern: '^\\d{14}$', labelKey: 'country.taxId.pinfl' },
+    ]);
+  });
+
   it('findAllPublic only returns ACTIVE tenants ordered by name', async () => {
     (prisma.tenant.findMany as any).mockResolvedValue([]);
     await svc.findAllPublic();

@@ -11,8 +11,7 @@ import type { SalesInvoice } from '../../../features/accounting/types';
 import { getApiErrorMessage } from '../../../lib/api-error';
 import { useFormatCurrency } from '../../../hooks/useFormatCurrency';
 import { useFormatDate } from '../../../hooks/useFormatDate';
-
-const TAX_ID_RE = /^\d{10,11}$/;
+import { useCountryProfile, isValidTaxId, taxIdMaxLength } from '../../../hooks/useCountryProfile';
 
 interface Props {
   onClose: () => void;
@@ -21,9 +20,10 @@ interface Props {
 
 /**
  * D1 — manual fatura issuance for a PAID order. Two-part flow inside one
- * modal: pick the paid order, optionally fill the buyer's VKN/TCKN + vergi
- * dairesi + unvan (everything CreateSalesInvoiceDto accepts for identity),
- * confirm. The parent invalidates + highlights the new invoice.
+ * modal: pick the paid order, optionally fill the buyer's tax id (country-
+ * scoped — VKN/TCKN for TR, STIR/PINFL for UZ) + vergi dairesi + unvan
+ * (everything CreateSalesInvoiceDto accepts for identity), confirm. The
+ * parent invalidates + highlights the new invoice.
  */
 export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Props) {
   const { t } = useTranslation('settings');
@@ -33,13 +33,14 @@ export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Prop
   // Recent PAID orders — the only ones the backend will invoice.
   const { data: orders, isLoading, isError } = useOrders({ status: 'PAID', limit: 50 });
   const createInvoice = useCreateInvoiceFromOrder();
+  const { taxIdRules } = useCountryProfile();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerTaxId, setCustomerTaxId] = useState('');
   const [customerTaxOffice, setCustomerTaxOffice] = useState('');
 
-  const taxIdInvalid = customerTaxId !== '' && !TAX_ID_RE.test(customerTaxId);
+  const taxIdInvalid = customerTaxId !== '' && !isValidTaxId(customerTaxId, taxIdRules);
 
   const handleSubmit = async () => {
     if (!selectedOrderId || taxIdInvalid) return;
@@ -134,13 +135,13 @@ export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Prop
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                {t('accounting.createInvoiceModal.customerTaxId')}
+                {taxIdRules.map((r) => t(r.labelKey)).join(' / ')}
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={customerTaxId}
-                maxLength={11}
+                maxLength={taxIdMaxLength(taxIdRules)}
                 onChange={(e) => setCustomerTaxId(e.target.value.replace(/\D/g, ''))}
                 aria-invalid={taxIdInvalid}
                 className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
@@ -150,7 +151,11 @@ export default function CreateInvoiceFromOrderModal({ onClose, onCreated }: Prop
                 }`}
               />
               {taxIdInvalid && (
-                <p className="mt-1 text-xs text-red-600">{t('accounting.taxIdError')}</p>
+                <p className="mt-1 text-xs text-red-600">
+                  {t('accounting.taxIdError', {
+                    names: taxIdRules.map((r) => r.name).join(' / '),
+                  })}
+                </p>
               )}
             </div>
             <div>

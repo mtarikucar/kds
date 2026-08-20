@@ -1,6 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 
+/**
+ * One country-scoped tax-id shape, mirrored from CountryProfile.taxIdRules
+ * — see backend/src/common/country/country-profile.const.ts. `pattern` is
+ * the RegExp SOURCE string: JSON can't carry a RegExp instance, so the
+ * backend ships `.source` and the frontend reconstructs it with
+ * `new RegExp(pattern)` — see isValidTaxId() below / in useCountryProfile.ts.
+ */
+export interface TaxIdRuleView {
+  name: string;
+  pattern: string;
+  labelKey: string;
+}
+
 export interface TenantSettings {
   id: string;
   name: string;
@@ -26,8 +39,9 @@ export interface TenantSettings {
   socialTiktok?: string;
   socialYoutube?: string;
   socialWhatsapp?: string;
-  /** Turkish tax identifier (Vergi No / TC Kimlik No) — required for
-   *  KDV-compliant invoices. */
+  /** Country-scoped tax identifier — VKN/TCKN for TR, STIR/PINFL for UZ.
+   *  Shape is validated against `taxIdRules` below, not a fixed pattern.
+   *  Required for KDV-compliant (or country-equivalent) invoices. */
   taxId?: string;
   /** DERIVED from the country profile (backend/src/modules/tenants/tenants.service.ts),
    *  never a stored column — the tenant's OWN allowed tax band, e.g. TR's
@@ -35,6 +49,9 @@ export interface TenantSettings {
   taxRates?: number[];
   /** DERIVED — the country profile's own default rate (TR: 10, UZ: 12). */
   defaultTaxRate?: number;
+  /** DERIVED — the tenant's OWN tax-id shapes (TR: VKN/TCKN, UZ: STIR/PINFL).
+   *  See useCountryProfile(). */
+  taxIdRules?: TaxIdRuleView[];
 }
 
 export interface UpdateTenantSettingsDto {

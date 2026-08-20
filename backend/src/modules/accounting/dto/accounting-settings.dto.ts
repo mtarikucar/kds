@@ -13,6 +13,7 @@ import {
   EmptyStringToUndefined,
   StringToBoolean,
 } from "../../../common/dto/transforms";
+import { IsCountryTaxId } from "../../../common/country/tax-id.validator";
 
 export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional()
@@ -22,19 +23,18 @@ export class UpdateAccountingSettingsDto {
   autoGenerateInvoice?: boolean;
 
   @ApiPropertyOptional() @IsString() @IsOptional() companyName?: string;
-  // A7: same VKN/TCKN shape rule as CreateSalesInvoiceDto.customerTaxId — a
-  // malformed seller tax id would ride the sellerTaxId snapshot into every
-  // issued document and only surface as a GİB rejection after sync.
+  // A7: same country-scoped shape rule as CreateSalesInvoiceDto.customerTaxId
+  // — a malformed seller tax id would ride the sellerTaxId snapshot into
+  // every issued document and only surface as a GİB rejection after sync.
   // EmptyStringToUndefined lets a form clear the field ("" → skip validation).
   @ApiPropertyOptional({
-    description: "TR VKN (10 digits) or TCKN (11 digits)",
+    description:
+      "Country-scoped tax identifier — see CountryProfile.taxIdRules (TR: VKN/TCKN, UZ: STIR/PINFL)",
   })
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
-  @Matches(/^\d{10}(\d)?$/, {
-    message: "companyTaxId must be 10 (VKN) or 11 (TCKN) digits",
-  })
+  @IsCountryTaxId()
   companyTaxId?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyTaxOffice?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyAddress?: string;
