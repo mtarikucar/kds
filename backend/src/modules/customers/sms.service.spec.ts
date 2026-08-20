@@ -75,6 +75,45 @@ describe("SmsService", () => {
       );
     });
 
+    it("still throws when DEPLOYMENT_COUNTRIES is unset (default TR) and no provider is registered — today's behaviour", () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_MOCK_SMS_IN_PROD;
+      delete process.env.DEPLOYMENT_COUNTRIES;
+      const registry = new SmsProviderRegistry(); // empty
+      const svc = new SmsService(makeConfig({}), registry, {} as CountryCapabilityResolver);
+
+      expect(() => svc.onApplicationBootstrap()).toThrow(
+        /SMS provider not configured in production/,
+      );
+    });
+
+    it("does NOT throw when DEPLOYMENT_COUNTRIES=UZ and no provider is registered — UZ names no SMS provider at all (Task 12)", () => {
+      // UZ's country profile has smsProviderId: null — no UZ tenant can
+      // ever reach mock (CountryCapabilityResolver.smsProviderIdFor throws
+      // first, per its own class comment). Demanding NetGSM/Twilio
+      // credentials from a deployment that structurally cannot use them is
+      // the SMS sibling of the PayTR bug Task 12 fixes.
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_MOCK_SMS_IN_PROD;
+      process.env.DEPLOYMENT_COUNTRIES = "UZ";
+      const registry = new SmsProviderRegistry(); // empty
+      const svc = new SmsService(makeConfig({}), registry, {} as CountryCapabilityResolver);
+
+      expect(() => svc.onApplicationBootstrap()).not.toThrow();
+    });
+
+    it("still throws when DEPLOYMENT_COUNTRIES=TR,UZ and no provider is registered — TR still needs one", () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.ALLOW_MOCK_SMS_IN_PROD;
+      process.env.DEPLOYMENT_COUNTRIES = "TR,UZ";
+      const registry = new SmsProviderRegistry(); // empty
+      const svc = new SmsService(makeConfig({}), registry, {} as CountryCapabilityResolver);
+
+      expect(() => svc.onApplicationBootstrap()).toThrow(
+        /SMS provider not configured in production/,
+      );
+    });
+
     it("allows mockMode in production with the explicit escape hatch", () => {
       process.env.NODE_ENV = "production";
       process.env.ALLOW_MOCK_SMS_IN_PROD = "true";
@@ -94,11 +133,12 @@ describe("SmsService", () => {
     });
 
     it("does NOT refuse in production when at least one provider is registered, even if it isn't the one every tenant needs", () => {
-      // The process-wide boot check is deliberately coarse (Task 12 will add
-      // country-aware boot validation) — "something is configured" is
-      // enough to boot; a specific tenant needing an unregistered provider
-      // is a send-time failure, not a boot-time one. See the "config typo"
-      // describe block below.
+      // The process-wide boot check is deliberately coarse — "something is
+      // configured" is enough to boot; a specific tenant needing an
+      // unregistered provider is a send-time failure, not a boot-time one.
+      // See the "config typo" describe block below. (Task 12's
+      // DEPLOYMENT_COUNTRIES gate, tested above, only relaxes the OTHER
+      // branch — an EMPTY registry — it never makes this branch stricter.)
       process.env.NODE_ENV = "production";
       delete process.env.ALLOW_MOCK_SMS_IN_PROD;
       const registry = new SmsProviderRegistry();

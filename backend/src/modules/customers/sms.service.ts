@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { SmsProvider, SmsSendResult } from "../sms-core/sms-provider.interface";
 import { SmsProviderRegistry } from "../sms-core/sms-provider.registry";
 import { CountryCapabilityResolver } from "../../common/country/country-capability.resolver";
+import { resolveDeploymentCountries } from "../../common/country/deployment-countries";
 import { RequestContext } from "../../common/context/request-context";
 import { maskPhone } from "../../common/helpers/pii-mask.helper";
 
@@ -83,15 +84,34 @@ export class SmsService implements OnApplicationBootstrap {
    * escape hatch for the rare "we genuinely want to silence outbound SMS in
    * prod" case (e.g. a dry-run window).
    *
-   * Deliberately process-wide, not country-aware: "at least one provider is
-   * registered somewhere" is enough to boot even though a SPECIFIC tenant
-   * might still hit the send-time "provider named but not registered"
-   * throw above. Task 12 adds a DEPLOYMENT_COUNTRIES env var that will make
-   * this check country-aware; this method does not anticipate its shape,
-   * only leaves room for it.
+   * "At least one provider is registered somewhere" is enough to boot even
+   * though a SPECIFIC tenant might still hit the send-time "provider named
+   * but not registered" throw above — this check exists only to keep the
+   * argumentless/no-tenant fallback path (resolveDefaultProviderId(), see
+   * class comment) out of mock in production, not to guarantee every
+   * country's provider is present.
+   *
+   * Task 12: gated on DEPLOYMENT_COUNTRIES actually naming an SMS provider
+   * for at least one served country. A deployment whose countries ALL have
+   * `smsProviderId: null` (UZ today) has no tenant that can ever reach
+   * mock — CountryCapabilityResolver.smsProviderIdFor() throws before
+   * send() gets anywhere near the mock branch, for every current and
+   * future UZ tenant — so demanding NetGSM/Twilio credentials from a
+   * UZ-only deployment would just be this task's PayTR bug's SMS sibling.
+   * DEPLOYMENT_COUNTRIES defaults to "TR", and TR names "netgsm", so this
+   * gate is a no-op for every deployment that existed before Task 12.
    */
   onApplicationBootstrap(): void {
     if (this.smsRegistry.list().length > 0) return;
+
+    const deployment = resolveDeploymentCountries();
+    if (deployment.smsProviderIds.size === 0) {
+      this.logger.log(
+        "No served country (DEPLOYMENT_COUNTRIES) names an SMS provider — " +
+          "skipping the mock-SMS production guard; no tenant here can reach it.",
+      );
+      return;
+    }
 
     if (
       process.env.NODE_ENV === "production" &&
