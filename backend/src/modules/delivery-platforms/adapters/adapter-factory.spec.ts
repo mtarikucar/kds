@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from "@nestjs/common";
 import { DeliveryPlatform } from "../constants/platform.enum";
 import { AdapterFactory } from "./adapter-factory";
 import { GetirAdapter } from "./getir.adapter";
@@ -56,5 +57,19 @@ describe("AdapterFactory", () => {
     expect(() => factory.getAdapter("")).toThrow(
       "Unknown delivery platform: ",
     );
+  });
+
+  it("fails closed for a coming-soon platform (no adapter exists)", () => {
+    // Adding SEMT to the enum opened POST /delivery-platforms/configs to it
+    // via @IsEnum; without this gate order-polling.scheduler.ts:102 would call
+    // getAdapter("SEMT") on every tick and raise a bare Error -> HTTP 500.
+    expect(() => factory.getAdapter("SEMT")).toThrow(ServiceUnavailableException);
+  });
+
+  it("still throws for a genuinely unknown platform", () => {
+    // The gate must be narrowed by `platform in PLATFORM_AVAILABILITY`. Written
+    // unconditionally it would swallow typos into a 503 "coming soon", which is
+    // a lie, and would break the two DOORDASH/"" specs above.
+    expect(() => factory.getAdapter("NOPE")).toThrow(/Unknown delivery platform/);
   });
 });
