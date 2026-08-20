@@ -90,13 +90,14 @@ describe("COUNTRY_PROFILES", () => {
   });
 
   it("CountryProfileCode narrows to the real keys, not to string", () => {
-    // Guards the `satisfies` form. With a Record<string, …> annotation this
-    // compiles, and every downstream task loses compile-time safety.
+    // NOTE: the real proof is the `_CountryCodeIsNarrow` type in
+    // country-profile.const.ts, NOT this test. tsconfig.json excludes
+    // `**/*.spec.ts`, so a `@ts-expect-error` written here is never
+    // typechecked — an earlier version of this test carried one and passed
+    // happily against the broken `Record<string, …>` annotation.
+    // This runtime half only pins the key set.
     const codes: CountryProfileCode[] = ["TR", "UZ"];
-    // @ts-expect-error "XX" is not a country we have a profile for
-    const bad: CountryProfileCode = "XX";
-    expect(codes).toHaveLength(2);
-    expect(bad).toBe("XX");
+    expect(Object.keys(COUNTRY_PROFILES).sort()).toEqual(codes.sort());
   });
 
   it("every profile's locale fields are populated", () => {

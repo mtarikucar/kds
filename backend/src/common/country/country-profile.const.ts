@@ -147,3 +147,22 @@ export const DEFAULT_COUNTRY = "TR";
  * `CountryCode`s in the same codebase is a foot-gun for Task 5.
  */
 export type CountryProfileCode = keyof typeof COUNTRY_PROFILES;
+
+/**
+ * Compile-time proof that the key type actually narrowed.
+ *
+ * This lives HERE, in the source file, and not in the spec — tsconfig.json
+ * excludes `**\/*.spec.ts`, so a `@ts-expect-error` written in a test is
+ * never typechecked and proves nothing. (Verified: reverting `satisfies` to
+ * a `Record<string, CountryProfile>` annotation left both jest and
+ * `tsc -p tsconfig.json` green.)
+ *
+ * If COUNTRY_PROFILES ever regains that annotation, CountryProfileCode
+ * widens to `string`, `string extends "TR" | "UZ"` becomes false, and this
+ * line stops compiling — which is the whole point.
+ */
+type AssertExtends<Bound, T extends Bound> = T;
+export type _CountryCodeIsNarrow = AssertExtends<
+  "TR" | "UZ",
+  CountryProfileCode
+>;
