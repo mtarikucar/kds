@@ -21,6 +21,14 @@ export interface RequestContextStore {
   tenantId?: string;
   branchId?: string;
   userId?: string;
+  /**
+   * ISO-3166-1 alpha-2 for the tenant in flight. Typed here so
+   * CountryService.ambient() compiles; nothing populates it yet — that is
+   * Task 3's job (wiring it from the resolved tenant, mirroring how
+   * tenantId/branchId/userId are set today). Until then this is always
+   * undefined and ambient() resolves to the default profile.
+   */
+  countryCode?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContextStore>();

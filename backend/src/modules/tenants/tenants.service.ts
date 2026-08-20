@@ -20,6 +20,9 @@ const SETTINGS_SELECT = {
   name: true,
   subdomain: true,
   currency: true,
+  // Task 7's frontend currency formatter resolves the country profile from
+  // this — currency alone can't tell it the display-decimals rule.
+  countryCode: true,
   closingTime: true,
   timezone: true,
   reportEmailEnabled: true,

@@ -6,6 +6,9 @@ export interface TenantSettings {
   name: string;
   subdomain?: string | null;
   currency: string;
+  /** ISO-3166-1 alpha-2. Resolves the country profile (display decimals,
+   *  locale, etc.) — see backend/src/common/country/country-profile.const.ts. */
+  countryCode: string;
   closingTime?: string;
   timezone?: string;
   reportEmailEnabled?: boolean;

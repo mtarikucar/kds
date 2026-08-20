@@ -41,6 +41,12 @@ model Tenant {
   // on the post-social-login onboarding page.
   taxOffice String?
 
+  // ISO-3166-1 alpha-2. The single piece of country DATA — everything else
+  // (currency, tax bands, phone region, locale, providers) is derived from
+  // COUNTRY_PROFILES in code. Defaults to TR because every tenant that
+  // existed when this shipped was Turkish.
+  countryCode String @default("TR")
+
   // Currency settings
   currency String @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
 
