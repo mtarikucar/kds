@@ -93,7 +93,12 @@
     "pay": "Öde",
     "reviewBill": "Adisyonu gör",
     "selectedCount": "{{count}} kalem seçildi",
-    "maxReached": "Azami adet"
+    "maxReached": "Azami adet",
+    "semt": {
+      "title": "Semt (yakında)",
+      "description": "Bağımsız teslimat platformu. Entegrasyon hazır olduğunda paket servis paketine ücretsiz dahil edilecek.",
+      "badge": "Yakında · Ücretsiz"
+    }
   },
   "invoices": {
     "title": "Faturalar",

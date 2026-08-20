@@ -93,7 +93,12 @@
     "pay": "Pay",
     "reviewBill": "Review bill",
     "selectedCount": "{{count}} selected",
-    "maxReached": "Max reached"
+    "maxReached": "Max reached",
+    "semt": {
+      "title": "Semt (coming soon)",
+      "description": "The independent delivery platform. When the integration is ready it will be included in the delivery package free of charge.",
+      "badge": "Coming soon · Free"
+    }
   },
   "invoices": {
     "title": "Invoices",
