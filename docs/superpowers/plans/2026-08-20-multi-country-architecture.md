@@ -763,115 +763,148 @@ mümkün kılan tek mekanizma bu."
 
 ---
 
-## Task 4: Vergi — dört ayna tek kaynağa
+## Task 4: Ürün vergi bandı ülkeden — ve platform faturasına DOKUNMA
 
 **Files:**
-- Modify: `backend/src/modules/accounting/constants/accounting.enum.ts`
-- Modify: `backend/src/common/helpers/kdv.helper.ts`
-- Modify: `backend/src/modules/checkout/quote.service.ts:35,317`
-- Modify: `backend/src/modules/subscriptions/services/billing.service.ts:68-74`
 - Modify: `backend/src/modules/menu/dto/create-product.dto.ts:217-225`
-- Test: her dosyanın mevcut spec'i + yeni vakalar
+- Modify: `backend/src/modules/menu/dto/update-product.dto.ts` (aynı bant varsa)
+- Modify: `backend/src/modules/accounting/constants/accounting.enum.ts`
+- Create: `backend/src/common/country/country-tax-rate.validator.ts`
+- Test: `backend/src/modules/menu/dto/create-product.dto.spec.ts`
 
 **Interfaces:**
-- Consumes: `CountryService.ambient()`, `CountryService.forTenant()`
-- Produces: davranış değişikliği yok (TR), yeni yetenek (UZ)
+- Consumes: `CountryService.ambient()` (T2/T3)
+- Produces: `@IsCountryTaxRate()` decorator
 
-**Bu görevin özü:** dört ayrı yerde yazılı olan "vergi %20 ve yalnız TRY'de" kuralı profilden okunacak. Ürün DTO'sundaki `@IsIn([0,1,10,20])` ise **ambient profilin `taxRates`'ine** karşı doğrulayacak — Özbekistan'ın %12'si bugün sisteme hiç girilemiyor, bu tek başına blocker.
+### Planın ilk hâli yanlıştı — önce bunu oku
 
-- [ ] **Step 1: Write the failing tests**
+Bu görev başlangıçta "dört vergi aynasını tek kaynağa indir" diyordu ve `quote.service`, `kdv.helper`, `billing.service`'i de kapsıyordu. **Kod okununca bu kavramsal bir hata çıktı.** İki tamamen ayrı vergi var ve plan bunları birbirine karıştırmıştı:
+
+| | Kim kime | Hangi ülkenin kuralı | Nerede |
+|---|---|---|---|
+| **Restoran vergisi** | restoran → müşteri | **restoranın** ülkesi | `Product.taxRate` → `OrderItem.taxRate` |
+| **Platform faturası** | HummyTummy → restoran | **Türkiye** + sınır-ötesi hizmet kuralları | `quote.service`, `billing.service`, `kdv.helper` |
+
+`quote.service` `CatalogService`/`AddOnCatalogService`/`LicensingService` import ediyor, "licence anniversary"e göre orantılıyor ve donanım kargosu hesaplıyor — yani **platformun kendi satışı**. `billing.service` abonelik faturası kesiyor. İkisi de Türk bir şirketin müşterisine kestiği faturadır.
+
+**Karar: platform faturasına dokunulmayacak.**
+
+`billing.service:68`'deki `isTurkish ? splitGrossAmount(...) : tax 0` bir hata değil, bir **hukuki ayrım**. Özbek bir müşteri Türk bir SaaS lisansı satın aldığında bu sınır-ötesi hizmet ihracıdır; Türk KDV'si açısından tipik olarak istisna/sıfır oranlıdır ve **kesinlikle %12 QQS değildir**. Planın ilk hâli uygulansaydı HummyTummy, kayıtlı olmadığı ve iade edemeyeceği bir Özbek vergisini tahsil ediyor görünecekti — bu, düzeltmesi kod hatasından çok daha pahalı bir sorundur.
+
+Bu satırlar yerinde kalıyor. Yapılan tek şey, oradaki yorumun bunun bilinçli bir karar olduğunu söylemesi (bugün "per-jurisdiction VAT is out of scope" diyor, ki bu bir eksiklik gibi okunuyor; oysa doğru davranış bu).
+
+**Ayrıca `DEFAULT_TAX_RATE` bir ayna değilmiş:** `grep` gösteriyor ki yalnız kendi dosyasında kullanılıyor. "Dört ayna" diye bir şey yok.
+
+### Geriye kalan gerçek iş
+
+Restoranın vergisi zaten **veri**: operatör her ürüne `taxRate` giriyor, o `OrderItem`'a akıyor, `TaxCalculationService` doğru hesaplıyor. Özbekistan'ı engelleyen **tek** şey ürün girişindeki sabit bant.
+
+- [ ] **Step 1: Write the failing test**
 
 ```ts
-// create-product.dto.spec.ts (yeni dosya)
 import { validate } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { CreateProductDto } from "./create-product.dto";
 import { RequestContext } from "../../../common/context/request-context";
 
 const make = (taxRate: number) =>
-  plainToInstance(CreateProductDto, { name: "X", price: 10, categoryId: "c1", taxRate });
+  plainToInstance(CreateProductDto, {
+    name: "X",
+    price: 10,
+    categoryId: "c1",
+    taxRate,
+  });
 
-describe("CreateProductDto taxRate", () => {
-  it("accepts a Turkish band under a TR tenant", async () => {
-    await RequestContext.run({ countryCode: "TR" }, async () => {
-      expect((await validate(make(20))).length).toBe(0);
-    });
+const errorsFor = async (taxRate: number, countryCode: string) =>
+  RequestContext.run({ countryCode }, () => validate(make(taxRate)));
+
+describe("CreateProductDto taxRate is country-scoped", () => {
+  it("accepts every Turkish band under a TR tenant", async () => {
+    for (const r of [0, 1, 10, 20]) {
+      expect(await errorsFor(r, "TR")).toHaveLength(0);
+    }
   });
 
   it("rejects 12 under a TR tenant", async () => {
-    await RequestContext.run({ countryCode: "TR" }, async () => {
-      expect((await validate(make(12))).length).toBeGreaterThan(0);
-    });
+    expect((await errorsFor(12, "TR")).length).toBeGreaterThan(0);
   });
 
   it("ACCEPTS 12 under a UZ tenant — the QQS rate that was impossible before", async () => {
-    await RequestContext.run({ countryCode: "UZ" }, async () => {
-      expect((await validate(make(12))).length).toBe(0);
-    });
+    expect(await errorsFor(12, "UZ")).toHaveLength(0);
   });
 
-  it("rejects 20 under a UZ tenant", async () => {
-    await RequestContext.run({ countryCode: "UZ" }, async () => {
-      expect((await validate(make(20))).length).toBeGreaterThan(0);
-    });
+  it("accepts the UZ catering rate of 6", async () => {
+    expect(await errorsFor(6, "UZ")).toHaveLength(0);
+  });
+
+  it("rejects 20 under a UZ tenant — Turkey's rate is not Uzbekistan's", async () => {
+    expect((await errorsFor(20, "UZ")).length).toBeGreaterThan(0);
+  });
+
+  it("falls back to the Turkish bands outside any request", async () => {
+    // Cron, seeds, bootstrap. Must not start rejecting everything.
+    expect(await validate(make(20))).toHaveLength(0);
+    expect((await validate(make(12))).length).toBeGreaterThan(0);
   });
 });
 ```
 
-`quote.service.spec.ts`'e ekle:
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `npx jest src/modules/menu/dto/create-product.dto.spec.ts`
+Expected: FAIL — UZ vakaları düşer, çünkü bant bugün sabit `[0, 1, 10, 20]`
+
+- [ ] **Step 3: Implement the validator**
+
+`country-tax-rate.validator.ts`, ambient profilin `taxRates`'ine karşı doğrulayan bir `registerDecorator` sarmalayıcısı. Hata mesajı ülkenin kendi bantlarını saymalı ("izin verilen oranlar: 0, 6, 12"), yoksa Özbek operatör neden reddedildiğini anlayamaz.
+
+- [ ] **Step 4: Swap the DTO band and the default**
+
+`create-product.dto.ts:220-223`'te `enum: [0, 1, 10, 20]` (Swagger) ve `@IsIn([0, 1, 10, 20])` yerine `@IsCountryTaxRate()`. Varsayılan da profilin `defaultTaxRate`'i olur. `update-product.dto.ts`'te aynı bant varsa o da.
+
+`accounting.enum.ts`'te `TaxRate` enum'u **kalır** (TR bantlarının adlandırılmış hâli, hâlâ okunabilir) ama üstüne bir yorum: bunlar yalnız TR içindir ve doğruluk kaynağı `COUNTRY_PROFILES.TR.taxRates`'tir. `DEFAULT_TAX_RATE` profilden türetilir.
+
+- [ ] **Step 5: Pin the platform-billing decision in code**
+
+`billing.service.ts:64-74` ve `quote.service.ts:313-317`'deki yorumları, bunun bilinçli bir hukuki ayrım olduğunu söyleyecek şekilde güncelle — bir sonraki okuyucunun "eksik kalmış, ülkeye bağlayalım" diye düşünmemesi için. Kod değişmiyor.
+
+Ve bunu bir testle çivile:
 
 ```ts
-  it("taxes a UZ quote at 12%, not 0% — the old code zero-rated every non-TRY currency", async () => {
-    // ... quote with currency UZS under a UZ tenant ...
-    expect(quote.taxCents).toBeGreaterThan(0);
-  });
+it("platform billing does NOT charge the customer country's VAT", async () => {
+  // HummyTummy is a Turkish company. Invoicing an Uzbek tenant for a licence
+  // is a cross-border service export — zero-rated for Turkish VAT, and
+  // certainly not 12% QQS, which HummyTummy is not registered to collect and
+  // could not remit. This test exists so nobody "fixes" it later.
+  const invoice = await billing.issue({ tenantCountry: "UZ", currency: "USD", amount: 100 });
+  expect(invoice.tax.toNumber()).toBe(0);
+});
 ```
 
-`billing.service.spec.ts`'e ekle:
+- [ ] **Step 6: Verify**
 
-```ts
-  it("records tax for a non-TRY invoice — isTurkish used to zero it", async () => {
-    // ... invoice for a UZ tenant ...
-    expect(invoice.tax.toNumber()).toBeGreaterThan(0);
-  });
-```
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/modules/menu src/modules/checkout src/modules/subscriptions src/modules/accounting && npx tsc --noEmit -p tsconfig.json && npm run lint:ci`
+Expected: PASS — TR davranışı bit-aynı, UZ %12 ve %6 artık girilebilir
 
-- [ ] **Step 2: Run them and confirm they fail**
-
-Run: `cd /home/tarik/Projects/kds/backend && npx jest src/modules/menu/dto src/modules/checkout src/modules/subscriptions/services/billing.service.spec.ts`
-Expected: FAIL — 12 reddediliyor, non-TRY vergi 0
-
-- [ ] **Step 3: Replace the four mirrors**
-
-1. `accounting.enum.ts` — `TaxRate` enum'u **kalır** (mevcut kod ona referans veriyor) ama `DEFAULT_TAX_RATE` artık türetilir; enum'un üstüne bir yorum: bu bantlar yalnız TR içindir ve doğruluk kaynağı `COUNTRY_PROFILES.TR.taxRates`'tir. Bir invariant testi ikisinin aynı kaldığını pinler.
-2. `kdv.helper.ts:3` — `DEFAULT_KDV_RATE` kalır ama **yalnız geriye-uyum varsayılanı** olarak; `splitGrossAmount` çağıranları oranı açıkça geçirecek şekilde güncellenir.
-3. `quote.service.ts:317` — `const taxRate = currency === "TRY" ? TR_KDV_RATE : 0;` yerine profilin `defaultTaxRate`'i yüzdeye çevrilerek kullanılır. `TR_KDV_RATE` sabiti silinir.
-4. `billing.service.ts:68-74` — `isTurkish` dalı kalkar; her para biriminde profilin oranıyla `splitGrossAmount` çağrılır.
-5. `create-product.dto.ts:223` — `@IsIn([0, 1, 10, 20])` yerine ambient profilin `taxRates`'ine karşı doğrulayan özel bir validator (`@IsCountryTaxRate()`). Varsayılan da profilin `defaultTaxRate`'i olur.
-
-- [ ] **Step 4: Run the full menu + checkout + subscriptions suites**
-
-Run: `cd /home/tarik/Projects/kds/backend && npx jest src/modules/menu src/modules/checkout src/modules/subscriptions src/modules/accounting`
-Expected: PASS — TR davranışı bit-aynı, UZ yeni testleri yeşil
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add backend/src
-git commit -m "feat(country): vergi kuralı tek kaynaktan
+git commit -m "feat(country): ürün vergi bandı kiracının ülkesinden
 
-Aynı kural dört yerde yazılıydı: quote.service (TR_KDV_RATE + currency===TRY
-? rate : 0), kdv.helper (DEFAULT_KDV_RATE), billing.service (isTurkish →
-non-TRY hiç vergi kaydetmiyordu) ve accounting.enum (TaxRate bandı). Hepsi
-profilden okuyor.
+@IsIn([0,1,10,20]) Özbekistan'ın %12 QQS'ini ve %6 ikram oranını sisteme
+girmeyi tümden imkansız kılıyordu. Artık ambient profilin bantlarına karşı
+doğrulanıyor; hata mesajı da ülkenin kendi oranlarını sayıyor.
 
-Ürün girişindeki @IsIn([0,1,10,20]) ambient profilin bantlarına karşı
-doğruluyor — Özbekistan'ın %12 QQS'i bugüne dek sisteme HİÇ girilemiyordu.
-
-TR davranışı bit-aynı; bunu pinleyen testler eklendi."
+PLATFORM FATURASINA DOKUNULMADI ve bu bilinçli. billing.service ile
+quote.service, HummyTummy'nin (Türk şirket) restorana kestiği faturadır —
+restoranın müşterisine kestiği değil. Özbek bir müşteriye lisans satmak
+sınır-ötesi hizmet ihracıdır; Türk KDV'si açısından sıfır oranlıdır ve
+%12 QQS değildir. Müşterinin ülke oranını uygulamak, HummyTummy'yi kayıtlı
+olmadığı ve iade edemeyeceği bir vergiyi tahsil eder duruma sokardı.
+Oradaki yorumlar artık bunun bir eksiklik değil karar olduğunu söylüyor,
+ve bir test kararı çiviliyor."
 ```
-
----
 
 ## Task 5: Telefon — 18 regex + 21 "TR" tek kurala
 
