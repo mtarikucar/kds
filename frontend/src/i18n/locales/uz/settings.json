@@ -298,8 +298,9 @@
   },
   "currencySettings": {
     "title": "Valyuta sozlamalari",
-    "selectCurrency": "Valyutani tanlang",
-    "description": "Restoraningizda narxlarni ko'rsatish uchun valyutani tanlang"
+    "description": "Valyutangiz biznesingiz mamlakatiga qarab avtomatik belgilanadi",
+    "currentCurrency": "Joriy valyuta",
+    "derivedFromCountry": "Valyuta mamlakatingizga qarab avtomatik belgilanadi va uni o'zgartirib bo'lmaydi."
   },
   "reportSettings": {
     "title": "Hisobot sozlamalari",

@@ -33,6 +33,12 @@ vi.mock('react-i18next', () => ({
     i18n: { language: 'tr' },
   }),
 }));
+// Step4's <PhoneInput> no longer hardcodes defaultCountry="TR" — it now
+// resolves the default from useCountryProfile() (Task 7), which needs a
+// QueryClient this suite doesn't set up. Mock at the hook boundary instead.
+vi.mock('../../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 
 // Capture the live form so tests can read form values written by the unit.
 let formRef: UseFormReturn<ReservationFormValues>;

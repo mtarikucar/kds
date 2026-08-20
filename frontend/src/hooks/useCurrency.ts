@@ -49,6 +49,9 @@ export interface TenantSettings {
   taxRates?: number[];
   /** DERIVED — the country profile's own default rate (TR: 10, UZ: 12). */
   defaultTaxRate?: number;
+  /** DERIVED — DISPLAY decimals only (TR: 2, UZ: 0 — so'm is quoted whole).
+   *  Storage stays x100 for every currency, always. See useCountryProfile(). */
+  displayDecimals?: number;
   /** DERIVED — the tenant's OWN tax-id shapes (TR: VKN/TCKN, UZ: STIR/PINFL).
    *  See useCountryProfile(). */
   taxIdRules?: TaxIdRuleView[];
@@ -56,7 +59,9 @@ export interface TenantSettings {
 
 export interface UpdateTenantSettingsDto {
   subdomain?: string | null;
-  currency?: string;
+  // No `currency` field — it is DERIVED from the tenant's country and is
+  // no longer user-writable (backend's UpdateTenantSettingsDto dropped it
+  // in Task 7 of the multi-country work; see useCountryProfile()).
   closingTime?: string;
   timezone?: string;
   reportEmailEnabled?: boolean;

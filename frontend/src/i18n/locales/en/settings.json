@@ -319,8 +319,9 @@
   },
   "currencySettings": {
     "title": "Currency Settings",
-    "selectCurrency": "Select Currency",
-    "description": "Choose the currency for displaying prices in your restaurant"
+    "description": "Your currency is automatically determined by your business's country",
+    "currentCurrency": "Current Currency",
+    "derivedFromCountry": "Currency is automatically determined by your country and cannot be changed."
   },
   "reportSettings": {
     "title": "Report Settings",

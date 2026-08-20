@@ -1,8 +1,18 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+
+const countryCodeRef = { value: 'TR' };
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: countryCodeRef.value }),
+}));
+
 import PhoneInput from './PhoneInput';
 
 describe('PhoneInput', () => {
+  beforeEach(() => {
+    countryCodeRef.value = 'TR';
+  });
+
   it('emits canonical E.164 when a natural Turkish number is typed', () => {
     const onChange = vi.fn();
     render(<PhoneInput label="Telefon" value="" onChange={onChange} />);
@@ -41,5 +51,33 @@ describe('PhoneInput', () => {
     render(<PhoneInput label="Telefon" value="" onChange={() => {}} onValidityChange={onValidityChange} />);
     fireEvent.change(screen.getByLabelText('Telefon'), { target: { value: '0555 123 45 67' } });
     expect(onValidityChange).toHaveBeenLastCalledWith(true);
+  });
+
+  // Task 7 / Step 0: the default country comes from the tenant's OWN
+  // country profile, not a hardcoded 'TR' — an Uzbek café's customers were
+  // seeing +90 preselected on every phone field (OTP, self-pay,
+  // reservations) and having to switch it by hand.
+  describe('default country from the tenant profile', () => {
+    it("defaults to the tenant's country, not Turkey, on a UZ tenant", () => {
+      countryCodeRef.value = 'UZ';
+      render(<PhoneInput label="Telefon" value="" onChange={() => {}} />);
+      expect(screen.getByText('+998')).toBeInTheDocument();
+      expect(screen.queryByText('+90')).not.toBeInTheDocument();
+    });
+
+    it('still defaults to TR for a Turkish tenant — unchanged', () => {
+      countryCodeRef.value = 'TR';
+      render(<PhoneInput label="Telefon" value="" onChange={() => {}} />);
+      expect(screen.getByText('+90')).toBeInTheDocument();
+    });
+
+    it('an explicit defaultCountry prop still wins over the tenant country', () => {
+      countryCodeRef.value = 'UZ';
+      render(
+        <PhoneInput label="Telefon" value="" onChange={() => {}} defaultCountry="US" />,
+      );
+      expect(screen.getByText('+1')).toBeInTheDocument();
+      expect(screen.queryByText('+998')).not.toBeInTheDocument();
+    });
   });
 });

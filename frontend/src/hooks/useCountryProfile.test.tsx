@@ -42,6 +42,8 @@ describe('useCountryProfile', () => {
     const { result } = renderHook(() => useCountryProfile(), { wrapper });
     expect(result.current).toEqual({
       countryCode: 'TR',
+      currency: 'TRY',
+      displayDecimals: 2,
       taxRates: [0, 1, 10, 20],
       defaultTaxRate: 10,
       taxIdRules: TR_RULES,
@@ -53,6 +55,8 @@ describe('useCountryProfile', () => {
       data: {
         id: 't1',
         countryCode: 'TR',
+        currency: 'TRY',
+        displayDecimals: 2,
         taxRates: [0, 1, 10, 20],
         defaultTaxRate: 10,
         taxIdRules: TR_RULES,
@@ -60,16 +64,20 @@ describe('useCountryProfile', () => {
     });
     const { result } = renderHook(() => useCountryProfile(), { wrapper });
     await waitFor(() => expect(result.current.countryCode).toBe('TR'));
+    expect(result.current.currency).toBe('TRY');
+    expect(result.current.displayDecimals).toBe(2);
     expect(result.current.taxRates).toEqual([0, 1, 10, 20]);
     expect(result.current.defaultTaxRate).toBe(10);
     expect(result.current.taxIdRules).toEqual(TR_RULES);
   });
 
-  it("surfaces the UZ tenant's OWN band (0/6/12), not Turkey's", async () => {
+  it("surfaces the UZ tenant's OWN band (0/6/12) and currency (UZS, zero decimals), not Turkey's", async () => {
     getMock.mockResolvedValue({
       data: {
         id: 't2',
         countryCode: 'UZ',
+        currency: 'UZS',
+        displayDecimals: 0,
         taxRates: [0, 6, 12],
         defaultTaxRate: 12,
         taxIdRules: UZ_RULES,
@@ -77,6 +85,8 @@ describe('useCountryProfile', () => {
     });
     const { result } = renderHook(() => useCountryProfile(), { wrapper });
     await waitFor(() => expect(result.current.countryCode).toBe('UZ'));
+    expect(result.current.currency).toBe('UZS');
+    expect(result.current.displayDecimals).toBe(0);
     expect(result.current.taxRates).toEqual([0, 6, 12]);
     expect(result.current.defaultTaxRate).toBe(12);
     expect(result.current.taxIdRules).toEqual(UZ_RULES);

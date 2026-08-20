@@ -28,6 +28,17 @@ describe('formatCurrency', () => {
   it('still honours an explicit non-TRY currency (multi-currency capability kept)', () => {
     expect(formatCurrency(100, 'USD')).toBe('$100,00');
   });
+
+  // Task 7 (multi-country): UZS quotes so'm WHOLE — zero decimals — even
+  // though ISO-4217 gives it two (see country-profile.const.ts). This
+  // ad-hoc formatter is a legacy path (most of the app renders money
+  // through useFormatCurrency(), which reads displayDecimals off the
+  // tenant's country profile); it doesn't have hook access, so it carries
+  // its own small override here rather than silently mis-rendering UZS
+  // with two decimals like every other currency.
+  it("renders UZS whole (so'm has no decimals) while TRY/USD keep theirs — unaffected", () => {
+    expect(formatCurrency(1234567.89, 'UZS')).toBe('UZS 1.234.568');
+  });
 });
 
 // A fixed "now" makes every Date.now()-based helper deterministic.

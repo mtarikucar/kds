@@ -4,7 +4,6 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
-  IsIn,
   IsNotIn,
   IsNumber,
   IsOptional,
@@ -49,10 +48,6 @@ class IsIanaTimezoneConstraint implements ValidatorConstraintInterface {
   }
 }
 import {
-  SUPPORTED_CURRENCIES,
-  SupportedCurrency,
-} from "../../../common/constants/currencies.const";
-import {
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_REGEX,
 } from "../../../common/constants/subdomain.const";
@@ -80,15 +75,14 @@ export class UpdateTenantSettingsDto {
   })
   subdomain?: string | null;
 
-  @ApiPropertyOptional({
-    description: "Tenant currency",
-    enum: SUPPORTED_CURRENCIES,
-    example: "TRY",
-  })
-  @IsString()
-  @IsOptional()
-  @IsIn(SUPPORTED_CURRENCIES)
-  currency?: SupportedCurrency;
+  // `currency` is intentionally NOT a field here. It is DERIVED from the
+  // tenant's country (CountryService.currencyForTenant() /
+  // COUNTRY_PROFILES), never user-writable — a tenant that could set its
+  // own currency independently of its country could disagree with the
+  // profile Task 2 built CountryService to be the single source of truth
+  // for. Reading currency is unaffected: TENANT_SETTINGS_SELECT still
+  // returns it (see tenants.service.ts#findSettings, which now derives the
+  // VALUE from the country profile too, not just the shape).
 
   @ApiPropertyOptional({
     description: "Store closing time (HH:mm format)",

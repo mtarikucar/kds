@@ -26,6 +26,12 @@ vi.mock('react-i18next', () => ({
     i18n: { language: 'tr' },
   }),
 }));
+// <PhoneInput> now defaults its country from useCountryProfile() (Task 7),
+// which needs a QueryClient this suite doesn't set up. Mock at the hook
+// boundary instead — TR matches this suite's existing expectations.
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 
 const lookupAsync = vi.fn();
 const cancelAsync = vi.fn();

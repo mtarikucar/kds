@@ -129,7 +129,7 @@ const ReservationLookupPage: React.FC = () => {
             <label className="text-xs text-muted-foreground flex items-center gap-1.5">
               <Phone className="h-3.5 w-3.5" /> {t('lookup.phone')}
             </label>
-            <PhoneInput value={phone} onChange={setPhone} defaultCountry="TR" />
+            <PhoneInput value={phone} onChange={setPhone} />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs text-muted-foreground flex items-center gap-1.5">

@@ -105,13 +105,14 @@ describe('BrandingSettingsPage', () => {
     );
   });
 
-  it('saves the currency selection', () => {
+  // Task 7: currency stops being a user choice — it is DERIVED from the
+  // tenant's country (CountryService.currencyForTenant()), so the picker is
+  // gone. This is the one visible change for a TR tenant.
+  it('shows the currency as read-only, derived text — no picker, nothing to save', () => {
     render(<BrandingSettingsPage />);
-    fireEvent.click(screen.getByText('save:currencySettings.title'));
-    expect(h.update).toHaveBeenCalledWith(
-      { currency: 'TRY' },
-      expect.any(Object),
-    );
+    expect(screen.getByText('TRY')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-select')).not.toBeInTheDocument();
+    expect(screen.queryByText('save:currencySettings.title')).not.toBeInTheDocument();
   });
 
   it('does not constrain the input with a fixed HTML pattern (validation is country-dependent)', () => {
@@ -125,11 +126,19 @@ describe('BrandingSettingsPage', () => {
   describe('under a UZ tenant', () => {
     beforeEach(() => {
       h.tenant.data = {
-        currency: 'TRY',
+        // The tenant-settings response DERIVES currency from the country
+        // profile (tenants.service.ts#findSettings), so a real UZ tenant's
+        // `currency` is 'UZS', never the TR mirror.
+        currency: 'UZS',
         taxId: '',
         countryCode: 'UZ',
         taxIdRules: UZ_TAX_ID_RULES,
       };
+    });
+
+    it("shows the tenant's OWN currency (UZS) read-only, not Turkey's", () => {
+      render(<BrandingSettingsPage />);
+      expect(screen.getByText('UZS')).toBeInTheDocument();
     });
 
     it('widens maxLength to fit the 14-digit PINFL instead of the TR-sized 11', () => {

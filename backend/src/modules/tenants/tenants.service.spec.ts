@@ -280,6 +280,51 @@ describe('TenantsService.findSettings / findAllPublic', () => {
   });
 
   /**
+   * Currency + display precision are DERIVED from the country profile, same
+   * as taxRates above — never a second read of the stored `currency`
+   * column. Task 7's whole point is that a tenant cannot disagree with its
+   * own country on currency once the update DTO stops accepting it.
+   */
+  it('findSettings adds currency + displayDecimals DERIVED from the TR profile', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+      currency: 'TRY',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('TRY');
+    expect(settings.displayDecimals).toBe(2);
+  });
+
+  it("findSettings surfaces the UZ tenant's OWN currency (UZS) with ZERO display decimals, not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+      currency: 'UZS',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('UZS');
+    expect(settings.displayDecimals).toBe(0);
+  });
+
+  /**
+   * The load-bearing regression pin: `Tenant.currency` is a WRITTEN MIRROR,
+   * never the truth (see CountryService.currencyForTenant()). If the stored
+   * column ever drifts from the country (a stale row, a bad migration), the
+   * settings response must still answer with the country's currency, not
+   * echo the stale mirror back to the client.
+   */
+  it('findSettings DERIVES currency from the country profile even when the stored mirror disagrees', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+      currency: 'USD', // stale/wrong mirror — must not leak through
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('TRY');
+  });
+
+  /**
    * The operator-typed tax-id field (Branding/Accounting settings, the
    * manual-invoice modal) needs the tenant's ACTUAL shape rules to render
    * the right label and to stop guessing a client-side pattern — see

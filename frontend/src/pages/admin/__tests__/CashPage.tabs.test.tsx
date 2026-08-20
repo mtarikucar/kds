@@ -6,8 +6,8 @@ import CashPage from '../CashPage';
 // which chains to useCurrency -> react-query. Stub the currency hook so the
 // page renders without a QueryClientProvider — same pattern used by
 // InvoicesPage.test.tsx for the same dependency chain.
-vi.mock('../../../hooks/useCurrency', () => ({
-  useCurrency: () => 'TRY',
+vi.mock('../../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ currency: 'TRY', displayDecimals: 2 }),
 }));
 vi.mock('../../../features/cash/cashApi', () => ({
   useCashierSessions: () => ({ data: [], isLoading: false }),

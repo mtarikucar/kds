@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AsYouType, type CountryCode } from 'libphonenumber-js';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import { useCountryProfile } from '../../hooks/useCountryProfile';
 import {
   buildCountryOptions,
   countryDialCode,
@@ -20,7 +21,10 @@ export interface PhoneInputProps {
   hint?: string;
   disabled?: boolean;
   autoFocus?: boolean;
-  /** Region used to interpret a number typed without an explicit country. */
+  /** Region used to interpret a number typed without an explicit country.
+   *  Defaults to the tenant's OWN country (useCountryProfile()) — pass this
+   *  explicitly only to override that (e.g. a deliberately TR-only flow
+   *  like the hardware-store checkout, which ships within Turkey only). */
   defaultCountry?: CountryCode;
   id?: string;
   name?: string;
@@ -52,7 +56,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       hint,
       disabled,
       autoFocus,
-      defaultCountry = 'TR',
+      defaultCountry,
       id,
       name,
       placeholder,
@@ -61,31 +65,54 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     ref,
   ) => {
     const { t, i18n } = useTranslation('common');
+    // The tenant's own country (COUNTRY_PROFILES via the settings endpoint)
+    // — falls back to 'TR' before settings load, same as every other
+    // country-derived UI in this app (see useCountryProfile.ts). An
+    // explicit `defaultCountry` prop always wins.
+    const { countryCode: tenantCountryCode } = useCountryProfile();
+    const resolvedDefaultCountry = (defaultCountry ?? tenantCountryCode) as CountryCode;
     const autoId = React.useId();
     const inputId = id ?? autoId;
     const messageId = `${inputId}-message`;
     const hasMessage = Boolean(error || hint);
 
     const seed = useMemo(() => splitE164(value), []); // eslint-disable-line react-hooks/exhaustive-deps
-    const [country, setCountry] = useState<CountryCode>(seed?.country ?? defaultCountry);
+    const [country, setCountry] = useState<CountryCode>(seed?.country ?? resolvedDefaultCountry);
     const [national, setNational] = useState<string>(
       seed ? new AsYouType(seed.country).input(seed.nationalNumber) : '',
     );
     // Track what we last emitted so an EXTERNAL value change (form reset, parent
     // clearing the field) re-seeds the inputs, but our own emits don't.
     const lastEmitted = useRef(value);
+    // True once the user has picked a country themselves (or an external
+    // value seeded one) — guards the sync effect below from overwriting a
+    // real choice once the tenant's settings query resolves.
+    const countryPinned = useRef(Boolean(seed));
 
     useEffect(() => {
       if (value === lastEmitted.current) return;
       lastEmitted.current = value;
       const s = splitE164(value);
       if (s) {
+        countryPinned.current = true;
         setCountry(s.country);
         setNational(new AsYouType(s.country).input(s.nationalNumber));
       } else if (!value) {
         setNational('');
       }
     }, [value]);
+
+    // The tenant's country profile starts at the TR fallback and resolves
+    // asynchronously (useCountryProfile.ts) — if THIS field mounts before
+    // that settles, the initial `useState` above already locked in 'TR'.
+    // Re-sync once the real value arrives, but only while nothing has
+    // pinned the country yet (no seeded value, no explicit defaultCountry,
+    // no manual pick) — never fight the user's own selection.
+    useEffect(() => {
+      if (defaultCountry) return;
+      if (countryPinned.current) return;
+      setCountry(tenantCountryCode as CountryCode);
+    }, [tenantCountryCode, defaultCountry]);
 
     const emit = (rawNational: string, region: CountryCode) => {
       const e164 = deriveE164(rawNational, region);
@@ -106,6 +133,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     };
 
     const handleCountryChange = (next: CountryCode) => {
+      countryPinned.current = true;
       setCountry(next);
       emit(national, next);
     };
@@ -114,8 +142,8 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     // only { t } — don't hard-crash; fall back to the Turkish-first locale.
     const locale = i18n?.language ?? 'tr';
     const countries = useMemo(
-      () => buildCountryOptions(locale, [defaultCountry]),
-      [locale, defaultCountry],
+      () => buildCountryOptions(locale, [resolvedDefaultCountry]),
+      [locale, resolvedDefaultCountry],
     );
 
     return (

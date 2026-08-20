@@ -298,8 +298,9 @@
   },
   "currencySettings": {
     "title": "إعدادات العملة",
-    "selectCurrency": "اختر العملة",
-    "description": "اختر العملة لعرض الأسعار في مطعمك"
+    "description": "يتم تحديد عملتك تلقائيًا بناءً على بلد نشاطك التجاري",
+    "currentCurrency": "العملة الحالية",
+    "derivedFromCountry": "يتم تحديد العملة تلقائيًا وفقًا لبلدك ولا يمكن تغييرها."
   },
   "reportSettings": {
     "title": "إعدادات التقارير",

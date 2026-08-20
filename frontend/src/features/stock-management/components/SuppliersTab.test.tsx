@@ -20,6 +20,13 @@ vi.mock('../stockManagementApi', () => ({
   useUpdateSupplier: () => updateMutation,
   useDeleteSupplier: () => deleteMutation,
 }));
+// The supplier form's <PhoneInput> no longer hardcodes defaultCountry="TR"
+// — it now resolves the default from useCountryProfile() (Task 7), which
+// needs a QueryClient this suite doesn't set up. Mock at the hook boundary
+// instead.
+vi.mock('../../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 
 import SuppliersTab from './SuppliersTab';
 

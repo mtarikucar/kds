@@ -27,8 +27,8 @@ vi.mock('../../../features/branches/branchesApi', () => ({
   useListBranches: () => ({ data: [] }),
 }));
 // useFormatCurrency -> useCurrency chains into react-query too.
-vi.mock('../../../hooks/useCurrency', () => ({
-  useCurrency: () => 'TRY',
+vi.mock('../../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ currency: 'TRY', displayDecimals: 2 }),
 }));
 
 import ReportsPage from '../ReportsPage';

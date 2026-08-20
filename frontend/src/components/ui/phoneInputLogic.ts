@@ -74,7 +74,12 @@ export interface CountryOption {
 /**
  * Build the country dropdown list, localized to `locale` via Intl.DisplayNames
  * (falls back to the raw code where unavailable). `preferred` codes are hoisted
- * to the top (default Turkey first), the rest sorted by localized name.
+ * to the top, the rest sorted by localized name.
+ *
+ * The `preferred` default below is NOT where the tenant's default country
+ * lives — PhoneInput.tsx is this function's only caller and always passes
+ * an explicit `[resolvedDefaultCountry]` (resolved from useCountryProfile(),
+ * Task 7), so this default only matters for a future caller that doesn't.
  */
 export function buildCountryOptions(
   locale: string,

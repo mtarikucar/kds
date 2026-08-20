@@ -249,7 +249,6 @@ const ProfilePage = () => {
                   value={field.value ?? ''}
                   onChange={field.onChange}
                   error={fieldState.error?.message}
-                  defaultCountry="TR"
                 />
               )}
             />

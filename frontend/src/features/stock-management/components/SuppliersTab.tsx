@@ -48,7 +48,6 @@ const SupplierForm = ({ supplier, onSave, onClose, isLoading }: SupplierFormProp
                 label={t('suppliers.phone')}
                 value={form.phone}
                 onChange={(v) => setForm({ ...form, phone: v })}
-                defaultCountry="TR"
               />
             </div>
           </div>

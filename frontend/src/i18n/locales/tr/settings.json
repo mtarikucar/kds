@@ -319,8 +319,9 @@
   },
   "currencySettings": {
     "title": "Para Birimi Ayarları",
-    "selectCurrency": "Para Birimi Seçin",
-    "description": "Restoranınızda fiyatları göstermek için para birimini seçin"
+    "description": "Para biriminiz, işletmenizin ülke ayarına göre otomatik belirlenir",
+    "currentCurrency": "Geçerli Para Birimi",
+    "derivedFromCountry": "Para birimi ülke ayarınıza göre otomatik belirlenir ve değiştirilemez."
   },
   "reportSettings": {
     "title": "Rapor Ayarları",

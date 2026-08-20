@@ -141,7 +141,6 @@ const PaymentModal = ({
               onChange={field.onChange}
               label={t('payment.customerPhone')}
               error={fieldState.error?.message}
-              defaultCountry="TR"
             />
           )}
         />

@@ -119,6 +119,14 @@ export class TenantsService {
     const profile = resolveCountryProfile(tenant.countryCode);
     return {
       ...tenant,
+      // DERIVED, overriding the raw `tenant.currency` column spread in
+      // above — that column is a written MIRROR, never the truth (see
+      // CountryService.currencyForTenant()). A stale/mismatched row must
+      // not leak its old currency back to the client; the profile always
+      // wins. `displayDecimals` has no column at all — UZS renders whole
+      // (so'm) while storage stays x100 for every currency, always.
+      currency: profile.currency,
+      displayDecimals: profile.displayDecimals,
       taxRates: profile.taxRates,
       defaultTaxRate: profile.defaultTaxRate,
       // Serialized: RegExp doesn't survive JSON, so ship the pattern SOURCE

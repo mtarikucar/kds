@@ -100,4 +100,26 @@ describe('UpdateTenantSettingsDto (iter-45)', () => {
       expect(await validateDto({ taxId: '' })).toEqual([]);
     });
   });
+
+  /**
+   * Currency is DERIVED from the tenant's country (CountryService /
+   * COUNTRY_PROFILES) — see backend/src/common/country/country.service.ts
+   * currencyForTenant(). Letting a tenant PATCH `currency` independently of
+   * its country would let it disagree with the profile, which is exactly
+   * the invariant Task 2 built CountryService to prevent. The DTO carries
+   * no decorators for `currency` any more, so Nest's global
+   * `ValidationPipe({ whitelist: true })` strips it before it ever reaches
+   * the service/Prisma — reproduced here with class-validator's own
+   * `whitelist` option, which is the same mechanism the pipe uses.
+   */
+  describe('currency (no longer writable)', () => {
+    it('strips currency — it is derived from country, never user-writable', async () => {
+      const dto = plainToInstance(UpdateTenantSettingsDto, {
+        currency: 'USD',
+      }) as UpdateTenantSettingsDto & { currency?: unknown };
+      const errors = await validate(dto, { whitelist: true });
+      expect(errors).toEqual([]);
+      expect(dto.currency).toBeUndefined();
+    });
+  });
 });

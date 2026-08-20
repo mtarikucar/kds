@@ -15,6 +15,12 @@ import { useGetTenantSettings, TaxIdRuleView } from './useCurrency';
  */
 export interface CountryProfileView {
   countryCode: string;
+  /** DERIVED from the country profile — never the tenant's independent
+   *  choice (Task 7 removed `currency` from UpdateTenantSettingsDto). */
+  currency: string;
+  /** DISPLAY decimals only — storage/wire stays x100 for every currency,
+   *  always. UZS is 0 (so'm quoted whole), TRY is 2. */
+  displayDecimals: number;
   taxRates: number[];
   defaultTaxRate: number;
   taxIdRules: TaxIdRuleView[];
@@ -25,6 +31,8 @@ export interface CountryProfileView {
 // so nothing regresses for the common case during the loading flash.
 const TR_FALLBACK: CountryProfileView = {
   countryCode: 'TR',
+  currency: 'TRY',
+  displayDecimals: 2,
   taxRates: [0, 1, 10, 20],
   defaultTaxRate: 10,
   taxIdRules: [
@@ -37,6 +45,8 @@ export function useCountryProfile(): CountryProfileView {
   const { data } = useGetTenantSettings();
   return {
     countryCode: data?.countryCode ?? TR_FALLBACK.countryCode,
+    currency: data?.currency ?? TR_FALLBACK.currency,
+    displayDecimals: data?.displayDecimals ?? TR_FALLBACK.displayDecimals,
     taxRates: data?.taxRates ?? TR_FALLBACK.taxRates,
     defaultTaxRate: data?.defaultTaxRate ?? TR_FALLBACK.defaultTaxRate,
     taxIdRules: data?.taxIdRules ?? TR_FALLBACK.taxIdRules,

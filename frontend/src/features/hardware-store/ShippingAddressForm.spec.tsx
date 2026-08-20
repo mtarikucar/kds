@@ -6,6 +6,14 @@ import type { Branch } from '../branches/branchesApi';
 import trHardware from '../../i18n/locales/tr/hardware.json';
 import enHardware from '../../i18n/locales/en/hardware.json';
 
+// The phone field's <PhoneInput> unconditionally calls useCountryProfile()
+// (Rules of Hooks — it can't skip the hook just because this form passes an
+// explicit defaultCountry="TR"), which needs a QueryClient this suite
+// doesn't set up. Mock at the hook boundary instead.
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
+
 // This form is Turkish-canonical: the backend formatAddress contract and
 // every assertion below reads the Turkish field labels / validation copy.
 // The shared test setup boots i18next in `en` with a small namespace
