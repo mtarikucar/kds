@@ -566,10 +566,49 @@ göre çözülür."
 - Test: `backend/src/common/context/request-context.spec.ts`
 
 **Interfaces:**
-- Consumes: `CountryService.forTenant` (Task 2)
+- Consumes: `CountryService.forTenant` (Task 2). **Task 2'nin iki eksiğini de bu görev kapatıyor** — servisin modül kaydı ve `set()`'in `countryCode`'u iletmesi (Step 0).
 - Produces: `RequestContextStore.countryCode?: string` (tip alanını Task 2 zaten ekledi — bu görev onu **dolduruyor**), `CountryService.cachedCodeFor(tenantId): string | null`, `CountryService.invalidate(tenantId): void`
 
 **Neden bu görev var:** `@NormalizePhone("TR")` gibi decorator'lar **tanımlama anında** sabitlenir ve transform **senkron** çalışır — bir DB okuması yapamazlar. Nest'te sıralama guard → interceptor → pipe olduğu için, interceptor `countryCode`'u store'a yazdığında ValidationPipe'ın DTO transform'u onu senkron okuyabilir. Ambient ülkeyi mümkün kılan tek şey bu.
+
+- [ ] **Step 0: Two prerequisites Task 2's review exposed — do these FIRST**
+
+Task 2 shipped a service nobody can inject and a `set()` that would silently swallow this task's whole point. Both bite here, so they belong to this task.
+
+**0a — `RequestContext.set()` hand-lists its fields and drops `countryCode`.**
+
+```ts
+set(patch: Partial<RequestContextStore>): void {
+  const store = storage.getStore();
+  if (!store) return;
+  if (patch.requestId !== undefined) store.requestId = patch.requestId;
+  if (patch.tenantId !== undefined) store.tenantId = patch.tenantId;
+  if (patch.branchId !== undefined) store.branchId = patch.branchId;
+  // ... userId ... and NO countryCode
+}
+```
+
+As written, `set({ countryCode: "UZ" })` is a **silent no-op** — every ambient read would return TR and every test in this task would still pass, because the fallback is TR. This is the exact "looks-working-but-isn't" shape this repo has been bitten by before. Add the `countryCode` line.
+
+Write a test that fails first:
+
+```ts
+it("set() actually forwards countryCode — it hand-lists fields and silently dropped it", () => {
+  RequestContext.run({ tenantId: "t1" }, () => {
+    RequestContext.set({ countryCode: "UZ" });
+    expect(RequestContext.get()?.countryCode).toBe("UZ");
+  });
+});
+```
+
+**0b — `CountryService` is registered in no module.** Injecting it throws `UnknownDependenciesException` at bootstrap. Add it to `src/common/common.module.ts`, which is already `@Global()` and holds exactly this kind of shared service:
+
+```ts
+providers: [ EmailService, /* … */, CountryService ],
+exports:   [ EmailService, /* … */, CountryService ],
+```
+
+Prove it with a DI-resolution test rather than a hand-constructed instance — Task 2's tests all did `new CountryService(prisma as any)`, which is precisely why this was invisible. Note the repo hazard: a module that imports `PrismaModule` directly beats a `@Global()` stub, and `new PrismaClient()` throws without `DATABASE_URL` (green locally, red in CI). Use `.overrideProvider(PrismaService).useValue({})`.
 
 - [ ] **Step 1: Write the failing test**
 
