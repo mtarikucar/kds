@@ -1769,6 +1769,26 @@ export interface AttendanceSummary {
   totalLateMinutes: number;
 }
 
+/** One staff member's card enrolment. The API returns the last 4 digits and
+ *  nothing else — never the hash, never the ciphertext, never the raw UID. */
+export interface CardAssignment {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  last4: string | null;
+  assignedAt: string | null;
+  assignedById: string | null;
+}
+
+/** What POST /personnel/attendance/card-tap answers. `ignored` is the 10s
+ *  debounce swallowing a reader's duplicate write, not an error. */
+export interface CardTapResponse {
+  action: 'clockIn' | 'clockOut' | 'breakEnd' | 'ignored';
+  user: { id: string; firstName: string; lastName: string; role: string };
+  attendance: Attendance | null;
+}
+
 export interface PerformanceMetrics {
   user: { id: string; firstName: string; lastName: string; role: string };
   totalOrders: number;

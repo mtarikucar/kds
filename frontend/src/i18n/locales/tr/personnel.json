@@ -1,6 +1,38 @@
 {
   "title": "Personel Yönetimi",
   "description": "Personel devam, vardiya, program ve performans yönetimi",
+  "cardShift": {
+    "title": "Kartlı Vardiya",
+    "tapPrompt": "Kartınızı okutun",
+    "assign": "Kart ata",
+    "assigned": "Kart atandı",
+    "revoke": "Kartı iptal et",
+    "revoked": "Kart iptal edildi",
+    "revokeConfirm": "{{name}} adlı personelin kartı iptal edilsin mi? Geçmiş puantaj kayıtları silinmez.",
+    "noCard": "Kart yok",
+    "cardLast4": "Kart (son 4)",
+    "assignedAt": "Atama tarihi",
+    "assignedBy": "Atayan",
+    "sourceCard": "Kart",
+    "sourceManual": "Uygulama",
+    "cardClockIns": "Kartla giriş",
+    "openStation": "İstasyon ekranını aç",
+    "errors": {
+      "notRecognised": "Kart tanınmadı — yöneticinize başvurun",
+      "invalidUid": "Kart numarası geçersiz",
+      "alreadyClockedOut": "Bugün çıkış yapılmış"
+    },
+    "station": {
+      "title": "Kartlı Vardiya İstasyonu",
+      "welcome": "Hoş geldin, {{name}} — giriş {{time}}",
+      "goodbye": "İyi çalışmalar, {{name}} — çıkış {{time}}",
+      "breakEnded": "Mola bitti, {{name}} — {{time}}",
+      "ignored": "Kart az önce okutuldu",
+      "lock": "Oturumu kilitle",
+      "locked": "Ekran kilitli",
+      "unlock": "Devam etmek için dokunun"
+    }
+  },
   "tabs": {
     "attendance": "Devam",
     "shiftTemplates": "Vardiya Şablonları",

@@ -1,6 +1,38 @@
 {
   "title": "Personnel Management",
   "description": "Manage staff attendance, shifts, schedules, and performance",
+  "cardShift": {
+    "title": "Card Shift",
+    "tapPrompt": "Tap your card",
+    "assign": "Assign card",
+    "assigned": "Card assigned",
+    "revoke": "Revoke card",
+    "revoked": "Card revoked",
+    "revokeConfirm": "Revoke the card assigned to {{name}}? Past attendance records are kept.",
+    "noCard": "No card",
+    "cardLast4": "Card (last 4)",
+    "assignedAt": "Assigned at",
+    "assignedBy": "Assigned by",
+    "sourceCard": "Card",
+    "sourceManual": "App",
+    "cardClockIns": "Card clock-ins",
+    "openStation": "Open the station screen",
+    "errors": {
+      "notRecognised": "Card not recognised — please contact your manager",
+      "invalidUid": "Invalid card number",
+      "alreadyClockedOut": "Already clocked out today"
+    },
+    "station": {
+      "title": "Card Shift Station",
+      "welcome": "Welcome, {{name}} — clocked in at {{time}}",
+      "goodbye": "Goodbye, {{name}} — clocked out at {{time}}",
+      "breakEnded": "Break ended, {{name}} — {{time}}",
+      "ignored": "Card was just tapped",
+      "lock": "Lock the session",
+      "locked": "Screen locked",
+      "unlock": "Touch to continue"
+    }
+  },
   "tabs": {
     "attendance": "Attendance",
     "shiftTemplates": "Shift Templates",

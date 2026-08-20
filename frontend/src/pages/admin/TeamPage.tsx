@@ -1,25 +1,30 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UsersRound, Clock } from 'lucide-react';
+import { UsersRound, Clock, CreditCard } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { usePersonnelSocket } from '../../features/personnel/usePersonnelSocket';
 import UserManagementPage from './UserManagementPage';
 import AttendanceTab from '../../components/personnel/AttendanceTab';
+import CardShiftTab from '../../components/personnel/CardShiftTab';
 
 /**
  * Ekip (Team) — the merged Users + Personnel section. "Kullanıcılar" holds the
  * account table (with performance now folded in as a per-user badge/detail +
- * aggregate strip); "Puantaj" is the attendance/clock-in surface. Shift
- * templates + schedule moved to Settings; performance merged into the users
- * table — so those personnel tabs are gone from here.
+ * aggregate strip); "Puantaj" is the attendance/clock-in surface; "Kartlı
+ * Vardiya" is card enrolment. Shift templates + schedule moved to Settings;
+ * performance merged into the users table — so those personnel tabs are gone
+ * from here.
  */
-type Tab = 'users' | 'attendance';
+type Tab = 'users' | 'attendance' | 'cards';
 
 const TeamPage = () => {
   const { t } = useTranslation(['common', 'personnel']);
   const { hasFeature } = useSubscription();
   const hasPersonnel = hasFeature('personnelManagement');
+  // Card Shift rides ON TOP of personnel: without the attendance module there
+  // are no rows for a tap to write onto, so both flags gate the tab.
+  const hasCardShift = hasPersonnel && hasFeature('cardShift');
   const [tab, setTab] = useState<Tab>('users');
 
   // Realtime invalidation (attendance clock-ins) — was owned by the old
@@ -34,6 +39,15 @@ const TeamPage = () => {
             id: 'attendance' as const,
             label: t('personnel:tabs.attendance', 'Puantaj'),
             icon: Clock,
+          },
+        ]
+      : []),
+    ...(hasCardShift
+      ? [
+          {
+            id: 'cards' as const,
+            label: t('personnel:cardShift.title', 'Kartlı Vardiya'),
+            icon: CreditCard,
           },
         ]
       : []),
@@ -80,7 +94,9 @@ const TeamPage = () => {
         </div>
       )}
 
-      {tab === 'users' ? <UserManagementPage embedded /> : <AttendanceTab />}
+      {tab === 'users' && <UserManagementPage embedded />}
+      {tab === 'attendance' && <AttendanceTab />}
+      {tab === 'cards' && <CardShiftTab />}
     </div>
   );
 };
