@@ -212,6 +212,9 @@ export interface SubscriptionPlan {
   posAccess?: boolean;
   // AI menu studio gate (photo/frame/video + 3D + OCR import). PRO+.
   aiContentGeneration?: boolean;
+  // Card Shift (RFID clock-in) gate. Optional so older cached payloads
+  // without the field still typecheck.
+  cardShift?: boolean;
   isActive: boolean;
   discountPercentage?: number;
   discountLabel?: string;

@@ -1089,6 +1089,10 @@ export interface PlanFeatures {
   reservationSystem: boolean;
   /** Paid — "Personel" module (`module_personnel`). */
   personnelManagement: boolean;
+  /** Paid — "Kartlı Vardiya" module (`module_personnel_card_shift`, ₺4.000
+   *  one-time). RFID card clock-in; rides ON TOP of personnelManagement, so
+   *  both flags must be live for the card surfaces to open. */
+  cardShift: boolean;
   /** Paid — set by any delivery-platform integration product (Yemeksepeti,
    *  Getir, Trendyol Yemek). Which vendors are actually connected lives in
    *  `EffectiveFeatures.integrations.delivery`, not here. */

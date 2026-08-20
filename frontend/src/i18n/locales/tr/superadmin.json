@@ -178,6 +178,7 @@
       "kdsIntegration": "KDS Entegrasyonu",
       "reservationSystem": "Rezervasyon Sistemi",
       "personnelManagement": "Personel Yönetimi",
+      "cardShift": "Kartlı Vardiya (RFID ile damgalama)",
       "deliveryIntegration": "Teslimat Entegrasyonu",
       "externalDisplay": "Harici Ekran (Partner Display)",
       "posAccess": "POS Erişimi"

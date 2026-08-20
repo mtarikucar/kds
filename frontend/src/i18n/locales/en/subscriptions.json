@@ -234,6 +234,7 @@
         "posAccess": "POS / Sales screen",
         "reservationSystem": "Reservation system",
         "personnelManagement": "Personnel management",
+        "cardShift": "Card clock-in/out",
         "deliveryIntegration": "Delivery platforms",
         "externalDisplay": "Remote display & Partner API",
         "multiLocation": "Multi-location",
