@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBoolean,
-  IsEnum,
   IsIn,
   IsObject,
   IsOptional,
@@ -9,11 +8,17 @@ import {
   IsUUID,
   ValidateIf,
 } from "class-validator";
-import { DeliveryPlatform } from "../constants/platform.enum";
+import {
+  AVAILABLE_DELIVERY_PLATFORMS,
+  DeliveryPlatform,
+} from "../constants/platform.enum";
 
 export class CreatePlatformConfigDto {
-  @ApiProperty({ enum: DeliveryPlatform })
-  @IsEnum(DeliveryPlatform)
+  // @IsIn, not @IsEnum: the enum now carries coming-soon platforms too, and
+  // POST /delivery-platforms/configs must answer 400 for those so a config row
+  // can never exist without an adapter behind it.
+  @ApiProperty({ enum: AVAILABLE_DELIVERY_PLATFORMS })
+  @IsIn(AVAILABLE_DELIVERY_PLATFORMS as readonly string[])
   platform: DeliveryPlatform;
 
   @ApiPropertyOptional()

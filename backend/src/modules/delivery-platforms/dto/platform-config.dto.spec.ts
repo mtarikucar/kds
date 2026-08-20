@@ -64,6 +64,13 @@ describe("CreatePlatformConfigDto", () => {
     });
     expect((await errs(dto)).some((m) => /branchId/.test(m))).toBe(true);
   });
+
+  it("rejects a coming-soon platform on config create", async () => {
+    // Adding SEMT to the enum would otherwise make @IsEnum accept it instantly
+    // and a SEMT config row could exist with no adapter behind it.
+    const dto = plainToInstance(CreatePlatformConfigDto, { platform: "SEMT" });
+    expect((await errs(dto)).some((m) => /platform/.test(m))).toBe(true);
+  });
 });
 
 describe("UpdatePlatformConfigDto", () => {
