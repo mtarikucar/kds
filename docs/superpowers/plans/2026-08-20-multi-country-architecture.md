@@ -980,13 +980,33 @@ Commit mesajı, para biriminin artık seçilmediğini ve ülkenin sonucu olduğu
 
 `Decimal(10,2)` tavanı 99.999.999,99 ve UZS'de bu ~8.000 dolar. **Ürün fiyatı oraya varmaz ama günlük ciro, fatura toplamı ve sipariş tutarı varır.**
 
-- [ ] **Step 1: Enumerate the columns that hold aggregates**
+- [ ] **Step 1: The classification is already done — verify it, don't redo it**
 
 ```bash
 cd /home/tarik/Projects/kds/backend
-grep -n "Decimal(10, 2)" prisma/schema.prisma | tee /tmp/decimal-sites.txt | wc -l
+grep -c "Decimal(10, 2)" prisma/schema.prisma   # 74
 ```
-74 çıkacak. **Hepsi genişletilmeyecek** — yalnız toplam/tutar tutanlar. Her satırı sınıflandır ve listeyi rapora yaz: birim fiyat mı, toplam mı, oran mı. Oran ve yüzde kolonları olduğu gibi kalır.
+
+74 eşleşmenin **73'ü gerçek kolon**; biri (`schema.prisma:4114`) `LeadOffer.discount`'ın üstündeki yorumun içinde geçen metin — kolon değil, atla.
+
+**73'ün hepsi paradır ve hepsi genişletilecek.** Planın ilk hâli "oran kolonları kalsın" diyordu; ağaca bakıldığında şemada **`Decimal(10, 2)` kullanan tek bir oran kolonu yok** — oranlar `Decimal(5, 4)` kullanıyor (`commissionRate`, iki yerde). `User.hourlyRate` isminde "Rate" geçse de saatlik **ücret**tir, para. Yani sınıflandırılacak bir şey kalmadı; ayrım yapmaya çalışmak sadece hata üretir.
+
+Genişletmenin gerekçesi büyüklük sırasına göre (1 USD ≈ 12.150 UZS, `Decimal(10,2)` tavanı 99.999.999,99 so'm ≈ **8.230 USD**):
+
+| Grup | Kolonlar | Neden taşar |
+|---|---|---|
+| `ZReport` | 20 kolon (`totalSales`, `netSales`, `totalTax`, `cashPayments`, …) | Günlük toplam. 8.000 USD/gün ciro yapan bir restoran **97M so'm** eder — tavanın dibinde. Yoğun bir gün taşar. |
+| `CashierSession` | 7 kolon (`expectedCash`, `cashSales`, `overShort`, …) | Vardiya toplamı, ZReport ile aynı mertebe. |
+| `Customer` | `totalSpent`, `averageOrder` | **Ömür boyu** toplam. Sadık bir müşteride kaçınılmaz taşar. |
+| `Order` / `SalesInvoice` / `Invoice` | 12 kolon | Tek bir büyük ikram/etkinlik siparişi 8.230 USD'yi geçebilir. |
+| `TableAnalytics` | `revenueGenerated`, `avgOrderValue` | Dönemsel toplam. |
+| Kalan birim fiyatlar | `Product.price`, `OrderItem.unitPrice`, … | Tek başına taşmaz **ama** 8.230 USD'lik bir ikram kalemi mümkün; ayrıca bir kolonu dar bırakmak, toplamı geniş olan bir alanla asimetri yaratır. |
+
+`Decimal(14, 2)` seçimi keyfi değil: şemada **zaten bir `Decimal(14, 2)` var**, yani bu repoda kurulu bir hassasiyet. (Ayrıca 8 adet `Decimal(12, 2)` var — bunlar bu görevin kapsamı dışında, ama tutarsızlık olarak rapora yazılsın.)
+
+- [ ] **Step 1b: Fix the comment that this task makes false**
+
+`schema.prisma:4112-4114`'teki yorum şöyle diyor: *"Aligned with every other money column in the schema (Decimal(10, 2))."* Bu görev tamamlandığında bu cümle **yanlış** olur. Yorumu güncelle.
 
 - [ ] **Step 2: Write the failing test**
 
