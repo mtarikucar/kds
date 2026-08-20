@@ -13,7 +13,7 @@
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+} from "../orders/services/receipt-snapshot.builder";
 
 /**
  * Which physical artefact a built byte stream targets. Maps 1:1 onto the
@@ -40,8 +40,13 @@ export type EscPosCommandKind = "print_receipt" | "open_drawer";
  */
 export interface EscPosJob {
   artifact: EscPosArtifact;
-  /** Codepage the bytes were encoded in (informational; bridge does not re-encode). */
-  codepage: "CP857";
+  /**
+   * Codepage the bytes were encoded in (informational; bridge does not
+   * re-encode). CP857 (Turkish) is the original dialect; CP866 (DOS
+   * Cyrillic #2) is Task 13's UZ dialect — see escpos-builder-uz.service.ts's
+   * class doc comment for why CP866 was chosen over CP1251.
+   */
+  codepage: "CP857" | "CP866";
   bytes: Uint8Array;
   base64: string;
   /** Byte length — convenience for callers logging/metering print volume. */
@@ -60,7 +65,7 @@ export interface EscPosJob {
 export interface EscPosCommandPayload {
   /** ESC/POS byte stream, base64-encoded. */
   data: string;
-  codepage: "CP857";
+  codepage: "CP857" | "CP866";
   artifact: EscPosArtifact;
   /**
    * Stable hash of the byte stream. Lets the bridge dedupe a re-delivered
@@ -100,6 +105,29 @@ export interface EscPosReceiptOptions {
   footerLines?: string[];
   /** Open the drawer at the end (appends ESC p). Default false. */
   kickDrawerAfter?: boolean;
+
+  /**
+   * `Intl.NumberFormat`/`DateTimeFormat` locale — pass the tenant's country
+   * profile's `intlLocale` (Task 13). Defaults to "tr-TR", the pre-existing
+   * hardcoded value, so an omitted option reproduces today's Turkish output
+   * exactly.
+   */
+  intlLocale?: string;
+  /**
+   * Fraction digits for money amounts — pass the tenant's country profile's
+   * `displayDecimals` (Task 13; UZS is 0, so'm is quoted whole). Defaults
+   * to 2, the pre-existing hardcoded value.
+   */
+  displayDecimals?: number;
+  /**
+   * IANA timezone for the printed timestamp — pass the order's BRANCH's own
+   * `timezone` field (Task 13), never the tenant's or a hardcoded country
+   * default; a branch can legitimately sit in a different timezone than
+   * its tenant's country default. Defaults to "Europe/Istanbul", the
+   * pre-existing hardcoded value, when the caller has no branch in hand
+   * (e.g. this builder used standalone, or in a test).
+   */
+  timezone?: string;
 }
 
 /**

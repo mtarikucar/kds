@@ -1063,7 +1063,7 @@ export interface PlanFeatures {
   customBranding: boolean;
   /** Paid — "API & Webhook" module (`api_access`). */
   apiAccess: boolean;
-  /** Paid — "Öncelikli Destek" module (`priority_support`). */
+  /** Paid — included in the "Bakım, Destek ve Güncelleme" licence (`license_annual`). Formerly the standalone `priority_support` module, archived in v3.6.7. */
   prioritySupport: boolean;
   /** Paid — "Stok & Maliyet" module (`module_inventory`). */
   inventoryTracking: boolean;

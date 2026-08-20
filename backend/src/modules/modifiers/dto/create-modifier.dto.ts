@@ -32,11 +32,11 @@ export class CreateModifierDto {
   @MaxLength(2000)
   description?: string;
 
-  // Schema column is Decimal(10, 2) — anything above 99,999,999.99 surfaces
-  // as a 500 from Postgres. 10,000 covers every realistic "add a side"
-  // upcharge with three orders of magnitude of headroom and keeps the
-  // computed Order.totalAmount from running into the same overflow when a
-  // line multiplies modifier price by quantity. Negative values are
+  // Schema column is Decimal(14, 2) since the Task 8 widening (was
+  // Decimal(10, 2)). 10,000 covers every realistic "add a side" upcharge
+  // with several orders of magnitude of headroom under either precision,
+  // and keeps the computed Order.totalAmount from running into overflow
+  // when a line multiplies modifier price by quantity. Negative values are
   // intentionally rejected here even though the schema allows them — the
   // service-side flow has no "discount modifier" path today.
   @ApiProperty({ example: 25.0, default: 0 })

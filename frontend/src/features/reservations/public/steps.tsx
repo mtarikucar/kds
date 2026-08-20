@@ -337,7 +337,6 @@ export const Step4Contact: React.FC<StepCommonProps> = () => {
               <PhoneInput
                 value={field.value ?? ''}
                 onChange={field.onChange}
-                defaultCountry="TR"
                 // Format errors can't occur now (PhoneInput only emits valid
                 // E.164 or ''); keep the existing branch so a real format
                 // error would still surface, but suppress the contact-group

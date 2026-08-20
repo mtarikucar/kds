@@ -7,6 +7,12 @@ vi.mock("../../../features/menu/menuApi", () => ({
   useParseMenuSource: () => ({ mutateAsync: parseMutate, isPending: false }),
   useCommitMenuImport: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
+// A successful parse renders MenuDraftReviewGrid, which reads the tenant's
+// tax band via useCountryProfile() (a react-query hook) — mock it so this
+// file doesn't need a live QueryClientProvider just to reach that render.
+vi.mock("../../../hooks/useCountryProfile", () => ({
+  useCountryProfile: () => ({ countryCode: "TR", taxRates: [0, 1, 10, 20], defaultTaxRate: 10 }),
+}));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (k: string, d?: any) => (typeof d === "string" ? d : d?.defaultValue ?? k),

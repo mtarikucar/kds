@@ -11,17 +11,22 @@ import { useSupplierScorecard, useApAging } from '../../../features/stock-manage
 import SuppliersTab from '../../../features/stock-management/components/SuppliersTab';
 import SupplierCatalog from '../../../features/stock-management/components/SupplierCatalog';
 import VendorBillsTab from '../../../features/stock-management/components/VendorBillsTab';
+import { BuyListSection, ChannelGuideSection } from './ProcurementGuidance';
 
 type Fmt = (n: number) => string;
 
-// Tedarikçiler hub: CRUD + price catalog (Phase 2) + scorecard + vendor
-// bills + AP aging as stacked sections. Scorecard/AP JSX + hooks
-// (useSupplierScorecard, useApAging) are lifted from PurchasingPage.
+// Tedarikçiler hub: buy list + CRUD + price catalog (Phase 2) + scorecard +
+// vendor bills + AP aging + channel guide as stacked sections. Scorecard/AP
+// JSX + hooks (useSupplierScorecard, useApAging) are lifted from
+// PurchasingPage; the two guidance sections came from the retired "Tedarik
+// Rehberi" tab in v3.6.7 and deliberately bracket the page — the buy list is
+// why you opened it, the channel guide is reference you read once.
 export default function SuppliersHub() {
   const { t } = useTranslation('stock');
   const fmt = useFormatCurrency();
   return (
     <div className="space-y-8">
+      <BuyListSection />
       <section>
         <h2 className="text-lg font-heading font-semibold text-slate-900 mb-3">{t('nav.suppliers')}</h2>
         <SuppliersTab />
@@ -42,6 +47,7 @@ export default function SuppliersHub() {
         <h2 className="text-lg font-heading font-semibold text-slate-900 mb-3">{t('sections.apAging')}</h2>
         <ApAgingSection fmt={fmt} />
       </section>
+      <ChannelGuideSection />
     </div>
   );
 }

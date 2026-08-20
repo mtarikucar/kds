@@ -5,12 +5,11 @@ import { Coins, Receipt } from 'lucide-react';
 import {
   useGetTenantSettings,
   useUpdateTenantSettings,
-  SUPPORTED_CURRENCIES,
 } from '../../hooks/useCurrency';
+import { useCountryProfile, isValidTaxId, taxIdMaxLength } from '../../hooks/useCountryProfile';
 import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { useServerHydratedState } from '../../hooks/useServerHydratedState';
 import { SettingsSection, SettingsGroup } from '../../components/settings/SettingsSection';
-import { SettingsSelect } from '../../components/settings/SettingsToggle';
 import SubdomainSettings from '../../components/settings/SubdomainSettings';
 import { getApiErrorMessage } from '../../lib/api-error';
 
@@ -18,9 +17,13 @@ const BrandingSettingsPage = () => {
   const { t } = useTranslation('settings');
   const { data: tenantSettings, isLoading } = useGetTenantSettings();
   const { mutate: updateTenantSettings, isPending: isUpdating } = useUpdateTenantSettings();
-
-  const [currency, setCurrency] = useState('TRY');
-  const [currencyStatus, setCurrencyStatus] = useState<AutoSaveStatus>('idle');
+  // currency is DERIVED from the tenant's country — no longer a setting the
+  // user picks (Task 7 removed `currency` from UpdateTenantSettingsDto; a
+  // tenant whose currency disagreed with its country broke the invariant
+  // CountryService.currencyForTenant() exists to guarantee).
+  const { taxIdRules, currency } = useCountryProfile();
+  const taxIdNames = taxIdRules.map((r) => r.name).join(' / ');
+  const taxIdLabel = taxIdRules.map((r) => t(r.labelKey)).join(' / ');
 
   const [taxId, setTaxId] = useState('');
   const [taxIdStatus, setTaxIdStatus] = useState<AutoSaveStatus>('idle');
@@ -29,10 +32,10 @@ const BrandingSettingsPage = () => {
 
   const handleSaveTaxId = () => {
     setTaxIdError(null);
-    // 10 hane (Vergi No) ya da 11 hane (TC Kimlik) — boş bırakmak silmek
-    // demek. Yanlış formatta kaydedilmesin diye yerelde de doğrula.
-    if (taxId && !/^\d{10,11}$/.test(taxId)) {
-      setTaxIdError(t('brandingSettings.taxId.formatError'));
+    // Şekil ülkeye bağlı (TR: VKN/TCKN, UZ: STIR/PINFL) — boş bırakmak
+    // silmek demek. Yanlış formatta kaydedilmesin diye yerelde de doğrula.
+    if (taxId && !isValidTaxId(taxId, taxIdRules)) {
+      setTaxIdError(t('brandingSettings.taxId.formatError', { names: taxIdNames }));
       return;
     }
     setTaxIdStatus('saving');
@@ -55,38 +58,20 @@ const BrandingSettingsPage = () => {
     );
   };
 
-  const handleSaveCurrency = () => {
-    setCurrencyStatus('saving');
-    updateTenantSettings(
-      { currency },
-      {
-        onSuccess: () => {
-          setCurrencyStatus('saved');
-          toast.success(t('settingsSaved'));
-          setTimeout(() => setCurrencyStatus('idle'), 2000);
-        },
-        onError: (error) => {
-          setCurrencyStatus('error');
-          toast.error(getApiErrorMessage(error, t('settingsFailed')));
-        },
-      }
-    );
-  };
-
-  const hasCurrencyChanges = tenantSettings && currency !== tenantSettings.currency;
   const hasTaxIdChanges =
     tenantSettings && (taxId || '') !== (tenantSettings.taxId || '');
 
   // Guarded hydration — the tenantSettings query is shared across several
   // settings components; a refetch one of them triggers must not clobber an
-  // unsaved currency/taxId edit here (see useServerHydratedState).
+  // unsaved taxId edit here (see useServerHydratedState). Currency has no
+  // local state to hydrate any more — it's read straight from
+  // useCountryProfile() below.
   useServerHydratedState(
     tenantSettings,
     (data) => {
-      setCurrency(data.currency || 'TRY');
       setTaxId(data.taxId || '');
     },
-    { skipWhile: Boolean(hasCurrencyChanges || hasTaxIdChanges) || isUpdating }
+    { skipWhile: Boolean(hasTaxIdChanges) || isUpdating }
   );
 
   if (isLoading) {
@@ -109,36 +94,23 @@ const BrandingSettingsPage = () => {
       </div>
 
       <div className="max-w-3xl space-y-4">
-        {/* Currency Settings */}
+        {/* Currency — DERIVED from the tenant's country, read-only */}
         <SettingsSection
           title={t('currencySettings.title')}
           description={t('currencySettings.description')}
           icon={<Coins className="w-4 h-4" />}
-          requireManualSave
-          saveStatus={currencyStatus}
-          onSave={handleSaveCurrency}
-          isSaving={isUpdating}
-          hasChanges={!!hasCurrencyChanges}
-          saveLabel={t('saveChanges')}
         >
           <SettingsGroup>
-            <SettingsSelect
-              label={t('currencySettings.selectCurrency')}
-              value={currency}
-              onChange={setCurrency}
-              options={SUPPORTED_CURRENCIES.map((curr) => ({
-                value: curr.code,
-                label: `${curr.symbol} - ${curr.name} (${curr.code})`,
-              }))}
-            />
+            <div>
+              <span className="block text-sm font-medium text-slate-700">
+                {t('currencySettings.currentCurrency')}
+              </span>
+              <p className="mt-1 text-sm text-slate-900">{currency}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {t('currencySettings.derivedFromCountry')}
+              </p>
+            </div>
           </SettingsGroup>
-
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
-              <strong>{t('info.noteLabel')}</strong>{' '}
-              {t('autoSave.currencyWarning')}
-            </p>
-          </div>
         </SettingsSection>
 
         {/* Tax ID for KDV-compliant invoices */}
@@ -156,13 +128,12 @@ const BrandingSettingsPage = () => {
           <SettingsGroup>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">
-                {t('brandingSettings.taxId.label')}
+                {taxIdLabel}
               </span>
               <input
                 type="text"
                 inputMode="numeric"
-                pattern="\d{10,11}"
-                maxLength={11}
+                maxLength={taxIdMaxLength(taxIdRules)}
                 value={taxId}
                 onChange={(e) => {
                   setTaxId(e.target.value.replace(/\D/g, ''));
@@ -175,7 +146,7 @@ const BrandingSettingsPage = () => {
                 <p className="mt-1 text-sm text-red-600">{taxIdError}</p>
               )}
               <p className="mt-1 text-xs text-slate-500">
-                {t('brandingSettings.taxId.help')}
+                {t('brandingSettings.taxId.help', { names: taxIdNames })}
               </p>
             </label>
           </SettingsGroup>

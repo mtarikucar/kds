@@ -75,6 +75,7 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
   // checkout-intent.hardware-stock.spec.ts. Still wired so the constructor
   // shape matches production DI.
   let hardwareCatalog: any;
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CheckoutIntentService;
 
   const buyer = {
@@ -99,6 +100,9 @@ describe("CheckoutIntentService.createIntent — add-on purchasability guard (Ta
       catalog,
       entitlements as any,
     );
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
     svc = new CheckoutIntentService(
 prisma as any,
       quoteSvc,
@@ -106,6 +110,7 @@ prisma as any,
       addonGuard,
       hardwareCatalog,
       referralDirectory as any,
+      countryCapability as any,
     );
   });
 

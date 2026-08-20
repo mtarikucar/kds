@@ -1,3 +1,12 @@
+// NOT a selection list — a tenant's currency is DERIVED from its country
+// profile (see backend/src/common/country/country-profile.const.ts,
+// CountryService.currencyForTenant()) and is no longer user-writable
+// (update-tenant-settings.dto.ts dropped `currency` in Task 7 of the
+// multi-country work; SUPPORTED_CURRENCIES was already narrowed to TRY-only
+// selection back in v3.2.9 when PayTR became the sole processor). This
+// array now exists ONLY to key CURRENCY_INFO below — a symbol/name lookup
+// table for wherever a currency code needs a human label (e.g. legacy
+// non-TRY plan rendering on the bank-transfer/havale path).
 export const SUPPORTED_CURRENCIES = [
   "USD",
   "EUR",

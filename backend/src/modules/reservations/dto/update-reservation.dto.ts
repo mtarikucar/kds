@@ -13,13 +13,13 @@ import {
 } from "class-validator";
 import { EmptyStringToNumber } from "../../../common/dto/transforms";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN as PHONE_REGEX } from "../../../common/phone/e164.const";
 
 // Phone is NORMALIZED to E.164 (NormalizePhone) before validation. Mirrors
 // CreateReservationDto so an UPDATE can't smuggle a junk phone into
 // reservation.customerPhone (which the public lookup endpoint reads as the
 // auth signal); a natural format normalizes to canonical E.164, an
 // unparseable value passes through and is rejected.
-const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 
 export class UpdateReservationDto {
@@ -59,7 +59,7 @@ export class UpdateReservationDto {
   customerName?: string;
 
   @ApiPropertyOptional()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsOptional()
   @ValidateIf(
     (o) =>

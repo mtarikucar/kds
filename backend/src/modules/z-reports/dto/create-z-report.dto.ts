@@ -9,10 +9,15 @@ import {
   MaxLength,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { MONEY_COLUMN_MAX } from "../../../common/money/money-column-bounds.const";
 
-// Cash fields are Decimal(10,2) — max 99 999 999.99. Bounding here turns an
-// over-capacity value into a clean 400 instead of a Postgres overflow 500.
-const CASH_MAX = 99_999_999.99;
+// Cash fields are Decimal(14,2) since the Task 8 widening — bounding here
+// turns an over-capacity value into a clean 400 instead of a Postgres
+// overflow 500. Sourced from the shared column ceiling (see
+// money-column-bounds.const.ts) rather than a hand-copied number, so this
+// stays correct if the column precision changes again — this is the exact
+// field the widening was for (a UZS restaurant's daily cash total).
+const CASH_MAX = MONEY_COLUMN_MAX;
 
 export class CreateZReportDto {
   @ApiProperty({ description: "Date of the report (YYYY-MM-DD)" })

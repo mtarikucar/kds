@@ -18,8 +18,8 @@ vi.mock('./fiscalApi', () => ({
 }));
 // useFormatCurrencyExtended -> useCurrency -> react-query; stub the currency
 // hook so the page renders without a QueryClientProvider.
-vi.mock('../../hooks/useCurrency', () => ({
-  useCurrency: () => 'TRY',
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ currency: 'TRY', displayDecimals: 2 }),
 }));
 
 import FiscalRecoveryPage from './FiscalRecoveryPage';

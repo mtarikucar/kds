@@ -18,6 +18,8 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
+import { IsCountryTaxRate } from "../../../common/country/country-tax-rate.validator";
+import { COUNTRY_PROFILES } from "../../../common/country/country-profile.const";
 
 export class ComboGroupItemDto {
   @ApiProperty({ example: "component-product-uuid" })
@@ -130,9 +132,11 @@ export class CreateProductDto {
   @MaxLength(5000)
   ingredients?: string;
 
-  // Schema is Decimal(10, 2) — anything above 99,999,999.99 surfaces as a 500
-  // from Postgres. 10,000,000 mirrors the payment-amount cap (iter-42); any
-  // realistic menu item is several orders below.
+  // Schema is Decimal(14, 2) since the Task 8 widening (was Decimal(10, 2);
+  // that old ceiling is exactly what money-column-bounds.const.ts guards
+  // against elsewhere). 10,000,000 is a business-realism cap independent of
+  // that precision — it mirrors the payment-amount cap (iter-42); any
+  // realistic menu item is several orders below, at either precision.
   @ApiProperty({ example: 12.99 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
@@ -209,18 +213,24 @@ export class CreateProductDto {
   @IsOptional()
   displayOrder?: number;
 
-  // KDV (VAT) rate for this product. TR allows 0 / 1 / 10 / 20. Defaults to 10
-  // server-side. Previously fixed at 10 for every item with no way to set it —
-  // mixed-rate menus (alcohol 20%, staples 1%) computed wrong KDV on every
-  // receipt + z-report.
+  // KDV/QQS (VAT) rate for this product, validated against the TENANT'S
+  // COUNTRY (@IsCountryTaxRate), not a fixed global list — TR allows
+  // 0/1/10/20, UZ allows 0/6/12 (see COUNTRY_PROFILES). Defaults to the
+  // country's own defaultTaxRate server-side when omitted. Previously fixed
+  // at @IsIn([0, 1, 10, 20]) for every tenant, which made it flatly
+  // impossible for a UZ operator to enter their 12% QQS or 6% catering rate.
+  // The Swagger `enum` below documents the TR default only — it is NOT the
+  // runtime constraint, which is resolved from the ambient request country.
   @ApiProperty({
     example: 10,
     default: 10,
     required: false,
-    enum: [0, 1, 10, 20],
+    enum: COUNTRY_PROFILES.TR.taxRates,
+    description:
+      "VAT/QQS rate. Must be one of the rates for the tenant's own country — see COUNTRY_PROFILES. The enum shown here is the TR default for documentation only.",
   })
   @IsInt()
-  @IsIn([0, 1, 10, 20])
+  @IsCountryTaxRate()
   @IsOptional()
   taxRate?: number;
 

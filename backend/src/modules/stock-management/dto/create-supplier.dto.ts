@@ -14,6 +14,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PartialType } from "@nestjs/swagger";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 export class SupplierStockItemDto {
   @ApiProperty({ description: "Stock item ID" })
@@ -58,11 +59,11 @@ export class CreateSupplierDto {
   // "(0555) 123-45-67" — and it lands as "+905551234567". An unparseable
   // value passes through untouched and fails the E.164 check below.
   @ApiPropertyOptional({ description: "Supplier phone" })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(/^\+[1-9]\d{6,14}$/, {
+  @Matches(E164_PATTERN, {
     message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone?: string;

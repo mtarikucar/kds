@@ -20,7 +20,7 @@ import {
 } from "../constants/platform.enum";
 import { OrderStatus } from "../../../common/constants/order-status.enum";
 import { CommandQueueService } from "../../device-mesh/command-queue.service";
-import { EscPosBuilderService } from "../../device-mesh/printing/escpos-builder.service";
+import { EscPosBuilderService } from "../../printing-core/escpos-builder.service";
 import { ReceiptSnapshotBuilder } from "../../orders/services/receipt-snapshot.builder";
 import { OutboxService } from "../../outbox/outbox.service";
 import { SalesInvoiceService } from "../../accounting/services/sales-invoice.service";

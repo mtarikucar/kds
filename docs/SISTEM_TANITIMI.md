@@ -65,7 +65,7 @@ Backend NestJS + PostgreSQL + Prisma, frontend React + Vite + TanStack Query + T
 
 ## 3. Lisans ve Modüller
 
-Paket, kademe, plan ve deneme süresi yoktur. Çekirdek her hesapta **süresiz ücretsiz** açıktır; ücretli tarafta ise yıllık bir **lisans** ve tek tek satın alınan **modül / entegrasyon / kapasite** kalemleri vardır. Tüm fiyatlar TRY ve KDV dahildir; tahsilat PayTR üzerinden yapılır.
+Paket, kademe, plan ve deneme süresi yoktur. Çekirdek her hesapta **süresiz ücretsiz** açıktır; ücretli tarafta ise yıllık bir **Bakım, Destek ve Güncelleme** kalemi (kodda `license_annual`; öncelikli destek, e-Fatura gönderimi, tüm güncellemeler ve günlük yedekleme dahildir) ve tek tek satın alınan **modül / entegrasyon / kapasite** kalemleri vardır. Tüm fiyatlar TRY ve KDV dahildir; tahsilat PayTR üzerinden yapılır.
 
 **Detay**
 
@@ -79,17 +79,15 @@ Kullanıcı, masa, ürün, kategori ve **aylık sipariş sayısı sınırsızdı
 
 | Kalem | Tip | Fiyat |
 |---|---|---:|
-| Lisans | yıllık | ₺2.990 |
+| Bakım, Destek ve Güncelleme (öncelikli destek + e-Fatura + güncellemeler dahil) | yıllık | ₺4.900 |
 | Gelişmiş Rapor & Analitik | modül / yıllık | ₺1.290 |
-| Stok & Maliyet Yönetimi | modül / yıllık | ₺1.490 |
+| Stok & Maliyet Yönetimi | modül / yıllık | ₺3.900 |
 | Rezervasyon Sistemi | modül / yıllık | ₺990 |
 | Personel Yönetimi | modül / yıllık | ₺990 |
 | AI Menü Stüdyosu | modül / yıllık | ₺1.990 |
 | API & Webhook Erişimi | modül / yıllık | ₺2.490 |
 | Partner Ekran API | modül / yıllık | ₺1.990 |
-| Öncelikli Destek | modül / yıllık | ₺1.990 |
 | Yemeksepeti / Getir / Trendyol Yemek | entegrasyon / yıllık | her biri ₺2.490 |
-| e-Fatura (Nilvera) | entegrasyon / yıllık | ₺1.990 |
 | ÖKC / Yazarkasa (Hugin) | entegrasyon / yıllık | ₺2.990 |
 | Çağrı-ID | entegrasyon / yıllık | ₺1.490 |
 | SMS Bildirimleri | entegrasyon / yıllık | ₺990 |
@@ -449,7 +447,7 @@ Sistemi yöneten ekip için izleme, müdahale ve destek araçları.
 - **Backup**: PostgreSQL günlük snapshot (deploy dışında ayrı süreç)
 - **Migration**: `prisma migrate deploy` ile prod; downtime sıfır (forward-only)
 - **Seed**: `seed.ts` (temel veri), `seeds/seed-marketplace.ts` (à-la-carte katalog), `seed-platform-users.ts` (e2e users), `seed-demo.ts` (Sultanahmet demo tenant)
-- **Destek**: standart destek e-posta ile, iş günü saatlerinde ve ücretsiz çekirdek dahil herkese açıktır. **Öncelikli Destek** modülü (yıllık, lisans ön koşuluyla) alındığında talepler öncelikli sıraya girer ve garantili yanıt süresi uygulanır
+- **Destek**: standart destek e-posta ile, iş günü saatlerinde ve ücretsiz çekirdek dahil herkese açıktır. **Bakım, Destek ve Güncelleme** kalemi alındığında talepler öncelikli sıraya girer ve garantili yanıt süresi uygulanır (ayrı bir modül değildir, bu kalemin içindedir)
 - **API erişimi**: **API & Webhook Erişimi** modülü gerekir (yıllık, lisans ön koşuluyla) — müşteri kendi entegrasyonu için API key alır (apiKeyHash ile saklanır)
 - **Deployment**: Docker Compose (db + backend + frontend + redis); CI build → image registry → docker swarm / k8s deploy
 - **CI/CD**: GitHub Actions; PR → typecheck + unit tests + e2e suite + lint

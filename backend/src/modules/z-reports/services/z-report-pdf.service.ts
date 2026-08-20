@@ -2,7 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { ZReport, Tenant } from "@prisma/client";
 import PDFDocument from "pdfkit";
 import { format } from "date-fns";
-import { CURRENCY_SYMBOLS } from "../currency-symbols";
+import { resolveCountryProfile } from "../../../common/country/country.service";
+import { formatMoneyForDocument } from "../../../common/country/money-format";
 
 /**
  * Pure Z-Report PDF renderer, extracted verbatim from
@@ -10,6 +11,17 @@ import { CURRENCY_SYMBOLS } from "../currency-symbols";
  * report + tenant and returns the document bytes — no DB access — so the
  * rendering logic is independently testable and the service keeps only the
  * fetch + delegation.
+ *
+ * Task 13: money used to hardcode 2 fraction digits and look up a currency
+ * symbol that silently fell back to "$" for anything not in a fixed map
+ * (UZS included — an Uzbek restaurant's end-of-day report printed a dollar
+ * sign). Both now come from `resolveCountryProfile(tenant.countryCode)` —
+ * the pure, non-DI door to the country profile (this class stays DB-free,
+ * per its own doc comment above) — via the shared server-side money
+ * formatter, common/country/money-format.ts. Deliberately NOT
+ * `tenant.currency`: that field is a written mirror, never the truth (see
+ * CountryService's class doc comment) — the profile derived from the
+ * tenant's COUNTRY is canonical.
  */
 @Injectable()
 export class ZReportPdfService {
@@ -34,59 +46,38 @@ export class ZReportPdfService {
       );
       doc.moveDown();
 
-      // Get currency symbol
-      const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || "$";
+      // Country-profile-driven money — see class doc comment above.
+      const profile = resolveCountryProfile(tenant.countryCode);
+      const money = (amount: unknown) =>
+        formatMoneyForDocument(Number(amount), profile);
 
       // Sales Summary
       doc.fontSize(14).text("Sales Summary", { underline: true });
       doc.fontSize(10);
       doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(
-        `Total Sales: ${currencySymbol}${Number(report.totalSales).toFixed(2)}`,
-      );
-      doc.text(
-        `Discounts: ${currencySymbol}${Number(report.totalDiscount).toFixed(2)}`,
-      );
-      doc.text(
-        `Net Sales: ${currencySymbol}${Number(report.netSales).toFixed(2)}`,
-      );
+      doc.text(`Total Sales: ${money(report.totalSales)}`);
+      doc.text(`Discounts: ${money(report.totalDiscount)}`);
+      doc.text(`Net Sales: ${money(report.netSales)}`);
       doc.moveDown();
 
       // Payment Methods
       doc.fontSize(14).text("Payment Methods", { underline: true });
       doc.fontSize(10);
-      doc.text(
-        `Cash: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Card: ${currencySymbol}${Number(report.cardPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Digital: ${currencySymbol}${Number(report.digitalPayments).toFixed(2)}`,
-      );
+      doc.text(`Cash: ${money(report.cashPayments)}`);
+      doc.text(`Card: ${money(report.cardPayments)}`);
+      doc.text(`Digital: ${money(report.digitalPayments)}`);
       doc.moveDown();
 
       // Cash Drawer
       doc.fontSize(14).text("Cash Drawer Reconciliation", { underline: true });
       doc.fontSize(10);
-      doc.text(
-        `Opening Balance: ${currencySymbol}${Number(report.openingCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Cash Sales: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`,
-      );
-      doc.text(
-        `Expected Cash: ${currencySymbol}${Number(report.expectedCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Actual Cash: ${currencySymbol}${Number(report.countedCash).toFixed(2)}`,
-      );
-      doc.text(
-        `Difference: ${currencySymbol}${Number(report.cashDifference).toFixed(2)}`,
-        {
-          continued: true,
-        },
-      );
+      doc.text(`Opening Balance: ${money(report.openingCash)}`);
+      doc.text(`Cash Sales: ${money(report.cashPayments)}`);
+      doc.text(`Expected Cash: ${money(report.expectedCash)}`);
+      doc.text(`Actual Cash: ${money(report.countedCash)}`);
+      doc.text(`Difference: ${money(report.cashDifference)}`, {
+        continued: true,
+      });
 
       const cashDiff = Number(report.cashDifference);
       if (cashDiff !== 0) {

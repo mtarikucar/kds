@@ -48,6 +48,17 @@ describe('customerPhone PHONE_REGEX parity (iter-54)', () => {
       const msgs = await errors(dto);
       expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
     });
+
+    // T5 sweep: PHONE_REGEX used to be the loose `\+?` variant here even
+    // though @NormalizePhone precedes it — dead permissiveness, since a
+    // naturally-typed number already normalizes to canonical E.164. Pin
+    // that a bare-digit shape (which the loose regex accepted) is now
+    // rejected by the shared, strict E164_PATTERN.
+    it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+      const dto = plainToInstance(PayItemsDto, { ...base, customerPhone: '12345678' });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    });
   });
 
   describe('SplitBillDto.customerPhone', () => {
@@ -63,6 +74,12 @@ describe('customerPhone PHONE_REGEX parity (iter-54)', () => {
 
     it('rejects junk', async () => {
       const dto = plainToInstance(SplitBillDto, { ...base, customerPhone: 'abc' });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    });
+
+    it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+      const dto = plainToInstance(SplitBillDto, { ...base, customerPhone: '12345678' });
       const msgs = await errors(dto);
       expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
     });
@@ -82,6 +99,12 @@ describe('customerPhone PHONE_REGEX parity (iter-54)', () => {
     // After iter-54, the regex rejects it.
     it('rejects junk that previously passed Length(4,32)', async () => {
       const dto = plainToInstance(CreatePayIntentDto, { ...base, customerPhone: 'junk-string!' });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    });
+
+    it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+      const dto = plainToInstance(CreatePayIntentDto, { ...base, customerPhone: '12345678' });
       const msgs = await errors(dto);
       expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
     });

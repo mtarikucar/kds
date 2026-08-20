@@ -15,9 +15,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
-
-// E.164-ish: 8-15 digits, optional leading +. Mirrors pay-intent.dto.ts.
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 /**
  * One OrderItem the screen wants to settle. The server already knows the
@@ -56,12 +54,12 @@ export class CreateDisplayPayIntentDto {
       "Optional customer phone — links the resulting Payment to a Customer row for loyalty.",
   })
   @EmptyStringToUndefined()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, {
-    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  @Matches(E164_PATTERN, {
+    message: "customerPhone must be in E.164 format, e.g. +905551234567",
   })
   customerPhone?: string;
 }

@@ -5,6 +5,7 @@ import { addHours } from "date-fns";
 import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { CountryCapabilityResolver } from "../../../common/country/country-capability.resolver";
 import { SelfPayWebhookService } from "./self-pay-webhook.service";
 
 /**
@@ -67,6 +68,11 @@ export class SelfPayRecoveryService {
     private readonly prisma: PrismaService,
     private readonly paytr: PaytrAdapter,
     private readonly webhook: SelfPayWebhookService,
+    // Task 10 — resolves which payment provider a row's tenant's country
+    // actually has, checked per-row before PaytrAdapter is touched.
+    // Required (no @Optional): CommonModule is @Global(), so DI fails
+    // loud at boot instead of silently letting every row through.
+    private readonly countryCapability: CountryCapabilityResolver,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR, { name: "self-pay-inquiry-recovery" })
@@ -124,6 +130,25 @@ export class SelfPayRecoveryService {
         for (const row of candidates) {
           const oid = row.merchantOid;
           try {
+            // Task 10 — a row can only be a live PayTR intent if its
+            // tenant's country still resolves to "paytr". This can't
+            // currently diverge from the resolver's answer at intent-
+            // create time (self-pay-intent.service.ts gates the same
+            // way), but re-checking here means a future provider-config
+            // change never sends a stale row to the wrong adapter. Any
+            // other outcome falls into the same per-row isolation the
+            // catch below already provides — one bad row never blocks
+            // the rest of the batch.
+            const provider = await this.countryCapability.paymentProviderFor(
+              row.tenantId,
+            );
+            if (provider.id !== "paytr") {
+              throw new Error(
+                `self-pay recovery: tenant ${row.tenantId} resolves to ` +
+                  `payment provider '${provider.id}', not paytr — cannot ` +
+                  `inquire oid=${oid}`,
+              );
+            }
             const inquiry = await this.paytr.inquiryStatus(oid);
             if (inquiry.status === "success") {
               // Replay settlement. handleWebhookSuccess re-opens the

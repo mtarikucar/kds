@@ -18,6 +18,8 @@ import {
   MenuImportProductDraftDto,
 } from "../dto/menu-import.dto";
 import { foldMenuKey } from "./menu-key-fold";
+import { RequestContext } from "../../../common/context/request-context";
+import { resolveCountryProfile } from "../../../common/country/country.service";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const SUPPORTED_IMAGE_TYPES = [
@@ -284,7 +286,13 @@ export class MenuImportService {
       throw new ServiceUnavailableException(unreadableMessage);
     }
 
-    const validTax = new Set([0, 1, 10, 20]);
+    // Country-scoped, not a fixed TR band — a UZ tenant's photo/text import
+    // can carry the model's read of a 12% QQS or 6% catering line, neither
+    // of which is in Turkey's 0/1/10/20. This runs inside the same request
+    // that uploaded the source, so the ambient country is already resolved.
+    const validTax = new Set(
+      resolveCountryProfile(RequestContext.get()?.countryCode).taxRates,
+    );
     const categories: MenuImportCategoryDraftDto[] = Array.isArray(
       parsed?.categories,
     )
@@ -622,7 +630,13 @@ export class MenuImportService {
               name: p.name,
               description: p.description,
               price: p.price,
-              taxRate: p.taxRate ?? 10,
+              // Country-scoped default, not a fixed 10 — a UZ tenant's row
+              // that omitted taxRate must default to UZ's own 12, not
+              // Turkey's 10 (which is not even a valid UZ rate).
+              taxRate:
+                p.taxRate ??
+                resolveCountryProfile(RequestContext.get()?.countryCode)
+                  .defaultTaxRate,
               categoryId,
             } as any,
             tenantId,

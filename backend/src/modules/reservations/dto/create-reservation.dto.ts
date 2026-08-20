@@ -13,13 +13,13 @@ import {
 } from "class-validator";
 import { AtLeastOneOf } from "../../../common/validators/at-least-one-of.decorator";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN as PHONE_REGEX } from "../../../common/phone/e164.const";
 
 // Phone is NORMALIZED to E.164 (NormalizePhone) before validation, so the
 // caller can type any natural format — "0555 123 45 67", "+90 555 123 45 67",
 // "(0555) 123-45-67" — and it lands as "+905551234567". The regex then
 // asserts canonical E.164; an unparseable value passes through untouched and
 // is rejected with the friendly message.
-const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 
 @AtLeastOneOf(["customerEmail", "customerPhone"], {
@@ -63,7 +63,7 @@ export class CreateReservationDto {
     description: "Customer phone (E.164 or digits)",
     example: "+905551234567",
   })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsOptional()
   @ValidateIf(
     (o) =>
@@ -107,7 +107,7 @@ export class CreateReservationDto {
 
 export class CancelPublicReservationDto {
   @ApiProperty({ description: "Customer phone used at booking time" })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @MaxLength(20)
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })

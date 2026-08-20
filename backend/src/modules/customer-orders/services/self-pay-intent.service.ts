@@ -13,6 +13,7 @@ import { createHash } from "crypto";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { PaymentsService } from "../../orders/services/payments.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { CountryCapabilityResolver } from "../../../common/country/country-capability.resolver";
 import { CustomerSessionService } from "../../customers/customer-session.service";
 import { DemoGuardService } from "../../demo/demo-guard.service";
 import { CreatePayIntentDto } from "../dto/pay-intent.dto";
@@ -53,6 +54,12 @@ export class SelfPayIntentService {
     private customerSessionService: CustomerSessionService,
     private config: ConfigService,
     private reservations: SelfPayReservationService,
+    // Task 10 — resolves which payment provider this tenant's country
+    // actually has, BEFORE PaytrAdapter (below) is ever touched. Required
+    // (no @Optional): CommonModule is @Global() and always provides it, so
+    // DI fails loud at boot if that ever stops being true, instead of
+    // silently letting every tenant fall through to PayTR.
+    private readonly countryCapability: CountryCapabilityResolver,
     // Demo-tenant real-money block. REQUIRED (no @Optional) —
     // CustomerOrdersModule imports DemoGuardModule, so DI fails loud at boot
     // if a future module-wiring regression ever drops that import, instead
@@ -203,24 +210,36 @@ export class SelfPayIntentService {
       }
     }
 
-    // Currency safety gate — PayTR collects in TRY only. The Order
-    // schema doesn't carry a per-order currency column today (line
-    // items inherit the tenant's currency setting from Tenant.currency),
-    // so we read the tenant row instead. A tenant operating in (e.g.)
-    // USD would otherwise have the customer see "$199" on the QR-menu
-    // bill while the adapter hardcodes wire-format currency=TL — same
-    // bug-shape iter-67 closes on the subscription path. The adapter
-    // throws on mismatch as defence in depth; this pre-check produces
-    // a clean structured error before the PendingSelfPayment row is
-    // reserved.
-    const tenantCurrency = tenant.currency || "TRY";
-    if (tenantCurrency !== "TRY") {
+    // Country capability gate (Task 10) — resolve which payment provider
+    // this tenant's country actually has BEFORE any order/reservation
+    // work or a PayTR call. A country with no payment provider configured
+    // (e.g. UZ, whose profile lists none yet) gets the resolver's own
+    // explicit, country-scoped refusal right here — never a bare PayTR
+    // error surfacing after reservation locks are already held. See
+    // CountryCapabilityResolver.
+    //
+    // This replaces the old local SELF_PAY_UNSUPPORTED_CURRENCY check,
+    // which duplicated the resolver's refusal in a way that could drift:
+    // currency and payment-provider country are independent tenant facts,
+    // and only the latter is this gate's business now. A non-TRY tenant
+    // whose country DOES resolve to PayTR reaches PayTR exactly like any
+    // other tenant — PayTR's own assertPaytrCurrency gate (paytr.adapter.ts,
+    // unchanged) is the sole remaining currency defence, as intended.
+    const paymentProvider = await this.countryCapability.paymentProviderFor(
+      session.tenantId,
+    );
+    if (paymentProvider.id !== "paytr") {
+      // Self-pay only knows how to drive PaytrAdapter's rich iframe-token
+      // API today — a resolver naming a different provider means this
+      // flow isn't implemented for that provider, not that PayTR should
+      // be used anyway.
       throw selfPayError(
-        "SELF_PAY_UNSUPPORTED_CURRENCY",
-        `Self-pay yalnızca TRY ile çalışan restoranlarda kullanılabilir (mevcut: ${tenantCurrency}).`,
+        "SELF_PAY_UNSUPPORTED_PROVIDER",
+        `Self-pay is not yet available for payment provider '${paymentProvider.id}'.`,
       );
     }
-    const orderCurrency = tenantCurrency;
+
+    const orderCurrency = tenant.currency || "TRY";
 
     // Defence-in-depth against the legacy-payment blind spot:
     // self-pay is disabled on any order that already has a Payment

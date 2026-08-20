@@ -177,6 +177,10 @@ describe("self-pay inquiry-recovery (sweep-3 #4)", () => {
   describe("SelfPayRecoveryService — hourly cron", () => {
     let paytr: { inquiryStatus: jest.Mock };
     let webhook: { handleWebhookSuccess: jest.Mock };
+    // Task 10 — CountryCapabilityResolver gate, checked per-row before the
+    // adapter is touched. Defaults every tenant to "paytr" (matching this
+    // file's TR-only fixtures); the UZ test below overrides per-tenantId.
+    let countryCapability: { paymentProviderFor: jest.Mock };
     let svc: SelfPayRecoveryService;
 
     beforeEach(() => {
@@ -190,10 +194,14 @@ describe("self-pay inquiry-recovery (sweep-3 #4)", () => {
 
       paytr = { inquiryStatus: jest.fn() };
       webhook = { handleWebhookSuccess: jest.fn().mockResolvedValue(undefined) };
+      countryCapability = {
+        paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+      };
       svc = new SelfPayRecoveryService(
         prisma as any,
         paytr as any,
         webhook as any,
+        countryCapability as any,
       );
     });
 
@@ -283,6 +291,50 @@ describe("self-pay inquiry-recovery (sweep-3 #4)", () => {
       await svc.recoverStuckIntents();
 
       expect(prisma.pendingSelfPayment.findMany).not.toHaveBeenCalled();
+    });
+
+    // Task 10 — a row belonging to a tenant whose country has no payment
+    // provider must never reach PayTR's inquiry API, even inside the
+    // per-row isolation loop. Per-row isolation means this doesn't abort
+    // the batch — it's treated exactly like any other per-row failure.
+    it("never inquires PayTR for a row whose tenant resolves to no payment provider (UZ-like)", async () => {
+      const UZ_TENANT_ID = "tenant-uz";
+      (prisma.pendingSelfPayment.findMany as any).mockResolvedValue([
+        { id: "intent-uz", merchantOid: "SPuz", tenantId: UZ_TENANT_ID },
+        { id: "intent-tr", merchantOid: "SPtr", tenantId: TENANT_ID },
+      ]);
+      countryCapability.paymentProviderFor.mockImplementation(
+        (tenantId: string) =>
+          tenantId === UZ_TENANT_ID
+            ? Promise.reject(
+                new Error(
+                  "No payment provider configured for UZ — the country " +
+                    "profile lists none yet.",
+                ),
+              )
+            : Promise.resolve({ id: "paytr" }),
+      );
+      paytr.inquiryStatus.mockResolvedValue({
+        status: "success",
+        paymentType: "card",
+        raw: {},
+      });
+
+      await svc.recoverStuckIntents();
+
+      // The UZ row's oid never reached PayTR...
+      expect(paytr.inquiryStatus).not.toHaveBeenCalledWith("SPuz");
+      // ...but the TR row in the same batch still did (per-row isolation —
+      // the UZ refusal didn't abort the rest of the batch).
+      expect(paytr.inquiryStatus).toHaveBeenCalledWith("SPtr");
+      expect(webhook.handleWebhookSuccess).toHaveBeenCalledWith(
+        "SPtr",
+        "card",
+      );
+      expect(webhook.handleWebhookSuccess).not.toHaveBeenCalledWith(
+        "SPuz",
+        expect.anything(),
+      );
     });
   });
 });

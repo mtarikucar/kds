@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PhoneVerificationService } from './phone-verification.service';
+import { E164_MESSAGE } from '../../common/phone/e164.const';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
 /**
@@ -69,5 +70,83 @@ describe('PhoneVerificationService.getVerificationStatus (iter-31)', () => {
     // Mask should retain enough to confirm the user is polling the right
     // record (last few digits) but not enough to dox a captured id.
     expect(out.phone).toMatch(/[*]/);
+  });
+});
+
+/**
+ * T5 sweep: sendOTP's format gate used the loose `/^\+?[1-9]\d{7,14}$/`
+ * regex directly (this service does not go through @NormalizePhone — its
+ * own customers.helpers.ts normalizePhone() runs first, which already
+ * turns a Turkish national/no-plus shape into "+90…"). In practice the
+ * only callers are SendOTPDto/VerifyOTPDto, both of which already enforce
+ * the shared E164_PATTERN upstream — so this check is a second, now
+ * strict, gate on an already-validated value.
+ */
+describe('PhoneVerificationService.sendOTP phone format gate (T5)', () => {
+  it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+    const prisma = mockPrismaClient();
+    const sms: any = { sendVerificationCode: jest.fn(), isServiceEnabled: () => true };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    // "12345678" is not a parseable phone under any region, so the local
+    // normalizePhone() helper returns it unchanged (no '+') — the old loose
+    // regex accepted that shape; the shared E164_PATTERN rejects it.
+    await expect(svc.sendOTP('12345678', 'sess-1', 'tenant-1')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  // Fix round 1: this is a generic, no-field-name-needed context (a raw
+  // phone string param, not a multi-field DTO), so E164_MESSAGE — the
+  // shared constant otherwise exported with zero call sites — is the
+  // genuinely right message here rather than a bespoke duplicate.
+  it('throws the shared E164_MESSAGE (not a bespoke duplicate string)', async () => {
+    const prisma = mockPrismaClient();
+    const sms: any = { sendVerificationCode: jest.fn(), isServiceEnabled: () => true };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await expect(svc.sendOTP('12345678', 'sess-1', 'tenant-1')).rejects.toThrow(
+      E164_MESSAGE,
+    );
+  });
+
+  it('accepts a canonical E.164 phone (format gate does not block real numbers)', async () => {
+    const prisma = mockPrismaClient();
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue(null);
+    (prisma.phoneVerification.count as any).mockResolvedValue(0);
+    (prisma.phoneVerification.create as any).mockResolvedValue({ id: 'v-1' });
+    const sms: any = {
+      sendVerificationCode: jest.fn().mockResolvedValue(true),
+      isServiceEnabled: () => true,
+    };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await expect(
+      svc.sendOTP('+905551234567', 'sess-1', 'tenant-1'),
+    ).resolves.toBeDefined();
+  });
+
+  // Task 11: sendOTP already has tenantId in scope — it must forward it to
+  // sendVerificationCode so SmsService can resolve THIS tenant's country
+  // SMS provider (NetGSM for TR, refused for UZ) rather than depending on
+  // an ambient RequestContext that may not carry the right tenant.
+  it('forwards tenantId to sendVerificationCode for per-tenant SMS provider routing', async () => {
+    const prisma = mockPrismaClient();
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue(null);
+    (prisma.phoneVerification.count as any).mockResolvedValue(0);
+    (prisma.phoneVerification.create as any).mockResolvedValue({ id: 'v-1' });
+    const sms: any = {
+      sendVerificationCode: jest.fn().mockResolvedValue(true),
+      isServiceEnabled: () => true,
+    };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await svc.sendOTP('+905551234567', 'sess-1', 'tenant-42');
+
+    expect(sms.sendVerificationCode).toHaveBeenCalledWith(
+      '+905551234567',
+      expect.any(String),
+      'tenant-42',
+    );
   });
 });

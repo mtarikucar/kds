@@ -13,15 +13,18 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
+import { IsCountryTaxId } from "../../../common/country/tax-id.validator";
 
 /**
  * Overrides for the invoice being generated from an order. All optional —
  * each field falls back to the order's own value when absent.
  *
- * Caps are sized for Turkish e-fatura: customerTaxId is exactly 10 (legal
- * entity VKN) or 11 (individual TCKN) digits — anything else would be
- * rejected by Foriba/Parasut downstream. We validate format here so the
- * operator sees the error at write time, not after sync round-trip.
+ * customerTaxId is validated against the tenant's OWN country shape
+ * (@IsCountryTaxId — TR: 10-digit VKN / 11-digit TCKN; UZ: 9-digit STIR /
+ * 14-digit PINFL); anything else would be rejected by the e-document
+ * provider downstream (Foriba/Parasut for TR). We validate format here so
+ * the operator sees the error at write time, not after sync round-trip.
  */
 export class CreateSalesInvoiceDto {
   @ApiPropertyOptional()
@@ -36,13 +39,12 @@ export class CreateSalesInvoiceDto {
   customerName?: string;
 
   @ApiPropertyOptional({
-    description: "TR VKN (10 digits) or TCKN (11 digits)",
+    description:
+      "Country-scoped tax identifier — see CountryProfile.taxIdRules (TR: VKN/TCKN, UZ: STIR/PINFL)",
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{10}(\d)?$/, {
-    message: "customerTaxId must be 10 (VKN) or 11 (TCKN) digits",
-  })
+  @IsCountryTaxId()
   customerTaxId?: string;
 
   @ApiPropertyOptional()
@@ -51,16 +53,15 @@ export class CreateSalesInvoiceDto {
   @MaxLength(120)
   customerTaxOffice?: string;
 
-  // Phone shape mirrors the PHONE_REGEX used in create-payment.dto.ts +
-  // create-customer-order.dto.ts. Accounting doesn't feed
+  // Phone shape is the shared E164_PATTERN. Accounting doesn't feed
   // findOrCreateByPhone, but Foriba/Parasut downstream rejects non-E.164
   // shapes too — fail fast at write time instead of after sync round-trip.
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(/^\+?[1-9]\d{7,14}$/, {
-    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  @Matches(E164_PATTERN, {
+    message: "customerPhone must be in E.164 format, e.g. +905551234567",
   })
   customerPhone?: string;
 

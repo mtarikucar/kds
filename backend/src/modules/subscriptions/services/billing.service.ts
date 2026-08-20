@@ -63,8 +63,22 @@ export class BillingService {
 
     // `amount` is the gross (KDV-inclusive) figure the tenant was actually
     // charged. For TRY invoices we reverse-engineer KDV; for non-TRY
-    // currencies (INTERNATIONAL tenants on the EMAIL flow) we keep
-    // tax at 0 since per-jurisdiction VAT is out of scope.
+    // currencies we keep tax at 0.
+    //
+    // This is a DECISION, not a gap to "finish" by charging the tenant's own
+    // country VAT/QQS. HummyTummy is a Turkish company; this invoice is
+    // HummyTummy → the restaurant (platform billing), which is legally
+    // unrelated to the restaurant → diner tax on Product.taxRate /
+    // OrderItem.taxRate. Selling a Turkish SaaS licence to, say, a UZ
+    // tenant is a cross-border service export: zero-rated for Turkish VAT,
+    // and certainly not Uzbekistan's 12% QQS — HummyTummy is not registered
+    // to collect that tax and could not remit it. Keying this off the
+    // tenant's country would make HummyTummy appear to collect a foreign
+    // tax it cannot pay over to that country's authority. See
+    // country-tax-rate.validator.ts for the restaurant-tax side, which DOES
+    // vary by (the restaurant's) country. Pinned by
+    // billing.service.spec.ts's "does NOT charge the customer country's
+    // VAT" test — don't "fix" this into a per-country rate.
     const isTurkish = currency.toUpperCase() === "TRY";
     const { subtotal, tax, total } = isTurkish
       ? splitGrossAmount(amount, this.kdvRate)

@@ -30,7 +30,7 @@ projektörü o satırın `grants` haritasını tenant'ın mevcut hak setine kata
 </Callout>
 
 Tüm uçlar `/api` global ön eki altındadır. Fiyatlar **TRY** cinsindendir ve
-kataloğda **kuruş** (`priceCents`) olarak tutulur: `299000` = ₺2.990,00. Tutarlar
+kataloğda **kuruş** (`priceCents`) olarak tutulur: `490000` = ₺4.900,00. Tutarlar
 KDV dahil (gross) gösterilir. Taban URL, kimlik realm'leri, hata zarfı ve
 rate-limit katmanları için [API Temelleri](/tr/developer/api-fundamentals)
 sayfasına bakın.
@@ -100,7 +100,7 @@ Yanıt:
     "description": "Reçete, stok sayımı, satın alma siparişi, fire takibi, tedarikçi yönetimi ve şubeler arası transfer.",
     "kind": "module",
     "billing": "annual",
-    "priceCents": 149000,
+    "priceCents": 390000,
     "currency": "TRY",
     "deps": [],
     "requiresLicense": true,
@@ -129,19 +129,19 @@ için gösterilir; public katalog payload'ının parçası değildir. Ayrıntıl
 
 | Kod | Tür | Fatura | Fiyat | Açtığı (grant) | Lisans | Bağımlılık |
 | --- | --- | --- | --- | --- | --- | --- |
-| `license_annual` | license | yıllık | ₺2.990 (`299000`) | `feature.license` | — | — |
+| `license_annual` | license | yıllık | ₺4.900 (`490000`) | `feature.license`, `feature.prioritySupport`, `integration.fiscal` += `efatura` | — | — |
 | `advanced_reports` | module | yıllık | ₺1.290 (`129000`) | `feature.advancedReports` | ✅ | — |
-| `module_inventory` | module | yıllık | ₺1.490 (`149000`) | `feature.inventoryTracking` | ✅ | — |
+| `module_inventory` | module | yıllık | ₺3.900 (`390000`) | `feature.inventoryTracking` | ✅ | — |
 | `module_reservations` | module | yıllık | ₺990 (`99000`) | `feature.reservationSystem` | ✅ | — |
 | `module_personnel` | module | yıllık | ₺990 (`99000`) | `feature.personnelManagement` | ✅ | — |
 | `module_ai_studio` | module | yıllık | ₺1.990 (`199000`) | `feature.aiContentGeneration` | ✅ | — |
 | `api_access` | module | yıllık | ₺2.490 (`249000`) | `feature.apiAccess` | ✅ | — |
 | `module_external_display` | module | yıllık | ₺1.990 (`199000`) | `feature.externalDisplay` | ✅ | — |
-| `priority_support` | module | yıllık | ₺1.990 (`199000`) | `feature.prioritySupport` | ✅ | — |
+| `priority_support` | module | yıllık | — | `feature.prioritySupport` | **v3.6.7 arşivlendi** — `license_annual` içine alındı | — |
 | `delivery_yemeksepeti` | integration | yıllık | ₺2.490 (`249000`) | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ | — |
 | `delivery_getir` | integration | yıllık | ₺2.490 (`249000`) | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ | — |
 | `delivery_trendyol_yemek` | integration | yıllık | ₺2.490 (`249000`) | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ | — |
-| `fiscal_efatura` | integration | yıllık | ₺1.990 (`199000`) | `integration.fiscal` += `efatura` | ✅ | — |
+| `fiscal_efatura` | integration | yıllık | — | `integration.fiscal` += `efatura` | **v3.6.7 arşivlendi** — `license_annual` içine alındı | — |
 | `fiscal_hugin` | integration | yıllık | ₺2.990 (`299000`) | `integration.fiscal` += `hugin` | ✅ | — |
 | `caller_id_integration` | integration | yıllık | ₺1.490 (`149000`) | `integration.caller` += `generic` | ✅ | — |
 | `sms_integration` | integration | yıllık | ₺990 (`99000`) | `integration.sms` += `*` | ✅ | — |
@@ -200,7 +200,7 @@ curl -X POST https://hummytummy.com/api/v1/checkout/intent \
     "cart": {
       "items": [
         { "type": "addon", "code": "license_annual", "qty": 1 },
-        { "type": "addon", "code": "fiscal_efatura", "qty": 1 }
+        { "type": "addon", "code": "fiscal_hugin", "qty": 1 }
       ]
     },
     "buyer": {
@@ -226,7 +226,7 @@ const res = await fetch("https://hummytummy.com/api/v1/checkout/intent", {
     cart: {
       items: [
         { type: "addon", code: "license_annual", qty: 1 },
-        { type: "addon", code: "fiscal_efatura", qty: 1 },
+        { type: "addon", code: "fiscal_hugin", qty: 1 },
       ],
     },
     buyer: {

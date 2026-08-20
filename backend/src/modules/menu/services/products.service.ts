@@ -14,6 +14,8 @@ import {
   resolveEffectivePrice,
   isCampaignActive,
 } from "../../orders/services/combo-pricing";
+import { RequestContext } from "../../../common/context/request-context";
+import { resolveCountryProfile } from "../../../common/country/country.service";
 
 // Flatten a product's combo slots into the client shape the POS/QR combo modal
 // consumes (item.name lifted from the nested component product). Kept here so
@@ -126,9 +128,15 @@ export class ProductsService {
         isAvailable: createProductDto.isAvailable ?? true,
         stockTracked: createProductDto.stockTracked ?? false,
         currentStock: createProductDto.currentStock ?? 0,
-        // KDV rate per product (0/1/10/20). Defaults to 10 when unset so the
-        // fiscal/receipt math is correct for non-10% items once configured.
-        taxRate: createProductDto.taxRate ?? 10,
+        // KDV/QQS rate per product, validated at the DTO boundary against
+        // the tenant's OWN country (@IsCountryTaxRate). Defaults to that
+        // SAME country's defaultTaxRate when unset — not a bare 10 — so a
+        // UZ tenant that omits taxRate gets UZ's 12%, not Turkey's 10%
+        // (which is not even a legal UZ rate).
+        taxRate:
+          createProductDto.taxRate ??
+          resolveCountryProfile(RequestContext.get()?.countryCode)
+            .defaultTaxRate,
         productType: createProductDto.productType ?? "STANDARD",
         campaignPrice: createProductDto.campaignPrice ?? null,
         campaignLabel: createProductDto.campaignLabel ?? null,

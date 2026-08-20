@@ -22,6 +22,12 @@ vi.mock('react-i18next', () => ({
   // field) to localize its country list, so the stub must expose it.
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'tr' } }),
 }));
+// <PhoneInput> now defaults its country from useCountryProfile() (Task 7),
+// which needs a QueryClient this suite doesn't set up. Mock at the hook
+// boundary instead — TR matches this suite's existing expectations.
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 vi.mock('@hookform/resolvers/zod', () => ({
   zodResolver: () => async (values: any) => ({ values, errors: {} }),
 }));

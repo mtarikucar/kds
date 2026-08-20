@@ -153,4 +153,42 @@ describe('CreateCustomerOrderDto (iter-84)', () => {
       expect(msgs.some((m) => /sessionId/i.test(m))).toBe(true);
     });
   });
+
+  /**
+   * T5 sweep: this field has no @NormalizePhone, so it used to accept a
+   * bare-digit E.164-shaped string too (the old regex made '+' optional).
+   * The shared E164_PATTERN requires the '+' — the same tightening applied
+   * at all 8 sites that carried the loose variant.
+   */
+  describe('customerPhone (T5 E164_PATTERN sweep)', () => {
+    it('accepts a canonical E.164 phone', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        customerPhone: '+905551234567',
+      });
+      expect(await errors(dto)).toEqual([]);
+    });
+
+    it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        customerPhone: '12345678',
+      });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
+    });
+
+    // Fix round 1: this field is a public QR-menu surface with zero live
+    // frontend callers today, but a customer typing a bare local number
+    // ("0555 123 45 67") should be normalized like every other phone field
+    // on the API, not rejected outright — @NormalizePhone added here.
+    it('normalizes a locally-typed Turkish number via @NormalizePhone', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        customerPhone: '0555 123 45 67',
+      });
+      expect(dto.customerPhone).toBe('+905551234567');
+      expect(await errors(dto)).toEqual([]);
+    });
+  });
 });

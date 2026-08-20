@@ -12,11 +12,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PaymentMethod } from "../../../common/constants/order-status.enum";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
-
-// E.164-ish: 8-15 digits, optional leading +. Mirrors the regex in
-// customer-orders/dto/create-customer-order.dto.ts so phones are
-// validated consistently across every entry surface.
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 export class CreatePaymentDto {
   // 10,000,000 currency-units cap. No legitimate restaurant order
@@ -88,8 +84,8 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, {
-    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  @Matches(E164_PATTERN, {
+    message: "customerPhone must be in E.164 format, e.g. +905551234567",
   })
   customerPhone?: string;
 }

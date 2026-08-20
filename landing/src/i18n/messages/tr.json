@@ -501,7 +501,7 @@
       "support": {
         "title": "Teknik Destek",
         "content": "Hizmeti kullanırken karşılaştığınız teknik sorunlar, hesabınız veya faturalama ile ilgili konular için aşağıdaki adresten bize ulaşabilirsiniz.",
-        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için Öncelikli Destek modülünüzün SLA hükümleri geçerlidir."
+        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için Bakım, Destek ve Güncelleme kaleminizin SLA hükümleri geçerlidir."
       },
       "kvkk": {
         "title": "KVKK Başvuruları",

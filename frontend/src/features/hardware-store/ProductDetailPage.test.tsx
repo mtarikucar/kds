@@ -38,6 +38,13 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: (sel: any) => sel({ user: { email: 'op@x.com', firstName: 'Op', lastName: 'E' } }),
 }));
 vi.mock('sonner', () => ({ toast: { success: (m: string) => toastSuccess(m), error: (m: string) => toastError(m) } }));
+// The quote form's <PhoneInput> unconditionally calls useCountryProfile()
+// (Rules of Hooks — it can't skip the hook just because this page passes an
+// explicit defaultCountry="TR"), which needs a QueryClient the rest of this
+// suite doesn't set up. Mock at the hook boundary instead.
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {

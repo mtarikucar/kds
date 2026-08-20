@@ -5,7 +5,8 @@
 
 import { useCallback, useMemo } from 'react';
 import { useLocale } from './useLocale';
-import { useCurrency } from './useCurrency';
+import { useCountryProfile } from './useCountryProfile';
+import { CURRENCY_DECIMALS_OVERRIDE } from '../lib/utils';
 
 /**
  * Hook providing locale-aware currency formatting
@@ -24,7 +25,12 @@ import { useCurrency } from './useCurrency';
  */
 export const useFormatCurrency = (): ((amount: number) => string) => {
   const { intlLocale } = useLocale();
-  const currency = useCurrency();
+  // Both currency AND its display precision come from the tenant's country
+  // profile (Task 7) — never independently: UZS renders with ZERO decimals
+  // (so'm is quoted whole) even though ISO-4217 gives it two, while TRY
+  // keeps its existing two. Storage/wire stays x100 for every currency,
+  // always — this only ever touches the Intl.NumberFormat presentation.
+  const { currency, displayDecimals } = useCountryProfile();
 
   // Cached formatter for the restaurant's currency
   const currencyFormatter = useMemo(
@@ -32,8 +38,10 @@ export const useFormatCurrency = (): ((amount: number) => string) => {
       new Intl.NumberFormat(intlLocale, {
         style: 'currency',
         currency: currency,
+        minimumFractionDigits: displayDecimals,
+        maximumFractionDigits: displayDecimals,
       }),
-    [intlLocale, currency]
+    [intlLocale, currency, displayDecimals]
   );
 
   /**
@@ -74,7 +82,7 @@ export interface UseFormatCurrencyExtendedReturn {
  */
 export const useFormatCurrencyExtended = (): UseFormatCurrencyExtendedReturn => {
   const { intlLocale } = useLocale();
-  const currency = useCurrency();
+  const { currency, displayDecimals } = useCountryProfile();
 
   // Cached formatter for the restaurant's currency
   const currencyFormatter = useMemo(
@@ -82,8 +90,10 @@ export const useFormatCurrencyExtended = (): UseFormatCurrencyExtendedReturn => 
       new Intl.NumberFormat(intlLocale, {
         style: 'currency',
         currency: currency,
+        minimumFractionDigits: displayDecimals,
+        maximumFractionDigits: displayDecimals,
       }),
-    [intlLocale, currency]
+    [intlLocale, currency, displayDecimals]
   );
 
   /**
@@ -98,12 +108,24 @@ export const useFormatCurrencyExtended = (): UseFormatCurrencyExtendedReturn => 
 
   /**
    * Format amount with specific currency code
+   *
+   * This is an explicit OVERRIDE — a caller passing a currency other than
+   * the live tenant currency (e.g. an invoice rendering its OWN frozen
+   * `currency` field: InvoicesPage/InvoiceDetailDrawer). It uses Intl's own
+   * default precision for whatever currency is passed, EXCEPT the same
+   * small override useFormatCurrency() applies for the tenant's own
+   * currency: "so'm is quoted whole" is a fact about UZS itself, not
+   * something that only holds on the live-tenant-currency path.
    */
   const formatWithCurrency = useCallback(
     (amount: number, currencyCode: string): string => {
+      const decimalsOverride = CURRENCY_DECIMALS_OVERRIDE[currencyCode];
       return new Intl.NumberFormat(intlLocale, {
         style: 'currency',
         currency: currencyCode,
+        ...(decimalsOverride !== undefined
+          ? { minimumFractionDigits: decimalsOverride, maximumFractionDigits: decimalsOverride }
+          : {}),
       }).format(amount);
     },
     [intlLocale]

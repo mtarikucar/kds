@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AsYouType, type CountryCode } from 'libphonenumber-js';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import { useCountryProfile } from '../../hooks/useCountryProfile';
 import {
   buildCountryOptions,
   countryDialCode,
@@ -20,7 +21,10 @@ export interface PhoneInputProps {
   hint?: string;
   disabled?: boolean;
   autoFocus?: boolean;
-  /** Region used to interpret a number typed without an explicit country. */
+  /** Region used to interpret a number typed without an explicit country.
+   *  Defaults to the tenant's OWN country (useCountryProfile()) — pass this
+   *  explicitly only to override that (e.g. a deliberately TR-only flow
+   *  like the hardware-store checkout, which ships within Turkey only). */
   defaultCountry?: CountryCode;
   id?: string;
   name?: string;
@@ -52,7 +56,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       hint,
       disabled,
       autoFocus,
-      defaultCountry = 'TR',
+      defaultCountry,
       id,
       name,
       placeholder,
@@ -61,31 +65,70 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     ref,
   ) => {
     const { t, i18n } = useTranslation('common');
+    // The tenant's own country (COUNTRY_PROFILES via the settings endpoint)
+    // — falls back to 'TR' before settings load, same as every other
+    // country-derived UI in this app (see useCountryProfile.ts). An
+    // explicit `defaultCountry` prop always wins.
+    const { countryCode: tenantCountryCode } = useCountryProfile();
     const autoId = React.useId();
     const inputId = id ?? autoId;
     const messageId = `${inputId}-message`;
     const hasMessage = Boolean(error || hint);
 
+    // Deliberately NOT folding tenantCountryCode in here: `country`'s
+    // ONE-AND-ONLY mechanism for picking up the tenant's derived country is
+    // the sync effect below, so that behaviour has exactly one place to
+    // break, not two redundant ones. Pre-effect, this is `defaultCountry`
+    // (if given) or the plain 'TR' fallback — the effect corrects it to the
+    // real tenant country on the very next flush when no defaultCountry was
+    // given (which, since useCountryProfile() resolves synchronously from
+    // cache in the common case, usually means "immediately" — see
+    // PhoneInput.test.tsx for the loading-flash case where it resolves
+    // later).
     const seed = useMemo(() => splitE164(value), []); // eslint-disable-line react-hooks/exhaustive-deps
-    const [country, setCountry] = useState<CountryCode>(seed?.country ?? defaultCountry);
+    const [country, setCountry] = useState<CountryCode>(
+      seed?.country ?? (defaultCountry as CountryCode | undefined) ?? 'TR',
+    );
     const [national, setNational] = useState<string>(
       seed ? new AsYouType(seed.country).input(seed.nationalNumber) : '',
     );
     // Track what we last emitted so an EXTERNAL value change (form reset, parent
     // clearing the field) re-seeds the inputs, but our own emits don't.
     const lastEmitted = useRef(value);
+    // True once the user has picked a country themselves (or an external
+    // value seeded one) — guards the sync effect below from overwriting a
+    // real choice once the tenant's settings query resolves.
+    const countryPinned = useRef(Boolean(seed));
 
     useEffect(() => {
       if (value === lastEmitted.current) return;
       lastEmitted.current = value;
       const s = splitE164(value);
       if (s) {
+        countryPinned.current = true;
         setCountry(s.country);
         setNational(new AsYouType(s.country).input(s.nationalNumber));
       } else if (!value) {
         setNational('');
       }
     }, [value]);
+
+    // THE mechanism that applies the tenant's derived country to the
+    // actual selection — see the `useState` initializer above, which
+    // deliberately does NOT also fold in tenantCountryCode (one place to
+    // break, not two). Runs on every render where tenantCountryCode changes
+    // — including the very first one, correcting the pre-effect 'TR' seed
+    // immediately when useCountryProfile() already has data (its usual
+    // case: react-query serves the cached tenantSettings synchronously) —
+    // and again later if it resolves after mount (the loading-flash case:
+    // this field mounted before the query settled). Only while nothing has
+    // pinned the country yet (no seeded value, no explicit defaultCountry,
+    // no manual pick) — never fight the user's own selection.
+    useEffect(() => {
+      if (defaultCountry) return;
+      if (countryPinned.current) return;
+      setCountry(tenantCountryCode as CountryCode);
+    }, [tenantCountryCode, defaultCountry]);
 
     const emit = (rawNational: string, region: CountryCode) => {
       const e164 = deriveE164(rawNational, region);
@@ -106,6 +149,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     };
 
     const handleCountryChange = (next: CountryCode) => {
+      countryPinned.current = true;
       setCountry(next);
       emit(national, next);
     };
@@ -113,9 +157,13 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     // i18n may be absent when a consumer's test mocks useTranslation to return
     // only { t } — don't hard-crash; fall back to the Turkish-first locale.
     const locale = i18n?.language ?? 'tr';
+    // Only for the dropdown's hoisted-to-top ordering — NOT the selected
+    // `country` state (see the sync effect above for that). Reactive to
+    // tenantCountryCode so the list re-sorts once the real country resolves.
+    const preferredCountry = (defaultCountry ?? tenantCountryCode) as CountryCode;
     const countries = useMemo(
-      () => buildCountryOptions(locale, [defaultCountry]),
-      [locale, defaultCountry],
+      () => buildCountryOptions(locale, [preferredCountry]),
+      [locale, preferredCountry],
     );
 
     return (

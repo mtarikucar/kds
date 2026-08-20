@@ -110,7 +110,7 @@ Geleneksel POS sistemleri:
 ✓ **Hareket Geçmişi** - Tüm stok hareketlerinin detaylı kaydı
 ✓ **Fire Takibi** - Kayıp ve fire analizi
 
-**Maliyeti**: Stok & Maliyet modülü 1.490₺/yıl (+ ön koşul olan 2.990₺/yıl lisans). Reçete, sayım, satın alma siparişi, tedarikçi ve şubeler arası transfer bu modülün içindedir. Sağlayacağı tasarruf mevcut fire oranınıza bağlıdır; sistem fireyi ölçülebilir hale getirir.
+**Maliyeti**: Stok & Maliyet modülü 3.900₺/yıl (+ ön koşul olan 4.900₺/yıl Bakım, Destek ve Güncelleme). Reçete, sayım, satın alma siparişi, tedarikçi ve şubeler arası transfer bu modülün içindedir. Sağlayacağı tasarruf mevcut fire oranınıza bağlıdır; sistem fireyi ölçülebilir hale getirir.
 
 ## 6. Raporlama ve Karar Destek
 
@@ -232,7 +232,7 @@ Geleneksel POS sistemleri:
 
 ## 5. Envanter ve Stok Yönetimi
 
-> **Stok & Maliyet Yönetimi** modülü — 1.490₺/yıl. Lisans ön koşuldur.
+> **Stok & Maliyet Yönetimi** modülü — 3.900₺/yıl. Bakım, Destek ve Güncelleme ön koşuldur.
 
 ### Stok Takibi
 - **Ürün Bazlı Envanter**: Her ürün için stok seviyesi
@@ -292,7 +292,7 @@ Geleneksel POS sistemleri:
 
 ### Ticari Model
 - **Ücretsiz çekirdek**: Süresiz, sınırsız, kredi kartsız. Lisans gerekmez.
-- **Lisans**: 2.990₺/yıl. Yalnızca ücretli modülleri açmak için gereken ön koşuldur.
+- **Bakım, Destek ve Güncelleme**: 4.900₺/yıl. Ücretli modülleri açan ön koşul; öncelikli destek, e-Fatura gönderimi, tüm güncellemeler ve günlük yedekleme dahildir.
 - **Modüller ve entegrasyonlar**: Tek tek, yıllık satın alınır. Paket, kademe veya plan yoktur.
 - **Kontör**: AI görsel/video/3D üretimi ve SMS için tek seferlik, süresiz kontör paketleri.
 - Tüm fiyatlar TL ve **KDV dahildir**.
@@ -550,24 +550,23 @@ Paket yok, kademe yok, plan yok. Restoranı çalıştıran her şey ücretsiz ve
 
 Tüm fiyatlar **TL ve KDV dahildir**. "/yıl" işaretli kalemler yıllıktır.
 
-### Lisans
+### Bakım, Destek ve Güncelleme
 
 | Kalem | Fiyat | Not |
 |---|---:|---|
-| **HummyTummy Lisansı** | **2.990₺/yıl** | Ücretli modülleri açmak için ön koşul. Alındığı gün hesabınızın değişmez yıl dönümü olur. |
+| **Bakım, Destek ve Güncelleme** | **4.900₺/yıl** | Ücretli modülleri açan ön koşul. Öncelikli destek, e-Fatura gönderimi, tüm sürüm güncellemeleri ve günlük yedekleme dahildir. Alındığı gün hesabınızın değişmez yıl dönümü olur. |
 
 ### Modüller
 
 | Modül | Fiyat | Ne yapar? |
 |---|---:|---|
 | Gelişmiş Rapor & Analitik | 1.290₺/yıl | Ürün/personel/müşteri analitiği, kâr-zarar, menü mühendisliği, muhasebe back-office |
-| Stok & Maliyet | 1.490₺/yıl | Reçete, sayım, satın alma siparişi, fire, tedarikçi, şubeler arası transfer |
+| Stok & Maliyet | 3.900₺/yıl | Reçete, sayım, satın alma siparişi, fire, tedarikçi, şubeler arası transfer |
 | Rezervasyon | 990₺/yıl | Rezervasyon takvimi, müsaitlik hesabı, online rezervasyon sayfası |
 | Personel | 990₺/yıl | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
 | AI Menü Stüdyosu | 1.990₺/yıl | AI ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretim kontörle) |
 | API & Webhook | 2.490₺/yıl | REST API anahtarları ve giden webhook'lar |
 | Partner Ekran API | 1.990₺/yıl | Üçüncü taraf ekranların menünüzü göstermesi için ekran bazlı API |
-| Öncelikli Destek | 1.990₺/yıl | Öncelikli sıra ve garantili yanıt süresi |
 
 ### Entegrasyonlar
 
@@ -576,7 +575,6 @@ Tüm fiyatlar **TL ve KDV dahildir**. "/yıl" işaretli kalemler yıllıktır.
 | Yemeksepeti | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
 | Getir | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
 | Trendyol Yemek | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
-| e-Fatura (Nilvera) | 1.990₺/yıl | Satış faturalarının e-Fatura / e-Arşiv olarak GİB'e gönderimi |
 | ÖKC / Yazarkasa (Hugin) | 2.990₺/yıl | Yazarkasa ile entegre fiş kesimi ve mali rapor senkronizasyonu |
 | Çağrı-ID | 1.490₺/yıl | Gelen çağrıda müşteriyi tanıma, tek tıkla sipariş açma |
 | SMS | 990₺/yıl | Sipariş, rezervasyon ve kampanya SMS'i (gönderim kontörle) |
@@ -625,71 +623,69 @@ Aşağıdakiler öneridir, zorunluluk değil. İstediğiniz kalemi istediğiniz 
 ### 🍽️ Menüsünü ve maliyetini kontrol etmek isteyen restoran
 **Profil:** Tek şube, sabit menü, malzeme maliyeti ciddi bir kalem.
 
-**Öneri:** Lisans + Stok & Maliyet + Gelişmiş Rapor & Analitik
+**Öneri:** Bakım, Destek ve Güncelleme + Stok & Maliyet + Gelişmiş Rapor & Analitik
 
 | Kalem | Fiyat |
 |---|---:|
-| Lisans | 2.990₺/yıl |
-| Stok & Maliyet | 1.490₺/yıl |
+| Bakım, Destek ve Güncelleme | 4.900₺/yıl |
+| Stok & Maliyet | 3.900₺/yıl |
 | Gelişmiş Rapor & Analitik | 1.290₺/yıl |
-| **Toplam** | **5.770₺/yıl** (aylığa bölündüğünde ~481₺) |
+| **Toplam** | **10.090₺/yıl** (aylığa bölündüğünde ~841₺) |
 
 ### 📞 Paket servis ve online sipariş ağırlıklı işletme
 **Profil:** Yemeksepeti/Getir/Trendyol siparişleri, telefonla sipariş, kurye.
 
-**Öneri:** Lisans + kullandığınız pazaryeri entegrasyonları + Çağrı-ID + SMS
+**Öneri:** Bakım, Destek ve Güncelleme + kullandığınız pazaryeri entegrasyonları + Çağrı-ID + SMS
 
 | Kalem | Fiyat |
 |---|---:|
-| Lisans | 2.990₺/yıl |
+| Bakım, Destek ve Güncelleme | 4.900₺/yıl |
 | Yemeksepeti | 2.490₺/yıl |
 | Getir | 2.490₺/yıl |
 | Çağrı-ID | 1.490₺/yıl |
 | SMS | 990₺/yıl |
-| **Toplam** | **10.450₺/yıl** |
+| **Toplam** | **12.360₺/yıl** |
 
 Not: SMS gönderimleri kontörle harcanır (500 SMS = 490₺, süresiz).
 
 ### 🍷 Rezervasyonla çalışan a la carte restoran
 **Profil:** Akşam servisi, masa rezervasyonu, vardiyalı ekip.
 
-**Öneri:** Lisans + Rezervasyon + Personel
+**Öneri:** Bakım, Destek ve Güncelleme + Rezervasyon + Personel
 
 | Kalem | Fiyat |
 |---|---:|
-| Lisans | 2.990₺/yıl |
+| Bakım, Destek ve Güncelleme | 4.900₺/yıl |
 | Rezervasyon | 990₺/yıl |
 | Personel | 990₺/yıl |
-| **Toplam** | **4.970₺/yıl** |
+| **Toplam** | **6.880₺/yıl** |
 
 ### 🏢 Çok şubeli zincir
 **Profil:** 3 şube, merkezi yönetim, muhasebe ve mali uyum ihtiyacı.
 
-**Öneri:** Lisans + 2 Ek Şube + Gelişmiş Rapor + Stok & Maliyet + e-Fatura + Öncelikli Destek
+**Öneri:** Bakım, Destek ve Güncelleme + 2 Ek Şube + Gelişmiş Rapor + Stok & Maliyet (e-Fatura ve öncelikli destek zaten dahil)
 
 | Kalem | Fiyat |
 |---|---:|
-| Lisans | 2.990₺/yıl |
+| Bakım, Destek ve Güncelleme | 4.900₺/yıl |
 | Ek Şube × 2 | 7.980₺/yıl |
 | Gelişmiş Rapor & Analitik | 1.290₺/yıl |
-| Stok & Maliyet | 1.490₺/yıl |
-| e-Fatura (Nilvera) | 1.990₺/yıl |
-| Öncelikli Destek | 1.990₺/yıl |
-| **Toplam** | **17.730₺/yıl** |
+| Stok & Maliyet | 3.900₺/yıl |
+| **Toplam** | **18.070₺/yıl** |
 
 Şube sayısı ne olursa olsun kullanıcı, masa, ürün ve sipariş sınırı yoktur; yalnızca ikinci ve sonraki şubeler ücretlidir.
 
 ### 🤖 Menü görselleri zayıf olan işletme
 **Profil:** Fotoğrafçı bütçesi yok, QR menüde ürün görseli eksik.
 
-**Öneri:** Lisans + AI Menü Stüdyosu + kontör
+**Öneri:** Bakım, Destek ve Güncelleme + AI Menü Stüdyosu + kontör
 
 | Kalem | Fiyat |
 |---|---:|
-| Lisans | 2.990₺/yıl |
+| Bakım, Destek ve Güncelleme | 4.900₺/yıl |
 | AI Menü Stüdyosu | 1.990₺/yıl |
 | 100 AI görsel kontörü | 690₺ tek seferlik |
-| **İlk yıl** | **5.670₺** |
+| **İlk yıl** | **7.580₺** |
 
 Kontörün süresi yoktur; tükenene kadar geçerlidir.
 
@@ -716,18 +712,18 @@ Aşağıda üç işletme profilinin **gerçek yıllık yazılım maliyeti** veri
 
 **Profil:** 25 masa, 8 personel, tek şube, malzeme maliyeti takibi ve vardiya planlaması ihtiyacı.
 
-**Seçim:** Lisans + Stok & Maliyet + Gelişmiş Rapor & Analitik + Personel + Rezervasyon
+**Seçim:** Bakım, Destek ve Güncelleme + Stok & Maliyet + Gelişmiş Rapor & Analitik + Personel + Rezervasyon
 
 | Kalem | Yıllık |
 |---|---:|
-| Lisans | 2.990₺ |
-| Stok & Maliyet | 1.490₺ |
+| Bakım, Destek ve Güncelleme | 4.900₺ |
+| Stok & Maliyet | 3.900₺ |
 | Gelişmiş Rapor & Analitik | 1.290₺ |
 | Personel | 990₺ |
 | Rezervasyon | 990₺ |
-| **Toplam** | **7.750₺/yıl** |
+| **Toplam** | **12.070₺/yıl** |
 
-Aylığa bölündüğünde yaklaşık **646₺**. Kullanıcı, masa, ürün ve sipariş sayısına bağlı ek ücret yoktur.
+Aylığa bölündüğünde yaklaşık **1.006₺**. Kullanıcı, masa, ürün ve sipariş sayısına bağlı ek ücret yoktur.
 
 **Neyi ölçebilir hale gelirsiniz:** ürün bazlı kâr marjı, reçete maliyeti, fire tutarı, personel başına satış, kâr-zarar tablosu, menü mühendisliği matrisi.
 
@@ -735,21 +731,19 @@ Aylığa bölündüğünde yaklaşık **646₺**. Kullanıcı, masa, ürün ve s
 
 **Profil:** 5 lokasyon, merkezi yönetim, pazaryeri siparişleri, e-belge zorunluluğu.
 
-**Seçim:** Lisans + 4 Ek Şube + Gelişmiş Rapor + Stok & Maliyet + Personel + e-Fatura + 3 pazaryeri entegrasyonu + Öncelikli Destek
+**Seçim:** Bakım, Destek ve Güncelleme + 4 Ek Şube + Gelişmiş Rapor + Stok & Maliyet + Personel + 3 pazaryeri entegrasyonu (e-Fatura ve öncelikli destek zaten dahil)
 
 | Kalem | Yıllık |
 |---|---:|
-| Lisans | 2.990₺ |
+| Bakım, Destek ve Güncelleme | 4.900₺ |
 | Ek Şube × 4 | 15.960₺ |
 | Gelişmiş Rapor & Analitik | 1.290₺ |
-| Stok & Maliyet | 1.490₺ |
+| Stok & Maliyet | 3.900₺ |
 | Personel | 990₺ |
-| e-Fatura (Nilvera) | 1.990₺ |
 | Yemeksepeti + Getir + Trendyol Yemek | 7.470₺ |
-| Öncelikli Destek | 1.990₺ |
-| **Toplam** | **34.170₺/yıl** |
+| **Toplam** | **34.510₺/yıl** |
 
-5 şube için şube başına yaklaşık **6.834₺/yıl**. Bu tutar toplam personel, masa, ürün ve sipariş hacminden bağımsızdır.
+5 şube için şube başına yaklaşık **6.902₺/yıl**. Bu tutar toplam personel, masa, ürün ve sipariş hacminden bağımsızdır.
 
 **Neyi ölçebilir hale gelirsiniz:** şubeler arası performans karşılaştırması, konsolide kâr-zarar, şubeler arası stok transferi, kanal bazlı (salon / paket / pazaryeri) ciro dağılımı.
 
@@ -800,7 +794,7 @@ Aylığa bölündüğünde yaklaşık **646₺**. Kullanıcı, masa, ürün ve s
 - ✓ Satış faturaları Nilvera üzerinden e-Fatura / e-Arşiv olarak gönderilir
 - ✓ Sadakat programı tüm şubelerde ortak çalışır
 
-**Yazılım maliyeti: 34.170₺/yıl** — şube başına yaklaşık 6.834₺.
+**Yazılım maliyeti: 34.510₺/yıl** — şube başına yaklaşık 6.902₺.
 
 ## Kayıt Olmadan Kendiniz Deneyin
 
@@ -853,7 +847,7 @@ Sunuma güvenmek zorunda değilsiniz. Paylaşımlı demo restoranımızda kayıt
 ✓ **%99.9 Çalışma Süresi Hedefi**: Yılda yaklaşık 8.7 saat kesinti bütçesi
 ✓ **Sağlık Kontrolleri**: Otomatik CI/CD pipeline health check
 ✓ **Sürekli İzleme**: Sistem izleme, hata takibi (Sentry) ve uyarı bildirimleri
-✓ **Sözleşmeli SLA**: Öncelikli Destek modülü ile garantili yanıt süresi
+✓ **Sözleşmeli SLA**: Bakım, Destek ve Güncelleme kalemi ile garantili yanıt süresi
 
 ## Bulut Tabanlı Avantajlar
 
@@ -926,7 +920,7 @@ Evet. POS, KDS, menü, masa planı, QR menü, sipariş, kasa, temel raporlar, ek
 Deneme süresi kavramı yoktur — çünkü gerek yoktur. Çekirdek zaten süresiz ücretsizdir; ayrıca kayıt olmadan gezebileceğiniz paylaşımlı bir demo restoranı sunuyoruz.
 
 ### Lisans ne işe yarıyor, almak zorunda mıyım?
-Lisans (2.990₺/yıl) yalnızca **ücretli modülleri** açmak için gereken ön koşuldur. Ücretsiz çekirdekte kalacaksanız lisans almanıza gerek yoktur.
+Bakım, Destek ve Güncelleme (4.900₺/yıl) yalnızca **ücretli modülleri** açmak için gereken ön koşuldur. Ücretsiz çekirdekte kalacaksanız almanıza gerek yoktur.
 
 ### Ödeme yöntemleri nelerdir?
 Ödemeler PayTR üzerinden kredi kartı veya banka kartı ile yapılır. Tüm ücretli kalemler yıllıktır (kontör ve yerinde kurulum tek seferliktir). Aylık abonelik seçeneği yoktur.
@@ -995,7 +989,7 @@ Hayır. Ödeme, ödeme sağlayıcımız PayTR üzerinden alınır; kart bilgiler
 ### Destek nasıl alınır?
 - **E-posta**: support@hummytummy.com — her hesap için, ücretsiz çekirdek dahil
 - **Dokümantasyon**: Kapsamlı kullanım kılavuzu ve yardım içerikleri
-- **Öncelikli Destek** (1.990₺/yıl): Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi
+- **Öncelikli destek** (Bakım, Destek ve Güncelleme kalemine dahil): Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi
 
 ### Eğitim veriliyor mu?
 - **Tüm hesaplar**: Online dokümantasyon ve yardım içerikleri

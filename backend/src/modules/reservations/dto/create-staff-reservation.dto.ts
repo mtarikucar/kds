@@ -14,10 +14,10 @@ import {
   ValidateIf,
 } from "class-validator";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN as PHONE_REGEX } from "../../../common/phone/e164.const";
 
 // Same E.164 contract as the public DTO — phone is NORMALIZED first, then the
 // regex asserts canonical form. Staff bookings accept any natural typed format.
-const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 
 /**
@@ -63,7 +63,7 @@ export class CreateStaffReservationDto {
     description: "Customer phone (E.164 or digits)",
     example: "+905551234567",
   })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsOptional()
   @ValidateIf(
     (o) =>

@@ -78,7 +78,7 @@ const product = (over: Partial<any> = {}) => ({
 
 const LICENCE = product({
   code: 'license_annual',
-  name: 'HummyTummy Lisansı',
+  name: 'Bakım, Destek ve Güncelleme',
   kind: 'license',
   priceCents: 299_000,
   requiresLicense: false,
@@ -154,7 +154,7 @@ describe('CatalogStore — building the bill', () => {
   it('pays for every line at once, with the consent ids', async () => {
     render(<CatalogStore />);
     tick('Personel Yönetimi');
-    tick('HummyTummy Lisansı');
+    tick('Bakım, Destek ve Güncelleme');
 
     fireEvent.click(screen.getByRole('button', { name: /store\.payTotal/ }));
     await vi.waitFor(() => expect(purchaseAsync).toHaveBeenCalled());
@@ -194,14 +194,14 @@ describe('CatalogStore — the licence prerequisite', () => {
     render(<CatalogStore />);
     tick('Personel Yönetimi');
 
-    expect(within(bill()).getByText('HummyTummy Lisansı')).toBeInTheDocument();
+    expect(within(bill()).getByText('Bakım, Destek ve Güncelleme')).toBeInTheDocument();
     // 990 + 2990
     expect(within(bill()).getByText('₺3.980,00')).toBeInTheDocument();
   });
 
   it('does not double-charge when the licence is also ticked by hand', () => {
     render(<CatalogStore />);
-    tick('HummyTummy Lisansı');
+    tick('Bakım, Destek ve Güncelleme');
     tick('Personel Yönetimi');
 
     fireEvent.click(screen.getByRole('button', { name: /store\.payTotal/ }));
@@ -214,14 +214,14 @@ describe('CatalogStore — the licence prerequisite', () => {
     render(<CatalogStore />);
     tick('AI Kontör');
 
-    expect(within(bill()).queryByText('HummyTummy Lisansı')).not.toBeInTheDocument();
+    expect(within(bill()).queryByText('Bakım, Destek ve Güncelleme')).not.toBeInTheDocument();
   });
 
   it('does not re-add a licence the tenant already holds', () => {
     licenseStatus = 'active';
     render(<CatalogStore />);
     tick('Personel Yönetimi');
-    expect(within(bill()).queryByText('HummyTummy Lisansı')).not.toBeInTheDocument();
+    expect(within(bill()).queryByText('Bakım, Destek ve Güncelleme')).not.toBeInTheDocument();
   });
 
   it('does not re-add a licence that is inside its grace window', () => {
@@ -231,7 +231,7 @@ describe('CatalogStore — the licence prerequisite', () => {
     render(<CatalogStore />);
     tick('Personel Yönetimi');
 
-    expect(within(bill()).queryByText('HummyTummy Lisansı')).not.toBeInTheDocument();
+    expect(within(bill()).queryByText('Bakım, Destek ve Güncelleme')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /store\.payTotal/ }));
     const codes = purchaseAsync.mock.calls[0][0].items.map((i: any) => i.code);
     expect(codes).toEqual(['module_personnel']);

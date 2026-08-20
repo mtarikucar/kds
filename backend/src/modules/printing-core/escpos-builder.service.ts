@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+} from "../orders/services/receipt-snapshot.builder";
 import {
   EscPosArtifact,
   EscPosBuilder,
@@ -14,6 +14,17 @@ import {
   EscPosReceiptOptions,
 } from "./escpos.types";
 import { EscPosBuilderRegistry } from "./escpos-builder.registry";
+import {
+  formatMoneyNumber,
+  asciiCurrencySuffix,
+} from "../../common/country/money-format";
+
+/** Pre-existing hardcoded defaults (Task 13) — reproduced exactly when a
+ * caller omits the corresponding EscPosReceiptOptions field, so the byte
+ * stream for a Turkish tenant is unchanged. */
+const DEFAULT_INTL_LOCALE = "tr-TR";
+const DEFAULT_DISPLAY_DECIMALS = 2;
+const DEFAULT_TIMEZONE = "Europe/Istanbul";
 
 // ──────────────────────────────────────────────────────────────────────────
 // ESC/POS control codes (Epson TM-T spec; the de-facto standard every cheap
@@ -110,6 +121,12 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     options: EscPosReceiptOptions = {},
   ): EscPosJob {
     const cols = this.columns(options);
+    // Country-profile-driven formatting (Task 13). Defaults reproduce the
+    // pre-existing hardcoded tr-TR/2dp/Istanbul behaviour exactly when the
+    // caller passes none of these — see the DEFAULT_* constants above.
+    const intlLocale = options.intlLocale ?? DEFAULT_INTL_LOCALE;
+    const displayDecimals = options.displayDecimals ?? DEFAULT_DISPLAY_DECIMALS;
+    const timezone = options.timezone ?? DEFAULT_TIMEZONE;
     const b = new ByteWriter();
     this.preamble(b);
 
@@ -127,13 +144,23 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     if (snapshot.order.tableNumber) {
       b.line(this.enc(`Masa   : ${snapshot.order.tableNumber}`), cols);
     }
-    b.line(this.enc(`Tarih  : ${this.trDateTime(snapshot.printedAt)}`), cols);
+    b.line(
+      this.enc(
+        `Tarih  : ${this.formatDateTime(snapshot.printedAt, intlLocale, timezone)}`,
+      ),
+      cols,
+    );
     this.rule(b, cols);
 
     // Items — "qty x name" left, line total right.
     for (const item of snapshot.items) {
       const left = `${item.quantity} x ${item.name}`;
-      const right = this.money(item.totalPrice, snapshot.restaurant.currency);
+      const right = this.money(
+        item.totalPrice,
+        snapshot.restaurant.currency,
+        intlLocale,
+        displayDecimals,
+      );
       b.line(this.encTwoCol(left, right, cols), cols);
       for (const mod of item.modifiers) {
         b.line(this.enc(`   + ${mod}`), cols);
@@ -146,33 +173,24 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
 
     // Totals + KDV breakdown.
     const cur = snapshot.restaurant.currency;
+    const money = (amount: string) =>
+      this.money(amount, cur, intlLocale, displayDecimals);
     b.line(
-      this.encTwoCol(
-        "Ara Toplam",
-        this.money(snapshot.totals.subtotal, cur),
-        cols,
-      ),
+      this.encTwoCol("Ara Toplam", money(snapshot.totals.subtotal), cols),
       cols,
     );
     if (this.nonZero(snapshot.totals.discount)) {
       b.line(
-        this.encTwoCol(
-          "İndirim",
-          `-${this.money(snapshot.totals.discount, cur)}`,
-          cols,
-        ),
+        this.encTwoCol("İndirim", `-${money(snapshot.totals.discount)}`, cols),
         cols,
       );
     }
-    b.line(
-      this.encTwoCol("KDV", this.money(snapshot.totals.tax, cur), cols),
-      cols,
-    );
+    b.line(this.encTwoCol("KDV", money(snapshot.totals.tax), cols), cols);
     b.push(boldOn(), sizeDoubleHeight());
     b.line(
       this.encTwoCol(
         "TOPLAM",
-        this.money(snapshot.totals.total, cur),
+        money(snapshot.totals.total),
         this.doubleWidthCols(cols),
       ),
       cols,
@@ -201,6 +219,8 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     options: EscPosReceiptOptions = {},
   ): EscPosJob {
     const cols = this.columns(options);
+    const intlLocale = options.intlLocale ?? DEFAULT_INTL_LOCALE;
+    const timezone = options.timezone ?? DEFAULT_TIMEZONE;
     const b = new ByteWriter();
     this.preamble(b);
 
@@ -216,7 +236,10 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
       b.line(this.enc(`MASA : ${snapshot.order.tableNumber}`), cols);
       b.push(boldOff());
     }
-    b.line(this.enc(this.trDateTime(snapshot.createdAt)), cols);
+    b.line(
+      this.enc(this.formatDateTime(snapshot.createdAt, intlLocale, timezone)),
+      cols,
+    );
     this.rule(b, cols);
 
     // Items — large qty, no prices.
@@ -403,32 +426,49 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
   }
 
   /**
-   * Money is rendered as "1.234,56 TL" (Turkish grouping + the literal "TL"
-   * suffix). The ₺ glyph has no CP857 codepoint, so we never try to print it;
-   * "TL" is the conventional fiş suffix anyway. Non-TRY currencies keep their
-   * ISO code suffix.
+   * Money is rendered as "1.234,56 TL" for TR (Turkish grouping + the
+   * literal "TL" suffix — the ₺ glyph has no CP857 codepoint, so we never
+   * try to print it; "TL" is the conventional fiş suffix anyway). Grouping
+   * and decimal-place count come from `intlLocale`/`displayDecimals` (Task
+   * 13: the tenant's country profile), never hardcoded — the shared
+   * server-side money formatter (common/country/money-format.ts) does the
+   * actual `Intl.NumberFormat` call, so this stays in lockstep with the
+   * Z-Report PDF/email and with the frontend's useFormatCurrency(). Only
+   * the ASCII-safe suffix (vs. a real Unicode currency glyph) is specific
+   * to this codepage-constrained caller.
    */
-  private money(amount: string, currency: string): string {
-    const n = Number.parseFloat(amount);
-    const safe = Number.isFinite(n) ? n : 0;
-    const grouped = new Intl.NumberFormat("tr-TR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safe);
-    const suffix = currency === "TRY" ? "TL" : currency;
-    return `${grouped} ${suffix}`;
+  private money(
+    amount: string,
+    currency: string,
+    intlLocale: string,
+    displayDecimals: number,
+  ): string {
+    const grouped = formatMoneyNumber(amount, { intlLocale, displayDecimals });
+    return `${grouped} ${asciiCurrencySuffix(currency)}`;
   }
 
-  private trDateTime(iso: string): string {
+  /**
+   * `intlLocale` for grouping/month-day-year order, `timezone` for the
+   * wall-clock hour — both supplied by the caller (Task 13: intlLocale from
+   * the tenant's country profile, timezone from the order's BRANCH, never a
+   * hardcoded "Europe/Istanbul"). A branch can legitimately run in a
+   * different timezone than its tenant's country default, so this must
+   * read the branch's own field, not re-derive from the country profile.
+   */
+  private formatDateTime(
+    iso: string,
+    intlLocale: string,
+    timezone: string,
+  ): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return new Intl.DateTimeFormat("tr-TR", {
+    return new Intl.DateTimeFormat(intlLocale, {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      timeZone: "Europe/Istanbul",
+      timeZone: timezone,
     }).format(d);
   }
 

@@ -21,6 +21,10 @@ describe("SelfPayIntentService.createPayIntent demo-tenant block", () => {
   let customerSessionService: { requireSession: jest.Mock };
   let config: { get: jest.Mock };
   let demoGuard: { assertNotDemo: jest.Mock };
+  // Task 10 — never reached in this spec (demoGuard rejects first, before
+  // the country-capability gate runs), but wired so the constructor shape
+  // matches production DI.
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let intentService: SelfPayIntentService;
   let facade: CustomerSelfPayService;
 
@@ -54,6 +58,9 @@ describe("SelfPayIntentService.createPayIntent demo-tenant block", () => {
         }),
       ),
     };
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
     intentService = new SelfPayIntentService(
       prisma,
       paymentsService,
@@ -61,6 +68,7 @@ describe("SelfPayIntentService.createPayIntent demo-tenant block", () => {
       customerSessionService as any,
       config as any,
       { fetchOrderItemReservations: jest.fn(), assertOrdersSettleable: jest.fn() } as any,
+      countryCapability as any,
       demoGuard as any,
     );
     facade = new CustomerSelfPayService(

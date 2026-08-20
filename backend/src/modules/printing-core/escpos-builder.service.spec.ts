@@ -1,9 +1,10 @@
 import { EscPosBuilderService } from "./escpos-builder.service";
 import { EscPosBuilderRegistry } from "./escpos-builder.registry";
-import type {
-  ReceiptSnapshotV1,
-  KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+import type { KitchenTicketSnapshotV1 } from "../orders/services/receipt-snapshot.builder";
+import {
+  TR_GOLDEN_RECEIPT_FIXTURE,
+  TR_GOLDEN_RECEIPT_BASE64,
+} from "./__fixtures__/tr-golden-receipt.fixture";
 
 /**
  * Spec for the cloud-side ESC/POS byte builder (the REAL impl behind the
@@ -19,47 +20,10 @@ import type {
  */
 describe("EscPosBuilderService", () => {
   // ── Fixtures ────────────────────────────────────────────────────────────
-  const receipt: ReceiptSnapshotV1 = {
-    version: 1,
-    restaurant: { name: "Çiğ Köfteci Ömer", currency: "TRY" },
-    order: {
-      id: "order-1",
-      orderNumber: "A-007",
-      type: "DINE_IN",
-      tableNumber: "5",
-      notes: null,
-    },
-    items: [
-      {
-        name: "Adana Kebap",
-        quantity: 2,
-        unitPrice: "30.00",
-        totalPrice: "60.00",
-        modifiers: ["Acılı"],
-        notes: null,
-      },
-      {
-        name: "Pide",
-        quantity: 1,
-        unitPrice: "40.00",
-        totalPrice: "40.00",
-        modifiers: [],
-        notes: "tuzsuz",
-      },
-    ],
-    totals: {
-      subtotal: "100.00",
-      tax: "18.00",
-      discount: "0.00",
-      total: "118.00",
-    },
-    payment: {
-      method: "CASH",
-      transactionId: null,
-      paidAt: "2026-04-27T10:30:00.000Z",
-    },
-    printedAt: "2026-04-27T10:30:00.000Z",
-  };
+  // Shared with tr-unchanged.spec.ts (Task 14) via TR_GOLDEN_RECEIPT_FIXTURE
+  // — see that fixture file's doc comment for why this is imported rather
+  // than redefined here.
+  const receipt = TR_GOLDEN_RECEIPT_FIXTURE;
 
   const kitchen: KitchenTicketSnapshotV1 = {
     version: 1,
@@ -277,6 +241,103 @@ describe("EscPosBuilderService", () => {
       const h2 = svc.toPrintCommand(svc.buildReceipt(receipt)).payload
         .contentHash;
       expect(h1).toBe(h2);
+    });
+  });
+
+  // ── Task 13: country-profile-driven money/timestamp ─────────────────────
+  describe("Task 13 — country-profile-driven formatting", () => {
+    // Byte-for-byte golden output, captured from this exact builder BEFORE
+    // Task 13 touched money()/date formatting (git rev preceding the Task
+    // 13 commit — see task-13-report.md). Mandatory regression pin: a
+    // Turkish receipt is printed on physical hardware in live restaurants,
+    // so a subtle shift in spacing/column-width/rounding is a real-world
+    // failure no unit test written AFTER the fact could catch. This one
+    // can, because it was captured BEFORE.
+    const GOLDEN = {
+      receipt: TR_GOLDEN_RECEIPT_BASE64,
+      receiptWithOptions:
+        "G0AbdBMbYQEbRQEdIRGAaacgS5RmdGVjaSCZbWVyCh0hABtFAEFEmFNZT04gLyBGmJ4KG2EALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCkZpnyBObyA6IEEtMDA3ClSBciAgICA6IE1hc2FkYQpNYXNhICAgOiA1ClRhcmloICA6IDI3LjA0LjIwMjYgMTM6MzAKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCjIgeCBBZGFuYSBLZWJhcCAgICAgICAgICAgICAgICAgICA2MCwwMCBUTAogICArIEFjjWyNCjEgeCBQaWRlICAgICAgICAgICAgICAgICAgICAgICAgICA0MCwwMCBUTAogICBub3Q6IHR1enN1egotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KQXJhIFRvcGxhbSAgICAgICAgICAgICAgICAgICAgICAgMTAwLDAwIFRMCktEViAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAxOCwwMCBUTAobRQEdIQFUT1BMQU0gICAgICAxMTgsMDAgVEwKHSEAG0UALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCplkZW1lICA6IE5ha2l0Ci0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQobYQFDdXN0b20gZm9vdGVyChthABtwABn6CgoKG2EBHShrBAAxQTIAHShrAwAxQwYdKGsDADFFMR0oax8AMVAwaHR0cHM6Ly92ZXJpZnkuZXhhbXBsZS9BLTAwNx0oawMAMVEwG2EAHVZCAA==",
+      kitchen:
+        "G0AbdBMbYQEbRQEdIRFNVVRGQUsKHSEAI0EtMDA3ChtFABthAFSBciAgOiBNYXNhZGEKG0UBTUFTQSA6IDUKG0UAMjcuMDQuMjAyNiAxMzowMAotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KG0UBHSEBMiB4IEFkYW5hIEtlYmFwCh0hABtFACAgICsgQWONbI0KG0UBHSEBMSB4IJ5pnwodIQAbRQAbRQEgICA+PiBheiBwaZ9taZ8KG0UALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tChtFAU5PVDogQWxlcmppc2kgdmFyOiBmjXN0jWsKG0UACgoKHVZCAA==",
+      takeaway:
+        "G0AbdBMbYQEbRQEdIRGAaacgS5RmdGVjaSCZbWVyCh0hABtFAEFEmFNZT04gLyBGmJ4KG2EALS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCkZpnyBObyA6IEEtMDA3ClSBciAgICA6IFBha2V0ClRhcmloICA6IDI3LjA0LjIwMjYgMTM6MzAKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCjIgeCBBZGFuYSBLZWJhcCAgICAgICAgICAgICAgICAgICA2MCwwMCBUTAogICArIEFjjWyNCjEgeCBQaWRlICAgICAgICAgICAgICAgICAgICAgICAgICA0MCwwMCBUTAogICBub3Q6IHR1enN1egotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KQXJhIFRvcGxhbSAgICAgICAgICAgICAgICAgICAgICAgMTAwLDAwIFRMCphuZGlyaW0gICAgICAgICAgICAgICAgICAgICAgICAgIC0xMCwwMCBUTApLRFYgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgMTgsMDAgVEwKG0UBHSEBVE9QTEFNICAgICAgMTE4LDAwIFRMCh0hABtFAC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQqZZGVtZSAgOiBOYWtpdAotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KG2EBQml6aSB0ZXJjaWggZXR0aadpbml6IGmHaW4KdGWfZWtrgXIgZWRlcml6LgobYQAKCgodVkIA",
+    };
+
+    it("renders a Turkish receipt byte-identically to before (default options — regression pin)", () => {
+      const job = makeService().buildReceipt(receipt);
+      expect(job.base64).toBe(GOLDEN.receipt);
+    });
+
+    it("renders byte-identically with explicit options too (qr/footer/drawer)", () => {
+      const job = makeService().buildReceipt(receipt, {
+        qr: { data: "https://verify.example/A-007" },
+        footerLines: ["Custom footer"],
+        kickDrawerAfter: true,
+      });
+      expect(job.base64).toBe(GOLDEN.receiptWithOptions);
+    });
+
+    it("renders a kitchen ticket byte-identically to before", () => {
+      const job = makeService().buildKitchenTicket(kitchen);
+      expect(job.base64).toBe(GOLDEN.kitchen);
+    });
+
+    it("renders a takeaway + discount receipt byte-identically to before", () => {
+      const job = makeService().buildReceipt({
+        ...receipt,
+        order: { ...receipt.order, type: "TAKEAWAY", tableNumber: null },
+        totals: { ...receipt.totals, discount: "10.00" },
+      });
+      expect(job.base64).toBe(GOLDEN.takeaway);
+    });
+
+    it("the receipt timestamp uses the BRANCH timezone, not a hardcoded Europe/Istanbul", () => {
+      // printedAt 10:30 UTC is 13:30 in Istanbul (UTC+3) — the golden/
+      // default output above. Asia/Tashkent is UTC+5 → 15:30. Passing the
+      // branch's own timezone must change the printed hour; today's code
+      // hardcodes "Europe/Istanbul" and never looks at this option at all.
+      const job = makeService().buildReceipt(receipt, {
+        timezone: "Asia/Tashkent",
+      });
+      const ascii = Buffer.from(job.bytes).toString("latin1");
+      expect(ascii).toContain("27.04.2026 15:30");
+      expect(ascii).not.toContain("13:30");
+    });
+
+    it("the kitchen ticket timestamp also honours an explicit timezone", () => {
+      const job = makeService().buildKitchenTicket(kitchen, {
+        timezone: "Asia/Tashkent",
+      });
+      const ascii = Buffer.from(job.bytes).toString("latin1");
+      // kitchen.createdAt is 10:00 UTC → 15:00 in Tashkent, 13:00 in Istanbul.
+      expect(ascii).toContain("27.04.2026 15:00");
+      expect(ascii).not.toContain("13:00");
+    });
+
+    it("an explicit intlLocale + displayDecimals drives money grouping (still ASCII 'TL' suffix — CP857 can't print ₺)", () => {
+      // Same currency (TRY) but a different locale/decimals pairing proves
+      // money() no longer hardcodes "tr-TR"+2 internally — it reads both
+      // from options. (uz-UZ grouping-with-0dp on a TRY amount is a
+      // synthetic combination for the purpose of this unit test only; a
+      // real UZ tenant is a different currency entirely, covered by the
+      // escpos-builder-uz spec.)
+      const job = makeService().buildReceipt(receipt, {
+        intlLocale: "uz-UZ",
+        displayDecimals: 0,
+      });
+      const ascii = Buffer.from(job.bytes).toString("latin1");
+      expect(ascii).toContain("118 TL");
+      expect(ascii).not.toContain("118,00 TL");
+    });
+
+    it("omitting the new options reproduces the pre-existing tr-TR/2dp/Istanbul defaults exactly", () => {
+      const withDefaults = makeService().buildReceipt(receipt);
+      const withExplicitTrDefaults = makeService().buildReceipt(receipt, {
+        intlLocale: "tr-TR",
+        displayDecimals: 2,
+        timezone: "Europe/Istanbul",
+      });
+      expect(withDefaults.base64).toBe(withExplicitTrDefaults.base64);
     });
   });
 

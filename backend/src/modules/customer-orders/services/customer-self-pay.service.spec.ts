@@ -58,6 +58,10 @@ describe("CustomerSelfPayService (characterization)", () => {
   let paytrAdapter: { getIframeToken: jest.Mock };
   let customerSessionService: { requireSession: jest.Mock };
   let config: { get: jest.Mock };
+  // Task 10 — CountryCapabilityResolver gate. Defaults to resolving "paytr"
+  // for every tenant (matching this file's implicit TR-only fixtures);
+  // individual tests override it to characterize the UZ-refusal path.
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CustomerSelfPayService;
   // The intent collaborator — exposed so tests can reach its private
   // resolveReturnUrls helper (moved here from the old monolith).
@@ -113,6 +117,9 @@ describe("CustomerSelfPayService (characterization)", () => {
       }),
     };
     config = makeConfig();
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
 
     // Build the real collaborator graph the way customer-orders.module
     // wires it, sharing the single mocked Prisma + stubs.
@@ -130,6 +137,7 @@ describe("CustomerSelfPayService (characterization)", () => {
       customerSessionService as any,
       config as any,
       reservationService,
+      countryCapability as any,
     );
     const webhookService = new SelfPayWebhookService(
       prisma as any,
@@ -453,6 +461,10 @@ describe("CustomerSelfPayService (characterization)", () => {
       { orderItemId: "oi-1", quantity: 1 },
     ],
     returnOrigin?: string,
+    // Task 10 — tenant.currency no longer gates self-pay at this layer
+    // (that was the removed SELF_PAY_UNSUPPORTED_CURRENCY duplicate check);
+    // exposed so a test can prove currency alone doesn't block the flow.
+    tenantCurrency = "TRY",
   ) {
     customerSessionService.requireSession.mockResolvedValue({
       tenantId: TENANT_ID,
@@ -460,7 +472,7 @@ describe("CustomerSelfPayService (characterization)", () => {
     });
     (prisma.tenant.findUnique as any).mockResolvedValue({
       id: TENANT_ID,
-      currency: "TRY",
+      currency: tenantCurrency,
     });
     (prisma.posSettings.findFirst as any).mockResolvedValue({
       enableCustomerSelfPay: true,
@@ -565,6 +577,37 @@ describe("CustomerSelfPayService (characterization)", () => {
       );
       expect(tokenArg.failUrl).toMatch(/&status=failed$/);
     });
+
+    // Task 10 regression pin — SelfPayIntentService now asks
+    // CountryCapabilityResolver before touching PayTR. This test captures
+    // the EXACT arguments a TR tenant's getIframeToken call carries today
+    // and asserts nothing about them moved as a side effect of the rewire.
+    it("reaches PayTR with byte-identical arguments for a TR tenant (Task 10 regression pin)", async () => {
+      await runHappyPathIntent();
+
+      // The rewire actually asked the resolver — not a no-op.
+      expect(countryCapability.paymentProviderFor).toHaveBeenCalledWith(
+        TENANT_ID,
+      );
+      expect(paytrAdapter.getIframeToken).toHaveBeenCalledTimes(1);
+
+      const call = paytrAdapter.getIframeToken.mock.calls[0][0];
+      const oid = call.merchantOid;
+      expect(oid).toMatch(/^SP/);
+      expect(call).toEqual({
+        merchantOid: oid,
+        amount: new Prisma.Decimal("25.00"),
+        currency: "TRY",
+        email: `${oid.toLowerCase()}@noreply.invalid`,
+        userName: "Müşteri",
+        userAddress: "Masa",
+        userPhone: "05000000000",
+        userBasket: [["Köfte", "25.00", 1]],
+        userIp: "1.2.3.4",
+        okUrl: `https://fallback.example.com/payment-result?oid=${oid}`,
+        failUrl: `https://fallback.example.com/payment-result?oid=${oid}&status=failed`,
+      });
+    });
   });
 
   describe("createPayIntent — guards", () => {
@@ -607,38 +650,60 @@ describe("CustomerSelfPayService (characterization)", () => {
       });
     });
 
-    it("throws SELF_PAY_UNSUPPORTED_CURRENCY for a non-TRY tenant", async () => {
-      customerSessionService.requireSession.mockResolvedValue({
-        tenantId: TENANT_ID,
-        tableId: TABLE_ID,
-      });
-      (prisma.tenant.findUnique as any).mockResolvedValue({
-        id: TENANT_ID,
-        currency: "USD",
-      });
-      (prisma.posSettings.findFirst as any).mockResolvedValue({
-        enableCustomerSelfPay: true,
-      });
-      (prisma.orderItem.findMany as any).mockResolvedValue([
-        {
-          id: "oi-1",
-          orderId: "order-A",
-          quantity: 2,
-          subtotal: new Prisma.Decimal("50.00"),
-          product: { name: "x" },
-          order: { id: "order-A", discount: 0, totalAmount: 50 },
-          orderItemPayments: [],
-        },
-      ]);
-      await expect(
-        svc.createPayIntent(
-          SESSION_ID,
-          { items: [{ orderItemId: "oi-1", quantity: 1 }] } as any,
-          "1.2.3.4",
+    // Task 10 — the local SELF_PAY_UNSUPPORTED_CURRENCY pre-check (item #7
+    // of the plan) was REMOVED: it duplicated the country-capability
+    // resolver's own refusal in a way that could drift. Currency is no
+    // longer this layer's business — a non-TRY tenant now reaches PayTR
+    // exactly like any other tenant, and PayTR's OWN assertPaytrCurrency
+    // gate (paytr.adapter.ts, unchanged by Task 10) is the sole remaining
+    // defence. This test replaces the old
+    // "throws SELF_PAY_UNSUPPORTED_CURRENCY for a non-TRY tenant" pin.
+    it("no longer blocks a non-TRY tenant at this layer — currency flows through to PayTR unchanged", async () => {
+      const res = await runHappyPathIntent(
+        [{ orderItemId: "oi-1", quantity: 1 }],
+        undefined,
+        "USD",
+      );
+
+      expect(paytrAdapter.getIframeToken).toHaveBeenCalledTimes(1);
+      const call = paytrAdapter.getIframeToken.mock.calls[0][0];
+      expect(call.currency).toBe("USD");
+      expect(res.currency).toBe("USD");
+    });
+
+    // Task 10 — the new gate. Country (via CountryCapabilityResolver), not
+    // currency, is what decides whether self-pay can reach PayTR at all.
+    it("a UZ-like tenant's self-pay never reaches the PayTR adapter", async () => {
+      countryCapability.paymentProviderFor.mockRejectedValue(
+        new Error(
+          "No payment provider configured for UZ — the country profile " +
+            "lists none yet. A UZ tenant cannot be charged through a " +
+            "provider that does not exist for their country.",
         ),
-      ).rejects.toMatchObject({
-        response: { code: "SELF_PAY_UNSUPPORTED_CURRENCY" },
-      });
+      );
+
+      // Currency is deliberately TRY (the default) here — isolating the
+      // assertion to the country gate, not accidentally re-testing the
+      // currency check this task just removed.
+      let caught: any;
+      try {
+        await runHappyPathIntent();
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.message).toMatch(/UZ/);
+      expect(caught.message).toMatch(/payment provider/);
+
+      expect(countryCapability.paymentProviderFor).toHaveBeenCalledWith(
+        TENANT_ID,
+      );
+      // The adapter's entry point was never reached.
+      expect(paytrAdapter.getIframeToken).not.toHaveBeenCalled();
+      // Fails fast — before any order lock / reservation transaction.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.pendingSelfPayment.create).not.toHaveBeenCalled();
     });
 
     it("rejects an item that isn't payable for this session", async () => {
@@ -1238,6 +1303,7 @@ describe("CustomerSelfPayService (characterization)", () => {
         customerSessionService as any,
         config as any,
         reservationService,
+        countryCapability as any,
       );
       const webhookService = new SelfPayWebhookService(
         prisma as any,

@@ -59,6 +59,11 @@ vi.mock('../../components/settings/SettingsToggle', () => ({
 
 import BrandingSettingsPage from './BrandingSettingsPage';
 
+const UZ_TAX_ID_RULES = [
+  { name: 'STIR', pattern: '^\\d{9}$', labelKey: 'country.taxId.stir' },
+  { name: 'PINFL', pattern: '^\\d{14}$', labelKey: 'country.taxId.pinfl' },
+];
+
 beforeEach(() => {
   h.tenant.data = { currency: 'TRY', taxId: '' };
   h.tenant.isLoading = false;
@@ -100,12 +105,79 @@ describe('BrandingSettingsPage', () => {
     );
   });
 
-  it('saves the currency selection', () => {
+  // Task 7: currency stops being a user choice — it is DERIVED from the
+  // tenant's country (CountryService.currencyForTenant()), so the picker is
+  // gone. This is the one visible change for a TR tenant.
+  it('shows the currency as read-only, derived text — no picker, nothing to save', () => {
     render(<BrandingSettingsPage />);
-    fireEvent.click(screen.getByText('save:currencySettings.title'));
-    expect(h.update).toHaveBeenCalledWith(
-      { currency: 'TRY' },
-      expect.any(Object),
-    );
+    expect(screen.getByText('TRY')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-select')).not.toBeInTheDocument();
+    expect(screen.queryByText('save:currencySettings.title')).not.toBeInTheDocument();
+  });
+
+  it('does not constrain the input with a fixed HTML pattern (validation is country-dependent)', () => {
+    render(<BrandingSettingsPage />);
+    const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+    expect(input).not.toHaveAttribute('pattern');
+  });
+
+  // UZ tenant: STIR(9)/PINFL(14), NOT the Turkish VKN(10)/TCKN(11) — before
+  // this task every one of these was rejected regardless of what was typed.
+  describe('under a UZ tenant', () => {
+    beforeEach(() => {
+      h.tenant.data = {
+        // The tenant-settings response DERIVES currency from the country
+        // profile (tenants.service.ts#findSettings), so a real UZ tenant's
+        // `currency` is 'UZS', never the TR mirror.
+        currency: 'UZS',
+        taxId: '',
+        countryCode: 'UZ',
+        taxIdRules: UZ_TAX_ID_RULES,
+      };
+    });
+
+    it("shows the tenant's OWN currency (UZS) read-only, not Turkey's", () => {
+      render(<BrandingSettingsPage />);
+      expect(screen.getByText('UZS')).toBeInTheDocument();
+    });
+
+    it('widens maxLength to fit the 14-digit PINFL instead of the TR-sized 11', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText(
+        'brandingSettings.taxId.placeholder',
+      ) as HTMLInputElement;
+      expect(input.maxLength).toBe(14);
+    });
+
+    it('rejects the Turkish 10-digit shape and does not call the mutation', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '1234567890' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(screen.getByText('brandingSettings.taxId.formatError')).toBeInTheDocument();
+      expect(h.update).not.toHaveBeenCalled();
+    });
+
+    it('ACCEPTS a 9-digit STIR', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '123456789' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(h.update).toHaveBeenCalledWith(
+        { taxId: '123456789' },
+        expect.any(Object),
+      );
+    });
+
+    it('ACCEPTS a 14-digit PINFL', () => {
+      render(<BrandingSettingsPage />);
+      const input = screen.getByPlaceholderText('brandingSettings.taxId.placeholder');
+      fireEvent.change(input, { target: { value: '12345678901234' } });
+      fireEvent.click(screen.getByText('save:brandingSettings.taxId.title'));
+      expect(h.update).toHaveBeenCalledWith(
+        { taxId: '12345678901234' },
+        expect.any(Object),
+      );
+    });
   });
 });

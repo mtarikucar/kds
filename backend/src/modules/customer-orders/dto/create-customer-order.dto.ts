@@ -23,8 +23,8 @@ import {
   EmptyStringToNumber,
   EmptyStringToUndefined,
 } from "../../../common/dto/transforms";
-
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 // Iter-85: customer-session token shape — 32 random bytes encoded as
 // hex = exactly 64 lower-hex chars (see customer-session.service.ts
@@ -135,10 +135,11 @@ export class CreateCustomerOrderDto {
 
   @ApiProperty({ required: false })
   @EmptyStringToUndefined()
+  @NormalizePhone()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX)
+  @Matches(E164_PATTERN)
   customerPhone?: string;
 
   @ApiProperty({ type: [CreateOrderItemDto] })

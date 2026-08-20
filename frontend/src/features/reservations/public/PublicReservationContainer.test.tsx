@@ -25,6 +25,12 @@ vi.mock('react-i18next', () => ({
       opts && typeof opts.count !== 'undefined' ? `${key}:${opts.count}` : key,
   }),
 }));
+// Step4Contact's <PhoneInput> now defaults its country from
+// useCountryProfile() (Task 7), which needs a QueryClient this suite
+// doesn't set up. Mock at the hook boundary instead.
+vi.mock('../../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
 
 // ---- api-hook mocks -------------------------------------------------------
 const settingsState = { data: undefined as unknown, isLoading: false, error: null as unknown };

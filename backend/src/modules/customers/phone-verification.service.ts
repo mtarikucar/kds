@@ -13,6 +13,7 @@ import {
   normalizePhone,
 } from "./customers.helpers";
 import { maskPhone } from "../../common/helpers/pii-mask.helper";
+import { E164_PATTERN, E164_MESSAGE } from "../../common/phone/e164.const";
 
 // Per-tenant and per-phone daily send caps to bound SMS cost and blunt
 // pumping-fraud (attacker cycles target phones to evade the 60s per-phone
@@ -49,8 +50,11 @@ export class PhoneVerificationService {
     tenantId: string,
   ): Promise<{ verificationId: string; expiresAt: Date; message: string }> {
     const phone = normalizePhone(phoneRaw);
-    if (!/^\+?[1-9]\d{7,14}$/.test(phone)) {
-      throw new BadRequestException("Invalid phone number format");
+    if (!E164_PATTERN.test(phone)) {
+      // Generic, no-field-name-needed context (a raw phone param, not a
+      // multi-field DTO) — the shared E164_MESSAGE is the genuinely right
+      // message here rather than a bespoke duplicate string.
+      throw new BadRequestException(E164_MESSAGE);
     }
 
     const now = new Date();
@@ -123,7 +127,16 @@ export class PhoneVerificationService {
       },
     });
 
-    const smsSent = await this.smsService.sendVerificationCode(phone, code);
+    // Task 11: tenantId is already in scope here — pass it explicitly
+    // rather than relying on ambient RequestContext, so this resolves the
+    // correct per-tenant SMS provider even if this method is ever called
+    // from outside an HTTP request (queue/cron) where no ambient context
+    // exists.
+    const smsSent = await this.smsService.sendVerificationCode(
+      phone,
+      code,
+      tenantId,
+    );
     if (!smsSent && this.smsService.isServiceEnabled()) {
       this.logger.warn(`SMS delivery failed for ${maskPhone(phone)}`);
     }

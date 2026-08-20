@@ -56,6 +56,7 @@ import { CashDrawerModule } from "./modules/cash-drawer/cash-drawer.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
 import { PaymentsCoreModule } from "./modules/payments-core/payments-core.module";
 import { FiscalCoreModule } from "./modules/fiscal-core/fiscal-core.module";
+import { SmsCoreModule } from "./modules/sms-core/sms-core.module";
 import { PaymentTerminalModule } from "./modules/payment-terminal/payment-terminal.module";
 import { CallerModule } from "./modules/caller/caller.module";
 import { FulfillmentModule } from "./modules/fulfillment/fulfillment.module";
@@ -156,6 +157,10 @@ import { validate } from "./config/env.validation";
     // double-fiscalization guards. FiscalCoreModule is the single fiscal rail.
     PaymentsCoreModule,
     FiscalCoreModule,
+    // Task 11: SMS provider registry (NetGSM/Twilio self-register here),
+    // mirroring PaymentsCoreModule/FiscalCoreModule above. @Global(), so
+    // SmsService (customers module) resolves SmsProviderRegistry ambiently.
+    SmsCoreModule,
     PaymentTerminalModule,
     // HummyTummy Phase 9: caller / phone-order ingest.
     CallerModule,

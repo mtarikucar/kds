@@ -64,9 +64,19 @@ describe('useCurrency hooks', () => {
   it('useUpdateTenantSettings PATCHes the settings endpoint', async () => {
     patchMock.mockResolvedValue({ data: { ok: true } });
     const { result } = renderHook(() => useUpdateTenantSettings(), { wrapper });
-    await result.current.mutateAsync({ currency: 'USD' });
+    await result.current.mutateAsync({ closingTime: '23:00' });
     expect(patchMock).toHaveBeenCalledWith('/tenants/settings', {
-      currency: 'USD',
+      closingTime: '23:00',
     });
+  });
+
+  // Task 7: currency is DERIVED from the tenant's country and is no longer
+  // part of the update payload's type — UpdateTenantSettingsDto has no
+  // `currency` field any more (mirrors the backend DTO, which the
+  // ValidationPipe's whitelist now strips server-side regardless).
+  it('UpdateTenantSettingsDto no longer accepts a currency field', () => {
+    // @ts-expect-error — currency was removed from UpdateTenantSettingsDto
+    const _dto: import('./useCurrency').UpdateTenantSettingsDto = { currency: 'USD' };
+    expect(_dto).toBeDefined();
   });
 });

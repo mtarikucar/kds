@@ -6,6 +6,8 @@
  * Kept as a plain helper (not Joi/class-validator) so env validation doesn't
  * depend on a side-installed schema library.
  */
+import { resolveDeploymentCountries } from "../country/deployment-countries";
+
 export interface EnvRule {
   key: string;
   required: boolean;
@@ -40,6 +42,44 @@ const CORE_SECRETS = [
   "INTEGRATION_KEY",
 ];
 
+/**
+ * Which env keys a given PaymentProviderRegistry id needs to actually run.
+ * The link from "this deployment serves these countries" to "these
+ * providers' credentials are required" must not be a second hardcoded list
+ * living next to country-profile.const.ts — that pair only ever needs to
+ * agree by accident. Instead: country-profile.const.ts already names the
+ * provider ids a country's `capabilities.paymentProviderIds` requires;
+ * this map is the ONLY place that says what each of those ids needs from
+ * the environment. Adding a country whose payment provider already has an
+ * entry here (or adding a brand-new provider id) is the only edit needed —
+ * see resolveDeploymentCountries() (common/country/deployment-countries.ts),
+ * which derives the required rule set from it instead of this validator
+ * hardcoding "TR needs PayTR".
+ */
+const PAYMENT_PROVIDER_ENV_REQUIREMENTS: Record<string, EnvRule[]> = {
+  // PayTR — required in production because the Turkish payment flow is
+  // useless without them. Dev can run without (PaymentsService throws a
+  // clear "credentials not configured" error if the user actually tries
+  // to check out without setting them).
+  paytr: [
+    { key: "PAYTR_MERCHANT_ID", required: true, prodOnly: true },
+    {
+      key: "PAYTR_MERCHANT_KEY",
+      required: true,
+      prodOnly: true,
+      minLength: 8,
+    },
+    {
+      key: "PAYTR_MERCHANT_SALT",
+      required: true,
+      prodOnly: true,
+      minLength: 8,
+    },
+    { key: "PAYTR_OK_URL", required: true, prodOnly: true, minLength: 10 },
+    { key: "PAYTR_FAIL_URL", required: true, prodOnly: true, minLength: 10 },
+  ],
+};
+
 const RULES: EnvRule[] = [
   { key: "DATABASE_URL", required: true, minLength: 10 },
   // JWT realms — presence is enforced in every environment. Length + cross-realm
@@ -55,15 +95,13 @@ const RULES: EnvRule[] = [
   // Production-only
   { key: "CORS_ORIGIN", required: true, prodOnly: true },
   { key: "SENTRY_DSN", required: false, prodOnly: true },
-  // PayTR — required in production because the Turkish payment flow is
-  // useless without them. Dev can run without (PaymentsService throws a
-  // clear "credentials not configured" error if the user actually tries
-  // to check out without setting them).
-  { key: "PAYTR_MERCHANT_ID", required: true, prodOnly: true },
-  { key: "PAYTR_MERCHANT_KEY", required: true, prodOnly: true, minLength: 8 },
-  { key: "PAYTR_MERCHANT_SALT", required: true, prodOnly: true, minLength: 8 },
-  { key: "PAYTR_OK_URL", required: true, prodOnly: true, minLength: 10 },
-  { key: "PAYTR_FAIL_URL", required: true, prodOnly: true, minLength: 10 },
+  // PayTR's five REQUIRED credentials moved to
+  // PAYMENT_PROVIDER_ENV_REQUIREMENTS["paytr"] above — required only when
+  // DEPLOYMENT_COUNTRIES resolves to a country whose profile names "paytr"
+  // (TR does; the default DEPLOYMENT_COUNTRIES is "TR", so today's
+  // behaviour is unchanged). See resolveDeploymentCountries() and its use
+  // in validateEnv() below.
+  //
   // POS-specific redirect URLs for customer self-pay (QR menu PayTR
   // flow). Optional — falls back to the subscription PAYTR_OK_URL /
   // PAYTR_FAIL_URL if unset, but production should set them so
@@ -97,7 +135,29 @@ export function validateEnv(): void {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  for (const rule of RULES) {
+  // DEPLOYMENT_COUNTRIES (default "TR") decides which payment providers'
+  // credentials this boot actually needs — see resolveDeploymentCountries()
+  // above. An unknown code refuses to boot rather than silently serving a
+  // country whose requirements were never checked. This runs in every
+  // environment (not prodOnly) because a malformed value is a config bug
+  // whether or not the process is about to enforce prod-only rules.
+  const deployment = resolveDeploymentCountries();
+  if (deployment.unknownCodes.length > 0) {
+    errors.push(
+      `DEPLOYMENT_COUNTRIES names unknown country code(s): ${deployment.unknownCodes.join(", ")}. ` +
+        "Each code must match a profile in country-profile.const.ts. Fix the typo, or add " +
+        "that country's profile before deploying to it.",
+    );
+  }
+
+  const providerRules: EnvRule[] = [];
+  for (const providerId of deployment.paymentProviderIds) {
+    const rules = PAYMENT_PROVIDER_ENV_REQUIREMENTS[providerId];
+    if (rules) providerRules.push(...rules);
+  }
+  const allRules = [...RULES, ...providerRules];
+
+  for (const rule of allRules) {
     if (rule.prodOnly && !IS_PROD) continue;
     const value = process.env[rule.key];
 
@@ -161,8 +221,12 @@ export function validateEnv(): void {
   // PayTR test mode — must NOT stay "1" in production. A customer
   // whose 3DS "succeeds" against PayTR's sandbox while the merchant
   // is running prod credentials would book real Payment rows without
-  // money actually moving. Hard-fail boot.
-  if (IS_PROD) {
+  // money actually moving. Hard-fail boot. Gated on "paytr" actually
+  // being a required provider for this deployment's countries — a
+  // deployment that serves no PayTR country (e.g. DEPLOYMENT_COUNTRIES=UZ)
+  // never touches PayTR at all, so demanding PAYTR_TEST_MODE from it would
+  // reintroduce exactly the unconditional-PayTR problem this task fixes.
+  if (IS_PROD && deployment.paymentProviderIds.has("paytr")) {
     const testMode = process.env.PAYTR_TEST_MODE;
     if (testMode === undefined || testMode === "" || testMode === "1") {
       errors.push(

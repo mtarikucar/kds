@@ -10,10 +10,33 @@ export function cn(...inputs: ClassValue[]) {
 // defaults to TRY and renders with Turkish grouping/decimals (₺2.999,00). A
 // non-TRY `currency` is still honoured for the multi-currency code paths that
 // remain (e.g. the bank-transfer/havale plan rendering).
+//
+// DISPLAY-DECIMALS OVERRIDE (Task 7, multi-country): most of the app renders
+// money through useFormatCurrency()/useFormatCurrencyExtended(), which read
+// `displayDecimals` off the tenant's country profile (COUNTRY_PROFILES —
+// see backend/src/common/country/country-profile.const.ts). This helper is
+// a plain (non-hook) function called from many places that don't have
+// access to that profile, so it can't ask for it — but it must not silently
+// mis-render UZS with Intl's ISO-4217 default of two decimals when the
+// country profile says so'm is quoted WHOLE. Mirrors ONLY the one currency
+// that actually diverges; every other currency (including TRY) keeps
+// Intl's own default, unchanged.
+//
+// Exported so useFormatCurrency.ts's formatWithCurrency() (the explicit
+// currency-override path, e.g. rendering an invoice's own frozen `currency`
+// field) can apply the SAME override — "so'm has no decimals" is a fact
+// about the currency, not something that only holds when it happens to be
+// the live tenant currency.
+export const CURRENCY_DECIMALS_OVERRIDE: Record<string, number> = { UZS: 0 };
+
 export function formatCurrency(amount: number, currency: string = 'TRY'): string {
+  const decimals = CURRENCY_DECIMALS_OVERRIDE[currency];
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency,
+    ...(decimals !== undefined
+      ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
+      : {}),
   }).format(amount);
 }
 

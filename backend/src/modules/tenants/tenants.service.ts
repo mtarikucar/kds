@@ -14,12 +14,16 @@ import {
   isSubdomainQuarantined,
   reserveSubdomain,
 } from "../../common/helpers/subdomain.helper";
+import { resolveCountryProfile } from "../../common/country/country.service";
 
 const SETTINGS_SELECT = {
   id: true,
   name: true,
   subdomain: true,
   currency: true,
+  // Task 7's frontend currency formatter resolves the country profile from
+  // this — currency alone can't tell it the display-decimals rule.
+  countryCode: true,
   closingTime: true,
   timezone: true,
   reportEmailEnabled: true,
@@ -107,7 +111,33 @@ export class TenantsService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
-    return tenant;
+    // DERIVED, not stored — the product editor and the menu-import review
+    // grid need the tenant's ACTUAL allowed tax band to offer as <option>s,
+    // not a hardcoded Turkish one. Nothing new is written to the Tenant
+    // row; COUNTRY_PROFILES (via resolveCountryProfile) stays the single
+    // source of truth, mirroring @IsCountryTaxRate on the backend DTOs.
+    const profile = resolveCountryProfile(tenant.countryCode);
+    return {
+      ...tenant,
+      // DERIVED, overriding the raw `tenant.currency` column spread in
+      // above — that column is a written MIRROR, never the truth (see
+      // CountryService.currencyForTenant()). A stale/mismatched row must
+      // not leak its old currency back to the client; the profile always
+      // wins. `displayDecimals` has no column at all — UZS renders whole
+      // (so'm) while storage stays x100 for every currency, always.
+      currency: profile.currency,
+      displayDecimals: profile.displayDecimals,
+      taxRates: profile.taxRates,
+      defaultTaxRate: profile.defaultTaxRate,
+      // Serialized: RegExp doesn't survive JSON, so ship the pattern SOURCE
+      // string. The frontend reconstructs it with `new RegExp(pattern)` —
+      // see isValidTaxId() in frontend/src/hooks/useCountryProfile.ts.
+      taxIdRules: profile.taxIdRules.map((r) => ({
+        name: r.name,
+        pattern: r.pattern.source,
+        labelKey: r.labelKey,
+      })),
+    };
   }
 
   async updateSettings(

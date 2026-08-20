@@ -1,5 +1,7 @@
 import { CommitMenuImportDto } from "../dto/menu-import.dto";
 import { foldMenuKey } from "./menu-key-fold";
+import { RequestContext } from "../../../common/context/request-context";
+import { resolveCountryProfile } from "../../../common/country/country.service";
 
 export interface ColumnMap {
   name: string;
@@ -95,11 +97,20 @@ export function rowsToDraft(
     }
 
     const taxRaw = iTax >= 0 ? parsePrice(row[iTax]) : NaN;
+    // Country-scoped, not a fixed TR band — a UZ tenant's sheet may carry
+    // 12 (QQS) or 6 (catering), neither of which is in Turkey's 0/1/10/20.
+    // Reads the AMBIENT request country (this runs inside the same request
+    // that uploaded the file) rather than a fixed list, mirroring
+    // @IsCountryTaxRate on the DTOs this draft eventually gets validated
+    // against at /commit.
+    const allowedTaxRates = resolveCountryProfile(
+      RequestContext.get()?.countryCode,
+    ).taxRates;
     buckets.get(key)!.products.push({
       name,
       description: iDesc >= 0 ? cleanCell(row[iDesc]) || undefined : undefined,
       price: parsePrice(row[iPrice]),
-      taxRate: [0, 1, 10, 20].includes(taxRaw) ? taxRaw : undefined,
+      taxRate: allowedTaxRates.includes(taxRaw) ? taxRaw : undefined,
     });
   }
 

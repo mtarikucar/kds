@@ -1,22 +1,46 @@
-import { Logger } from "@nestjs/common";
-import { SmsProvider, SmsSendResult } from "./sms-provider.interface";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { SmsProvider, SmsSendResult } from "../sms-provider.interface";
+import { SmsProviderRegistry } from "../sms-provider.registry";
 import { maskPhone } from "../../../common/helpers/pii-mask.helper";
 
-export class NetGsmProvider implements SmsProvider {
+/**
+ * Task 11: moved from customers/sms-providers/ into sms-core/adapters/,
+ * mirroring payments-core/adapters + fiscal-core/adapters. Credentials are
+ * now read from ConfigService in the constructor (DI, singleton) instead of
+ * being passed positionally by a caller that constructed a fresh instance
+ * per selection attempt — the wire behaviour of send() is unchanged.
+ */
+@Injectable()
+export class NetGsmProvider implements SmsProvider, OnModuleInit {
   readonly name = "netgsm";
   private readonly logger = new Logger(NetGsmProvider.name);
   private readonly apiUrl = "https://api.netgsm.com.tr/sms/send/get";
-  private usercode: string;
-  private password: string;
-  private msgheader: string;
+  private readonly usercode: string;
+  private readonly password: string;
+  private readonly msgheader: string;
 
-  constructor(usercode?: string, password?: string, msgheader?: string) {
-    this.usercode = usercode || "";
-    this.password = password || "";
-    this.msgheader = msgheader || "";
+  constructor(
+    private readonly registry: SmsProviderRegistry,
+    config: ConfigService,
+  ) {
+    this.usercode = config.get<string>("NETGSM_USERCODE") || "";
+    this.password = config.get<string>("NETGSM_PASSWORD") || "";
+    this.msgheader = config.get<string>("NETGSM_MSGHEADER") || "";
+  }
 
+  /**
+   * Only registers into the shared registry when real credentials are
+   * present — mirrors PaytrPaymentProvider.onModuleInit(). An unconfigured
+   * NetGsmProvider simply never becomes selectable; it does NOT throw here
+   * (a dev box with no NetGSM account still needs to boot).
+   */
+  onModuleInit(): void {
     if (this.isConfigured()) {
       this.logger.log("NetGSM provider initialized");
+      this.registry.register(this);
+    } else {
+      this.logger.warn("NetGSM credentials missing — provider not registered");
     }
   }
 

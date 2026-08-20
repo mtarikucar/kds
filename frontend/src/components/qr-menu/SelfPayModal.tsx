@@ -305,7 +305,6 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
                   value={customerPhone}
                   onChange={setCustomerPhone}
                   label={t('payment.phoneOptional', 'Phone (optional — for loyalty)')}
-                  defaultCountry="TR"
                 />
               </>
             )}

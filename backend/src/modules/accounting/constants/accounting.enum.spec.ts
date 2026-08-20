@@ -5,6 +5,7 @@ import {
   AccountingProvider,
   InvoiceType,
 } from "./accounting.enum";
+import { COUNTRY_PROFILES } from "../../../common/country/country-profile.const";
 
 /**
  * Long-tail drift-guard for the accounting enums. These values key the
@@ -21,6 +22,17 @@ describe("accounting.enum", () => {
 
   it("defaults the tax rate to 10%", () => {
     expect(DEFAULT_TAX_RATE).toBe(TaxRate.TEN);
+  });
+
+  it("TaxRate is TR-only, and DEFAULT_TAX_RATE is DERIVED from the TR country profile, not a second hardcode", () => {
+    // This enum is not a "mirror" that could drift on its own — it is
+    // sourced from COUNTRY_PROFILES.TR. Failing here means someone
+    // reintroduced an independent hardcoded 10.
+    expect(TaxRate.ZERO).toBe(COUNTRY_PROFILES.TR.taxRates[0]);
+    expect(TaxRate.ONE).toBe(COUNTRY_PROFILES.TR.taxRates[1]);
+    expect(TaxRate.TEN).toBe(COUNTRY_PROFILES.TR.taxRates[2]);
+    expect(TaxRate.TWENTY).toBe(COUNTRY_PROFILES.TR.taxRates[3]);
+    expect(DEFAULT_TAX_RATE).toBe(COUNTRY_PROFILES.TR.defaultTaxRate);
   });
 
   it("enumerates the accounting providers including NONE", () => {

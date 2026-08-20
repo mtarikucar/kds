@@ -8,6 +8,7 @@ import {
 import { v7 as uuidv7 } from "uuid";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PaymentsFacadeService } from "../payments-core/payments-facade.service";
+import { CountryCapabilityResolver } from "../../common/country/country-capability.resolver";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 import { CheckoutBuyerDto } from "./dto/create-intent.dto";
@@ -76,6 +77,12 @@ export class CheckoutIntentService {
     // core never reads marketing_users directly.
     @Inject(REFERRAL_DIRECTORY_PORT)
     private readonly referralDirectory: ReferralDirectoryPort,
+    // Task 10 — resolves which payment provider this tenant's country
+    // actually has, so the id below stops being a literal "paytr".
+    // Required (no @Optional): CommonModule is @Global() and always
+    // provides it, so DI fails loud at boot instead of silently falling
+    // back to PayTR for a country that doesn't have it.
+    private readonly countryCapability: CountryCapabilityResolver,
     // Demo-tenant real-money block. REQUIRED (no @Optional) —
     // CheckoutModule imports DemoGuardModule, so DI fails loud at boot if a
     // future module-wiring regression ever drops that import, instead of
@@ -117,6 +124,16 @@ export class CheckoutIntentService {
     // never reach PayTR via marketplace/hardware checkout. First statement,
     // before pricing/guard/stock checks or any PayTR call.
     await this.demoGuard?.assertNotDemo(tenantId);
+
+    // Country capability gate (Task 10) — resolve which payment provider
+    // this tenant's country actually has, before consent/addon/stock work
+    // or any gateway call. A country with no payment provider configured
+    // (e.g. UZ, whose profile lists none yet) gets the resolver's own
+    // explicit, country-scoped refusal right here instead of the literal
+    // "paytr" this rail used to hardcode two lines below and at the
+    // eventual PaymentsFacade call.
+    const paymentProvider =
+      await this.countryCapability.paymentProviderFor(tenantId);
 
     // Distance-selling consent, recorded BEFORE any PayTR token is minted.
     //
@@ -288,7 +305,7 @@ export class CheckoutIntentService {
         cartJson: cart as any,
         amountCents: quote.totalCents,
         currency: quote.currency,
-        providerId: "paytr",
+        providerId: paymentProvider.id,
         status: "pending",
         pricedAt,
         quoteJson: quote as any,
@@ -301,7 +318,7 @@ export class CheckoutIntentService {
       },
     });
 
-    const intent = await this.payments.createIntent("paytr", {
+    const intent = await this.payments.createIntent(paymentProvider.id, {
       tenantId,
       externalRef: paymentRef,
       idempotencyKey: paymentRef,

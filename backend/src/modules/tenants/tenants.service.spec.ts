@@ -242,6 +242,119 @@ describe('TenantsService.findSettings / findAllPublic', () => {
     );
   });
 
+  /**
+   * The product editor / menu-import review grid need the tenant's ACTUAL
+   * allowed tax band to offer as <option>s, not a hardcoded Turkish one —
+   * otherwise a UZ operator can enter 12% via the API (backend validator)
+   * but never see it as a choice in the UI. Derived from the country
+   * profile, not a new column.
+   */
+  it('findSettings adds taxRates + defaultTaxRate DERIVED from the TR profile', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 1, 10, 20]);
+    expect(settings.defaultTaxRate).toBe(10);
+  });
+
+  it("findSettings adds the UZ tenant's OWN band (0/6/12), not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 6, 12]);
+    expect(settings.defaultTaxRate).toBe(12);
+  });
+
+  it('findSettings falls back to the TR band when countryCode is missing (legacy row)', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: null,
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 1, 10, 20]);
+    expect(settings.defaultTaxRate).toBe(10);
+  });
+
+  /**
+   * Currency + display precision are DERIVED from the country profile, same
+   * as taxRates above — never a second read of the stored `currency`
+   * column. Task 7's whole point is that a tenant cannot disagree with its
+   * own country on currency once the update DTO stops accepting it.
+   */
+  it('findSettings adds currency + displayDecimals DERIVED from the TR profile', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+      currency: 'TRY',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('TRY');
+    expect(settings.displayDecimals).toBe(2);
+  });
+
+  it("findSettings surfaces the UZ tenant's OWN currency (UZS) with ZERO display decimals, not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+      currency: 'UZS',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('UZS');
+    expect(settings.displayDecimals).toBe(0);
+  });
+
+  /**
+   * The load-bearing regression pin: `Tenant.currency` is a WRITTEN MIRROR,
+   * never the truth (see CountryService.currencyForTenant()). If the stored
+   * column ever drifts from the country (a stale row, a bad migration), the
+   * settings response must still answer with the country's currency, not
+   * echo the stale mirror back to the client.
+   */
+  it('findSettings DERIVES currency from the country profile even when the stored mirror disagrees', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+      currency: 'USD', // stale/wrong mirror — must not leak through
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.currency).toBe('TRY');
+  });
+
+  /**
+   * The operator-typed tax-id field (Branding/Accounting settings, the
+   * manual-invoice modal) needs the tenant's ACTUAL shape rules to render
+   * the right label and to stop guessing a client-side pattern — see
+   * useCountryProfile() on the frontend. RegExp doesn't survive JSON, so
+   * this ships the pattern SOURCE string, not a RegExp instance.
+   */
+  it("findSettings adds taxIdRules serialized (pattern as a source string) from the TR profile", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxIdRules).toEqual([
+      { name: 'VKN', pattern: '^\\d{10}$', labelKey: 'country.taxId.vkn' },
+      { name: 'TCKN', pattern: '^\\d{11}$', labelKey: 'country.taxId.tckn' },
+    ]);
+  });
+
+  it("findSettings adds the UZ tenant's OWN taxIdRules (STIR/PINFL), not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxIdRules).toEqual([
+      { name: 'STIR', pattern: '^\\d{9}$', labelKey: 'country.taxId.stir' },
+      { name: 'PINFL', pattern: '^\\d{14}$', labelKey: 'country.taxId.pinfl' },
+    ]);
+  });
+
   it('findAllPublic only returns ACTIVE tenants ordered by name', async () => {
     (prisma.tenant.findMany as any).mockResolvedValue([]);
     await svc.findAllPublic();

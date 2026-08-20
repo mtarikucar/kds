@@ -32,6 +32,15 @@ vi.mock('framer-motion', () => {
 const toastError = vi.fn();
 vi.mock('sonner', () => ({ toast: { error: (m: string) => toastError(m) } }));
 
+// SelfPayModal renders <PhoneInput> without an explicit defaultCountry
+// (Task 7) — it now resolves the default from useCountryProfile(), which
+// needs a QueryClient the rest of this suite doesn't set up. Mock at the
+// hook boundary instead, same pattern used across the settings/product
+// pages that already consume useCountryProfile().
+vi.mock('../../hooks/useCountryProfile', () => ({
+  useCountryProfile: () => ({ countryCode: 'TR' }),
+}));
+
 const PAYABLE = {
   sessionId: 's1',
   tableId: 't1',

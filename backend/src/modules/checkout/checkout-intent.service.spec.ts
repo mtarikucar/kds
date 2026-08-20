@@ -23,6 +23,11 @@ describe('CheckoutIntentService (v2.8.85)', () => {
   let quoteSvc: any;
   let addonGuard: any;
   let catalog: any;
+  let referralDirectory: any;
+  // Task 10 — CountryCapabilityResolver gate. Defaults to resolving
+  // "paytr" for every tenant (matching this file's TR-only fixtures);
+  // individual tests override it to characterize the no-provider refusal.
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CheckoutIntentService;
 
   beforeEach(() => {
@@ -58,7 +63,19 @@ describe('CheckoutIntentService (v2.8.85)', () => {
     catalog = {
       getAvailableStock: jest.fn().mockResolvedValue(999),
     };
-    svc = new CheckoutIntentService(prisma, quoteSvc, payments, addonGuard, catalog);
+    referralDirectory = { resolveReferralCode: jest.fn().mockResolvedValue(null) };
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: 'paytr' }),
+    };
+    svc = new CheckoutIntentService(
+      prisma,
+      quoteSvc,
+      payments,
+      addonGuard,
+      catalog,
+      referralDirectory,
+      countryCapability as any,
+    );
   });
 
   function mockQuote(overrides: Partial<CartQuote> = {}): CartQuote {
@@ -240,5 +257,58 @@ describe('CheckoutIntentService (v2.8.85)', () => {
     const basket = payments.createIntent.mock.calls[0][1].basket;
     expect(basket).toHaveLength(1);
     expect(basket[0].priceCents).toBe(6000);
+  });
+
+  // Task 10 — checkout-intent.service.ts no longer hardcodes "paytr"; the
+  // provider id now comes from CountryCapabilityResolver.
+  describe('country capability gate (Task 10)', () => {
+    it("a TR tenant's checkout still resolves to paytr — behaviour unchanged", async () => {
+      quoteSvc.quote.mockResolvedValue(mockQuote());
+      const out = await svc.createIntent({
+        tenantId: 't-1',
+        cart: dummyCart(),
+        buyer,
+        buyerIp: '1.2.3.4',
+      });
+
+      // The id genuinely flows from the resolver, not a coincidental match
+      // against a still-hardcoded literal.
+      expect(countryCapability.paymentProviderFor).toHaveBeenCalledWith('t-1');
+      expect(payments.createIntent.mock.calls[0][0]).toBe('paytr');
+      const persisted = prisma.checkoutIntent.create.mock.calls[0][0].data;
+      expect(persisted.providerId).toBe('paytr');
+      expect(out).toBeDefined();
+    });
+
+    it('refuses a tenant whose country has no payment provider before any pricing/PayTR work (UZ-like)', async () => {
+      countryCapability.paymentProviderFor.mockRejectedValue(
+        new Error(
+          'No payment provider configured for UZ — the country profile ' +
+            'lists none yet. A UZ tenant cannot be charged through a ' +
+            'provider that does not exist for their country.',
+        ),
+      );
+
+      let caught: any;
+      try {
+        await svc.createIntent({
+          tenantId: 't-uz',
+          cart: dummyCart(),
+          buyer,
+          buyerIp: '1.2.3.4',
+        });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeDefined();
+      expect(caught.message).toMatch(/UZ/);
+      expect(caught.message).toMatch(/payment provider/);
+
+      // Fails fast — no pricing, no intent row, no gateway call.
+      expect(quoteSvc.quote).not.toHaveBeenCalled();
+      expect(prisma.checkoutIntent.create).not.toHaveBeenCalled();
+      expect(payments.createIntent).not.toHaveBeenCalled();
+    });
   });
 });

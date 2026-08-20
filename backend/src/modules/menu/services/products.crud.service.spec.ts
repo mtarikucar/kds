@@ -9,6 +9,7 @@ import {
   mockPrismaClient,
   MockPrismaClient,
 } from "../../../common/test/prisma-mock.service";
+import { RequestContext } from "../../../common/context/request-context";
 
 /**
  * Real-logic spec for ProductsService create / update / remove and the
@@ -76,6 +77,40 @@ describe("ProductsService — create/update/remove/transform", () => {
           currentStock: 0, // default
         }),
       );
+    });
+
+    it("defaults an omitted taxRate from the AMBIENT country, not a bare 10", async () => {
+      (prisma.category.findFirst as any).mockResolvedValue({ id: "cat-1" });
+      (prisma.product.create as any).mockResolvedValue({
+        id: "p-1",
+        productImages: [],
+        modifierGroups: [],
+      });
+
+      // No request context — cron/seed/bootstrap path — must still be TR's
+      // default (10), i.e. bit-identical to before this change.
+      await svc.create(
+        { name: "Tea", price: 5, categoryId: "cat-1" } as any,
+        TENANT,
+      );
+      expect(
+        (prisma.product.create as any).mock.calls[0][0].data.taxRate,
+      ).toBe(10);
+
+      (prisma.product.create as any).mockClear();
+
+      // A UZ tenant creating a product without a taxRate must default to
+      // UZ's OWN default (12), never Turkey's 10 — 10 is not even a legal
+      // UZ QQS/catering rate.
+      await RequestContext.run({ countryCode: "UZ" }, () =>
+        svc.create(
+          { name: "Osh", price: 30000, categoryId: "cat-1" } as any,
+          TENANT,
+        ),
+      );
+      expect(
+        (prisma.product.create as any).mock.calls[0][0].data.taxRate,
+      ).toBe(12);
     });
 
     it("delegates to findOne to re-fetch with images when imageIds are supplied", async () => {
