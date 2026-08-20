@@ -767,6 +767,67 @@ invalidate(tenantId: string): void {
 
 Tenant yoksa (kimliksiz istek) `countryCode` yazılmaz — `ambient()` varsayılana düşer.
 
+- [ ] **Step 4b: Public routes — where the ambient country is otherwise DEAD**
+
+`request.tenantId` yalnız **tek bir yerde** set ediliyor: `tenant.guard.ts:22`, `user.tenantId`'den. Ve o guard `@Public()` / `@MachineAuth()` için `shouldBypassGlobalAuth` ile devre dışı kalıyor. Yani **her public yüzeyde** interceptor kiracı göremiyor, erken dönüyor ve ambient ülke hiç dolmuyor. Bu, ülke çözümünü sessizce şurada devre dışı bırakıyor:
+
+- QR menü (`menu/controllers/qr-menu.controller.ts`)
+- halka açık rezervasyon (`reservations/controllers/public-reservations.controller.ts`)
+- müşteri self-ödeme · OTP · Partner Display
+
+Yani tam olarak **müşterinin kendi telefonunu yazdığı yüzeyler**. Özbek bir kafenin QR menüsünde müşteri "90 123 45 67" yazınca numara Türk varsayılıp yanlış ayrıştırılır — bu mimarinin var oluş sebebi olan senaryonun ta kendisi.
+
+Neyse ki bu rotalar kiracıyı **route parametresi olarak** zaten taşıyor: `@Get(":tenantId")`, `@Get(":tenantId/settings")`.
+
+**GÜVENLİK SINIRI — bu ayrım zorunlu.** Public bir rotada `req.params.tenantId` **saldırgan kontrollüdür**:
+
+- ✅ `countryCode`'u **set edebilir** — tek etkisi telefon ayrıştırma bölgesi ve gösterim biçimi. Yetkilendirme kararı değil; en kötü ihtimalle saldırgan kendi numarasını başka bir ülkenin kuralıyla ayrıştırtır.
+- ❌ `RequestContext.tenantId`'yi **ASLA doldurmamalı** — o değer log'lara, Sentry'ye ve kapsamlama mantığına akıyor. Kimliksiz bir route parametresinden doldurulursa ona güvenen her kod bir kiracı-kaçışı vektörü kazanır.
+
+```ts
+// Authenticated: the guard chain vouched for this tenant.
+const tenantId = req?.user?.tenantId ?? req?.tenantId;
+RequestContext.set({ tenantId, branchId: ..., userId: ... });
+if (tenantId) { /* cached fast path, exactly as above */ }
+
+// Public route: the tenant arrives as a ROUTE PARAM, so it is
+// attacker-controlled. Use it ONLY to choose a country profile. Never
+// write it to RequestContext.tenantId — that value reaches logs, Sentry
+// and scoping decisions, and trusting an unauthenticated param there
+// would hand out a tenant-escape vector.
+const claimed = req?.params?.tenantId;
+if (!tenantId && claimed) {
+  const cached = this.country.cachedCodeFor(claimed);
+  if (cached) {
+    RequestContext.set({ countryCode: cached }); // countryCode ONLY
+    return next.handle();
+  }
+  return from(this.country.forTenant(claimed)).pipe(
+    switchMap((p) => {
+      RequestContext.set({ countryCode: p.code });
+      return next.handle();
+    }),
+    catchError(() => next.handle()),
+  );
+}
+```
+
+`by-subdomain/:subdomain` yolu bu görevin **kapsamı dışında** — kiracıyı çözmek ayrı bir arama ister. TR'ye düşer, yani bugünkü davranış; raporda böyle yazılsın.
+
+```ts
+it("resolves the country from a route param on a public route", async () => {});
+
+it("NEVER populates RequestContext.tenantId from a route param", async () => {
+  // The security boundary. An unauthenticated caller must not be able to
+  // make the request context claim a tenant identity.
+  await runPublicRoute({ params: { tenantId: "victim-tenant" } });
+  expect(RequestContext.get()?.tenantId).toBeUndefined();
+  expect(RequestContext.get()?.countryCode).toBe("UZ");
+});
+
+it("falls back to TR when a public route carries no tenant param", async () => {});
+```
+
 - [ ] **Step 5: Run tests**
 
 Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/context && npx tsc --noEmit -p tsconfig.json`
