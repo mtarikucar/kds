@@ -13,6 +13,7 @@ import {
   normalizePhone,
 } from "./customers.helpers";
 import { maskPhone } from "../../common/helpers/pii-mask.helper";
+import { E164_PATTERN } from "../../common/phone/e164.const";
 
 // Per-tenant and per-phone daily send caps to bound SMS cost and blunt
 // pumping-fraud (attacker cycles target phones to evade the 60s per-phone
@@ -49,7 +50,7 @@ export class PhoneVerificationService {
     tenantId: string,
   ): Promise<{ verificationId: string; expiresAt: Date; message: string }> {
     const phone = normalizePhone(phoneRaw);
-    if (!/^\+?[1-9]\d{7,14}$/.test(phone)) {
+    if (!E164_PATTERN.test(phone)) {
       throw new BadRequestException("Invalid phone number format");
     }
 

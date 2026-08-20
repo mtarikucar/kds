@@ -15,6 +15,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CartDto } from "./cart.dto";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 // v2.8.85 — input contract for `POST /v1/checkout/intent`.
 //
@@ -52,11 +53,11 @@ export class CheckoutBuyerDto {
   // unparseable value passes through untouched and fails the E.164 check
   // below with a clear message.
   @ApiProperty({ maxLength: PHONE_MAX })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsNotEmpty()
   @MaxLength(PHONE_MAX)
-  @Matches(/^\+[1-9]\d{6,14}$/, {
+  @Matches(E164_PATTERN, {
     message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone!: string;

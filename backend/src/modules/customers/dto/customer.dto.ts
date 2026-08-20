@@ -9,13 +9,13 @@ import {
   MaxLength,
 } from "class-validator";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN as PHONE_REGEX } from "../../../common/phone/e164.const";
 
 // Phone fields are NORMALIZED to E.164 (NormalizePhone) before validation, so
 // callers can type any natural format — "0555 123 45 67", "+90 555 123 45 67",
 // "(0555) 123-45-67" — and it lands as "+905551234567". The regex then asserts
 // the canonical E.164 shape; an unparseable value passes through untouched and
 // is rejected with the friendly message.
-const PHONE_REGEX = /^\+[1-9]\d{6,14}$/;
 const PHONE_MESSAGE = "Lütfen geçerli bir telefon numarası girin.";
 // Iter-85: customer-session token shape. createSession emits
 // randomBytes(32).toString('hex') = exactly 64 lower-hex chars.
@@ -31,7 +31,7 @@ export class CreateCustomerDto {
   name: string;
 
   @ApiProperty({ description: "Customer phone (E.164 or digits)" })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
@@ -64,7 +64,7 @@ export class UpdateCustomerDto {
   name?: string;
 
   @ApiPropertyOptional()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsOptional()
   @IsString()
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
@@ -121,7 +121,7 @@ export class IdentifyCustomerDto {
   sessionId: string;
 
   @ApiProperty()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
@@ -142,7 +142,7 @@ export class IdentifyCustomerDto {
 
 export class SendOTPDto {
   @ApiProperty()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)
@@ -159,7 +159,7 @@ export class SendOTPDto {
 
 export class VerifyOTPDto {
   @ApiProperty()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   @MaxLength(20)

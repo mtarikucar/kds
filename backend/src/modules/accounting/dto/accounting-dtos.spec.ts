@@ -120,6 +120,24 @@ describe("CreateSalesInvoiceDto", () => {
     expect((await errs(dto)).some((m) => /customerPhone/.test(m))).toBe(true);
   });
 
+  it("accepts a canonical E.164 customerPhone", async () => {
+    const dto = plainToInstance(CreateSalesInvoiceDto, {
+      customerPhone: "+905551234567",
+    });
+    expect(await errs(dto)).toEqual([]);
+  });
+
+  // T5 sweep: this field never had @NormalizePhone, so it used to accept
+  // a bare-digit E.164-shaped string too ("+" optional). The shared
+  // E164_PATTERN requires the '+' — the same tightening applied to all 8
+  // sites that carried the loose variant.
+  it("rejects a bare-digit phone without '+' (loose-to-strict tightening)", async () => {
+    const dto = plainToInstance(CreateSalesInvoiceDto, {
+      customerPhone: "12345678",
+    });
+    expect((await errs(dto)).some((m) => /customerPhone/.test(m))).toBe(true);
+  });
+
   it("rejects an invalid customerEmail", async () => {
     const dto = plainToInstance(CreateSalesInvoiceDto, {
       customerEmail: "nope",

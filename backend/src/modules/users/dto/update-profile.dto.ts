@@ -9,6 +9,7 @@ import {
 import { ApiProperty } from "@nestjs/swagger";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 // Caps mirror auth + create-user DTOs (iter-43 / iter-46) so every
 // password-shaped field on the API surface is bounded against the
@@ -40,11 +41,11 @@ export class UpdateProfileDto {
   // value passes through untouched and fails the E.164 check below with a
   // clear message. E.164 max is 15 digits + '+'; cap at 20 for headroom.
   @ApiProperty({ example: "+905551234567", required: false })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  @Matches(/^\+[1-9]\d{6,14}$/, {
+  @Matches(E164_PATTERN, {
     message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone?: string;

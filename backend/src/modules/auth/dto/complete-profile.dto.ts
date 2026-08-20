@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 /**
  * Post-social-login (and any incomplete-profile) onboarding. Phone is the one
@@ -18,11 +19,11 @@ import { EmptyStringToUndefined } from "../../../common/dto/transforms";
  */
 export class CompleteProfileDto {
   @ApiProperty({ example: "+905551234567", maxLength: 32 })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsNotEmpty()
   @MaxLength(32)
-  @Matches(/^\+[1-9]\d{6,14}$/, {
+  @Matches(E164_PATTERN, {
     message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone: string;

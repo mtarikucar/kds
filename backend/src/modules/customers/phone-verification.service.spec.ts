@@ -71,3 +71,43 @@ describe('PhoneVerificationService.getVerificationStatus (iter-31)', () => {
     expect(out.phone).toMatch(/[*]/);
   });
 });
+
+/**
+ * T5 sweep: sendOTP's format gate used the loose `/^\+?[1-9]\d{7,14}$/`
+ * regex directly (this service does not go through @NormalizePhone — its
+ * own customers.helpers.ts normalizePhone() runs first, which already
+ * turns a Turkish national/no-plus shape into "+90…"). In practice the
+ * only callers are SendOTPDto/VerifyOTPDto, both of which already enforce
+ * the shared E164_PATTERN upstream — so this check is a second, now
+ * strict, gate on an already-validated value.
+ */
+describe('PhoneVerificationService.sendOTP phone format gate (T5)', () => {
+  it('rejects a bare-digit phone without "+" (loose-to-strict tightening)', async () => {
+    const prisma = mockPrismaClient();
+    const sms: any = { sendVerificationCode: jest.fn(), isServiceEnabled: () => true };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    // "12345678" is not a parseable phone under any region, so the local
+    // normalizePhone() helper returns it unchanged (no '+') — the old loose
+    // regex accepted that shape; the shared E164_PATTERN rejects it.
+    await expect(svc.sendOTP('12345678', 'sess-1', 'tenant-1')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('accepts a canonical E.164 phone (format gate does not block real numbers)', async () => {
+    const prisma = mockPrismaClient();
+    (prisma.phoneVerification.findFirst as any).mockResolvedValue(null);
+    (prisma.phoneVerification.count as any).mockResolvedValue(0);
+    (prisma.phoneVerification.create as any).mockResolvedValue({ id: 'v-1' });
+    const sms: any = {
+      sendVerificationCode: jest.fn().mockResolvedValue(true),
+      isServiceEnabled: () => true,
+    };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await expect(
+      svc.sendOTP('+905551234567', 'sess-1', 'tenant-1'),
+    ).resolves.toBeDefined();
+  });
+});

@@ -15,13 +15,7 @@ import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
-
-// E.164-ish: 8-15 digits, optional leading +. Mirrors the regex used in
-// orders/dto/create-payment.dto.ts and customer-orders/dto/create-customer-order.dto.ts
-// — every surface that funnels into findOrCreateByPhone must validate
-// against the same shape so the canonical Customer.phone column never
-// inherits junk from an unvalidated entry path.
-const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 /**
  * One OrderItem the customer wants to settle. The server already
@@ -61,12 +55,12 @@ export class CreatePayIntentDto {
       "Optional customer phone — links the resulting Payment to a Customer row for loyalty.",
   })
   @EmptyStringToUndefined()
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, {
-    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  @Matches(E164_PATTERN, {
+    message: "customerPhone must be in E.164 format, e.g. +905551234567",
   })
   customerPhone?: string;
 }

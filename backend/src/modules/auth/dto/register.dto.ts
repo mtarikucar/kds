@@ -13,6 +13,7 @@ import {
 import { UserRole } from "../../../common/constants/roles.enum";
 import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 import { NormalizePhone } from "../../../common/dto/normalize-phone";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 export class RegisterDto {
   @ApiProperty({ example: "admin@restaurant.com" })
@@ -53,11 +54,11 @@ export class RegisterDto {
   // as E.164 ("+905551234567"); the regex rejects anything unparseable.
   // Mirrors CheckoutBuyerDto exactly.
   @ApiProperty({ example: "+905551234567", maxLength: 32 })
-  @NormalizePhone("TR")
+  @NormalizePhone()
   @IsString()
   @IsNotEmpty()
   @MaxLength(32)
-  @Matches(/^\+[1-9]\d{6,14}$/, {
+  @Matches(E164_PATTERN, {
     message: "Lütfen geçerli bir telefon numarası girin.",
   })
   phone: string;

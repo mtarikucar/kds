@@ -13,6 +13,7 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 /**
  * Overrides for the invoice being generated from an order. All optional —
@@ -51,16 +52,15 @@ export class CreateSalesInvoiceDto {
   @MaxLength(120)
   customerTaxOffice?: string;
 
-  // Phone shape mirrors the PHONE_REGEX used in create-payment.dto.ts +
-  // create-customer-order.dto.ts. Accounting doesn't feed
+  // Phone shape is the shared E164_PATTERN. Accounting doesn't feed
   // findOrCreateByPhone, but Foriba/Parasut downstream rejects non-E.164
   // shapes too — fail fast at write time instead of after sync round-trip.
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(/^\+?[1-9]\d{7,14}$/, {
-    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  @Matches(E164_PATTERN, {
+    message: "customerPhone must be in E.164 format, e.g. +905551234567",
   })
   customerPhone?: string;
 
