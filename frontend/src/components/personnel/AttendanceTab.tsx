@@ -281,12 +281,13 @@ const AttendanceTab = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.workedHours')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.overtime')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.late')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('cardShift.sourceCard')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {historyLoading ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                           <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                           {t('common.loading')}
                         </td>
@@ -307,11 +308,25 @@ const AttendanceTab = () => {
                               <span className="text-green-600">{t('attendance.onTime')}</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-sm">
+                            {/* Unknown values fall through to "App": the enum is
+                                not covered by the contract-drift script, so a
+                                future value must not blank the column. */}
+                            {a.clockInSource === 'card' ? (
+                              <span className="rounded bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
+                                {t('cardShift.sourceCard')}
+                              </span>
+                            ) : (
+                              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                                {t('cardShift.sourceManual')}
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                           {t('attendance.noRecords')}
                         </td>
                       </tr>
@@ -351,12 +366,13 @@ const AttendanceTab = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.totalHours')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.totalOvertime')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('attendance.lateDays')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('cardShift.cardClockIns')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {summaryLoading ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           <Loader2 className="h-5 w-5 animate-spin inline-block mr-2" />
                           {t('common.loading')}
                         </td>
@@ -375,11 +391,12 @@ const AttendanceTab = () => {
                               <span className="text-green-600">0</span>
                             )}
                           </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{s.cardClockIns ?? 0}</td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           {t('attendance.noRecords')}
                         </td>
                       </tr>

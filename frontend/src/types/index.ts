@@ -1705,6 +1705,12 @@ export interface Attendance {
   isLate: boolean;
   lateMinutes: number;
   notes?: string;
+  /** manual | card — mirrored by hand from the backend AttendanceSource enum.
+   *  Deliberately a plain string, not a union: check-contract-drift.mjs does
+   *  not cover this enum, so an unknown value must degrade to the "App" badge
+   *  rather than break a type. */
+  clockInSource: string;
+  clockOutSource?: string;
   shiftAssignmentId?: string;
   shiftAssignment?: ShiftAssignment;
   userId: string;
@@ -1767,6 +1773,8 @@ export interface AttendanceSummary {
   totalOvertimeMinutes: number;
   lateDays: number;
   totalLateMinutes: number;
+  /** How many of totalDays were clocked in with a card. */
+  cardClockIns: number;
 }
 
 /** One staff member's card enrolment. The API returns the last 4 digits and
