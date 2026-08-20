@@ -50,6 +50,7 @@ export const CATEGORY_DEFAULT_SALE_MODE: Record<string, SaleMode> = {
   kds_screen: "DIRECT_SALE",
   tablet: "DIRECT_SALE",
   scanner: "DIRECT_SALE",
+  card_reader: "DIRECT_SALE", // Tier 3 — not a fiscal device, sold outright
   caller_id: "DIRECT_SALE",
   cash_drawer: "DIRECT_SALE",
   bridge: "DIRECT_SALE",
