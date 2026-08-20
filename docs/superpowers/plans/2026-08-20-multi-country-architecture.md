@@ -1294,6 +1294,31 @@ olduğu için istemcide sabit bir pattern yanlış olur; mesaj sunucudan gelir."
 
 Para birimi **yazılabilir olmaktan da çıkar**: `UpdateTenantSettingsDto.currency` kaldırılır. Bir kiracının para birimini ülkesinden bağımsız değiştirebilmesi, Task 2'nin kurduğu "currency türetilir" değişmezini deler. Okuma tarafı (`TENANT_SETTINGS_SELECT.currency`) kalır.
 
+- [ ] **Step 0: `PhoneInput`'un varsayılan ülkesi — T5'ten devredilen gerçek boşluk**
+
+T5'in incelemesi ambient ülkenin public rotalarda ölü olduğunu buldu ve interceptor kısmen düzeltildi. Ama araştırma daha iyi bir sonuç verdi: **müşteriye bakan her telefon girişi zaten `PhoneInput` kullanıyor** — `qr-menu/PhoneVerification.tsx` (OTP), `qr-menu/SelfPayModal.tsx` (self-ödeme), `features/reservations/public/steps.tsx` — ve `PhoneInput`'un sözleşmesi "her zaman E.164 ya da boş yayar". Numara sunucuya zaten E.164 geldiği için **sunucu tarafı ayrıştırma bölgesi o yüzeylerde önemsiz**.
+
+Gerçek boşluk frontend'de:
+
+```ts
+// PhoneInput.tsx:55
+defaultCountry = 'TR',
+// phoneInputLogic.ts:81
+preferred: CountryCode[] = ['TR'],
+```
+
+Özbek bir kafede **her müşteri +90 seçili görüyor** ve elle +998'e çevirmek zorunda — hem de tam olarak mimarinin hedeflediği yüzeyde. Sunucu doğru ayrıştırsa bile kullanıcı deneyimi Türkiye'ye çivili.
+
+`defaultCountry`, `useCountryProfile()`'ın `countryCode`'undan gelmeli. Çağıran her yer (yukarıdaki üçü + POS, kayıt, profil, rezervasyon arama) açıkça bir ülke geçmiyorsa kancadan almalı.
+
+**Dikkat:** buradaki `CountryCode` libphonenumber-js'in tipi, Task 1'in `CountryProfileCode`'u değil.
+
+```ts
+it("defaults to the tenant's country, not Turkey, on a UZ tenant", () => {});
+it("still defaults to TR for a Turkish tenant — unchanged", () => {});
+it("an explicit defaultCountry prop still wins over the tenant's country", () => {});
+```
+
 - [ ] **Step 1: Write the failing test**
 
 ```ts
