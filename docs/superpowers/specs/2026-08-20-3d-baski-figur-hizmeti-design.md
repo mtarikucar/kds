@@ -78,8 +78,8 @@ olmadan 3D baskı hiç satılamaz**. Bu yüzden düzeltme bu değişikliğin kap
 | K12 | `Print3dJob.hwOrderId` → `HardwareOrder`, **NOT NULL + `onDelete: Cascade`** | İş yalnızca ödenmiş bir siparişin sonucu olarak doğar; başka yaratım yolu yok, `HardwareOrder` hiç silinmiyor (kod tabanında `hardwareOrder.delete` çağrısı yok). |
 | K13 | İş durumu **yalnızca üretimi** izler; kargo `Shipment`'ta kalır | Tek gerçeğin tek kaynağı; iki yerde "kargolandı" tutmak kaçınılmaz olarak ayrışır. |
 | K14 | Frontend'de **bağımsız sihirbaz**; paylaşılan `cartStore` kullanılmaz | `cartStore.setQty` hizmet satırlarını değiştirmiyor (`cartStore.ts:138-140`) → çoklu-ürün adedi yönetilemez. |
-| K15 | Ortak URL'i **`PRINT3D_PARTNER_URL` backend env değişkeni** (opsiyonel) taşır | Platform çapında tek dize; tenant-üstü ayar tablosu yok (§3.6) ve `VITE_` değişkeni bundle'a gömülür → değişiklik için frontend yeniden derlemesi gerekirdi. |
-| K16 | Rozet metni **asla boş değil**: URL yoksa `<span>`, varsa `<a>` | "Üretim ortağı: Figurunica" bir beyandır, bağlantıya bağlı değildir. |
+| K15 | Ortak URL'i **`https://figurunica.com`** (kullanıcı tarafından verildi, 2026-08-20). Kodda `PRINT3D_PARTNER_URL` sabiti olarak varsayılan, aynı adlı **backend env değişkeni** onu ezebilir | Değer artık biliniyor, yani rozet ilk günden bağlantılı çıkar. Env geçersiz kılması yine de kalıyor: ticari taraf değişirse yeniden derleme gerekmesin. `VITE_` değişkeni bundle'a gömülür, tenant-üstü ayar tablosu ise yok (§3.6) → env backend'de durur. |
+| K16 | Rozet metni **asla boş değil**: URL geçerliyse `<a>`, env geçersiz bir değerle ezilmişse `<span>` | "Üretim ortağı: Figurunica" bir beyandır, bağlantıya bağlı değildir. Varsayılan URL geçerli olduğu için `<span>` dalı yalnızca hatalı env yapılandırmasında görülür — yine de test edilir. |
 | K17 | `model3dUrl` varsa işe ek referans olarak **snapshot edilir** (v1'de EVET) | Bedava; yazıcının işine yarar; AI hattını çalıştırmaz — sadece varsa mevcut değeri kopyalar. |
 | K18 | SKU regex'i `^[a-z0-9][a-z0-9_-]{2,63}$`'e **genişletilir** | Onaylı SKU'lar alt çizgi içeriyor; mevcut regex (`create-hardware-product.dto.ts:69`) alt çizgiyi reddeder → superadmin katalog API'sinden bu satırlar yönetilemezdi. Genişletme kesinlikle geriye dönük uyumlu (mevcut tüm SKU'lar hâlâ eşleşir). |
 
@@ -303,6 +303,8 @@ on both SKUs` testi kırmızı olur. Tek bir anahtar `CatalogService.hasComplian
 export const PRINT3D_SERVICE_TYPE = "print3d";
 export const PRINT3D_PARTNER = "figurunica";
 export const PRINT3D_PARTNER_LABEL = "Figurunica";
+/** Varsayılan ortak sitesi; PRINT3D_PARTNER_URL env değişkeni ezebilir. */
+export const PRINT3D_PARTNER_URL_DEFAULT = "https://figurunica.com";
 export const PRINT3D_BASE_SKU = "print3d_base";
 export const PRINT3D_ITEM_SKU = "print3d_item";
 export const PRINT3D_BASE_PRICE_CENTS = 150_000;
@@ -844,15 +846,20 @@ kapsamında:
 
 ### 4.11 Rozet: "Üretim ortağı: Figurunica"
 
-- **Kaynak:** `PRINT3D_PARTNER_URL` (backend env, **opsiyonel**).
+- **Kaynak:** `PRINT3D_PARTNER_URL_DEFAULT = "https://figurunica.com"` (§4.2 sabitler bloğu),
+  aynı adlı **opsiyonel** env değişkeniyle ezilebilir:
+  `config.get("PRINT3D_PARTNER_URL") ?? PRINT3D_PARTNER_URL_DEFAULT`.
   `backend/src/common/helpers/env-validation.ts` `RULES` dizisine
-  `{ key: "PRINT3D_PARTNER_URL", required: false }`; `backend/.env.example`'a yorumla birlikte.
+  `{ key: "PRINT3D_PARTNER_URL", required: false }`; `backend/.env.example`'a
+  `PRINT3D_PARTNER_URL=` (boş = varsayılanı kullan) yorumuyla birlikte.
 - **Taşıyıcı:** `GET /v1/print3d/offer` yanıtındaki `partnerUrl`. Sunucu yalnızca
   `/^https?:\/\//i` eşleşen bir değeri yayınlar, aksi halde `null` (açık yönlendirme /
   `javascript:` yükü koruması — `StorePage.tsx:548-553` deseni).
 - **Bileşen:** `frontend/src/features/print3d/PartnerBadge.tsx` (YENİ).
-  `partnerUrl` yoksa `<span>Üretim ortağı: Figurunica</span>`, varsa aynı metin
-  `<a href target="_blank" rel="noopener noreferrer">` içinde. **Metin hiçbir koşulda boş değil.**
+  `partnerUrl` varsa (normal durum — varsayılan `https://figurunica.com`) metin
+  `<a href target="_blank" rel="noopener noreferrer">` içinde; env geçersiz bir değerle
+  ezildiği için sunucu `null` döndürdüyse düz `<span>Üretim ortağı: Figurunica</span>`.
+  **Metin hiçbir koşulda boş değil.**
 - **Basıldığı dört yüzey:** mağaza kartı (`Print3dStoreCard`), sihirbazın üç adımının
   başlığı, özet adımı (`Print3dSummary`), ve dönüş/onay ekranı (`HardwareCheckoutResult`
   print3d siparişi ise).
@@ -945,7 +952,8 @@ Sıra bağımlılık-doğrudur: her adım yalnızca kendinden öncekilere dayan�
     }
     ```
 21. `backend/src/common/helpers/env-validation.ts` — `{ key: "PRINT3D_PARTNER_URL", required: false }`.
-22. `backend/.env.example` — `PRINT3D_PARTNER_URL=` + açıklama yorumu.
+22. `backend/.env.example` — `PRINT3D_PARTNER_URL=` + yorum: boş bırakılırsa kod
+    varsayılanı (`https://figurunica.com`) kullanılır; yalnızca ortak sitesi değişirse doldurulur.
 
 ### Frontend
 
@@ -1380,8 +1388,9 @@ Tek seferlik atılabilir Postgres üzerinde (`docker run --rm -e POSTGRES_PASSWO
 |---|---|
 | `getOffer reads live prices from the two catalog rows, never the constants` | DB 160_000 dönerse teklif 160_000 |
 | `getOffer reports available:false when either SKU is unpublished or not DIRECT_SALE` | kart gizlenir |
-| `getOffer returns partnerUrl null when PRINT3D_PARTNER_URL is unset` | K16 |
-| `getOffer rejects a non-http(s) PRINT3D_PARTNER_URL` | `javascript:alert(1)` → `null` |
+| `getOffer falls back to https://figurunica.com when PRINT3D_PARTNER_URL is unset` | K15 |
+| `getOffer prefers PRINT3D_PARTNER_URL over the built-in default` | K15 |
+| `getOffer rejects a non-http(s) PRINT3D_PARTNER_URL` | `javascript:alert(1)` → `null` (varsayılana **düşmez**: açık bir yanlış yapılandırma sessizce düzeltilmez) |
 | `allows queued -> in_production -> produced and refuses produced -> queued` | `PRINT3D_INVALID_TRANSITION` |
 | `allows cancelling from queued and in_production but not from produced` | terminal |
 | `stamps producedAt / cancelledAt on the terminal transitions` | zaman damgaları |
@@ -1530,14 +1539,12 @@ node scripts/check-contract-drift.mjs
    (panel + CSV). Webhook/SFTP entegrasyonu ayrı iş.
 5. **Yeniden baskı / iade akışı.** `Print3dJobItem.status = 'rejected'` operatöre
    sinyaldir; para iadesi rayı yoktur (platformda hiç yok).
-6. **`PRINT3D_PARTNER_URL`'in gerçek değeri.** Ticari taraf netleşince env'e yazılır;
-   kod değişikliği gerekmez.
-7. **Figurunica ile veri işleme sözleşmesi (KVKK).** Manifesto adres + fotoğraf
+6. **Figurunica ile veri işleme sözleşmesi (KVKK).** Manifesto adres + fotoğraf
    taşıyor; hukuki metin ürün tarafının işi.
-8. **Superadmin kargo ekranının genelleştirilmesi.** Bugün SPA'da hiç yok; print3d
+7. **Superadmin kargo ekranının genelleştirilmesi.** Bugün SPA'da hiç yok; print3d
    paneli mevcut backend endpoint'lerini kullanan ilk yüzey olacak. Donanım siparişleri
    için aynı ekran ayrı iş.
-9. **Superadmin kategori `<select>`'inin sözlükten türetilmesi.**
+8. **Superadmin kategori `<select>`'inin sözlükten türetilmesi.**
    `MarketplaceAdminPage.tsx:602-612` elle yazılmış ve zaten drift'te: sözlükteki
    (`category-vocabulary.ts:16-31`) `cash_drawer` / `scale` / `accessory` / `cable`
    eksik, sözlükte olmayan `other` fazladan. Bu PR yalnız `service`'i ekliyor (§5/35b),
