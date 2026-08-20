@@ -717,8 +717,32 @@ intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
       RequestContext.set({ countryCode: profile.code });
       return next.handle();
     }),
+    // MANDATORY. Without this, a rejected forTenant() means the switchMap
+    // projector never fires, next.handle() is never called, and the request
+    // dies as a bare 500 with the real route handler — an order, a payment —
+    // never executing. Before this task the interceptor was synchronous and
+    // could not fail this way; the cache makes that failure mode reachable
+    // for every tenant's FIRST request after a process restart, Turkish ones
+    // included. Country is a nice-to-have; the request is not.
+    catchError((err) => {
+      this.logger.warn(
+        `Country resolution failed for tenant ${tenantId}, continuing without it: ${err?.message ?? err}`,
+      );
+      return next.handle();
+    }),
   );
 }
+```
+
+Bu `catchError`'ın kendi testi olmalı ve test, hatanın yutulduğunu değil **isteğin tamamlandığını** iddia etmeli:
+
+```ts
+it("still runs the request when country resolution fails — a DB blip must not 500 every route", async () => {
+  (prisma.tenant.findUnique as any).mockRejectedValue(new Error("connection reset"));
+  const handled = await runThroughInterceptor({ tenantId: "t1" });
+  expect(handled).toBe(HANDLER_RESULT);        // the route actually ran
+  expect(RequestContext.get()?.countryCode).toBeUndefined(); // degraded, not wrong
+});
 ```
 
 `CountryService` kazandığı iki üye:
