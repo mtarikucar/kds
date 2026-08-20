@@ -272,8 +272,27 @@ class StubLicensingGlobalsModule {}
 
 describe("CountryCapabilityResolver — real DI wiring", () => {
   let moduleRef: TestingModule;
+  let savedPaytrEnv: Record<string, string | undefined>;
 
   beforeAll(async () => {
+    // PaytrPaymentProvider self-registers ONLY when merchant credentials are
+    // present (paytr-payment-provider.ts onModuleInit), so what lands in the
+    // registry depends on the environment rather than on the code. Without
+    // priming these, this suite asserts something about whoever ran it: it
+    // passes on a developer machine whose .env carries PayTR keys and fails
+    // in CI, which has none — exactly how it failed on PR #359.
+    //
+    // What this test is actually for is "does every id a profile names match
+    // an id some adapter really registers under" — a typo like "hugin" vs
+    // "fiscal_hugin". That question has nothing to do with credentials, so
+    // prime them and let every adapter register deterministically.
+    savedPaytrEnv = {
+      PAYTR_MERCHANT_ID: process.env.PAYTR_MERCHANT_ID,
+      PAYTR_MERCHANT_KEY: process.env.PAYTR_MERCHANT_KEY,
+    };
+    process.env.PAYTR_MERCHANT_ID = "test-merchant-id";
+    process.env.PAYTR_MERCHANT_KEY = "test-merchant-key";
+
     const { CommonModule } = await import("../common.module");
 
     // overrideProvider, not a stand-in module: several modules in this graph
@@ -338,6 +357,10 @@ describe("CountryCapabilityResolver — real DI wiring", () => {
 
   afterAll(async () => {
     await moduleRef?.close();
+    for (const [key, value] of Object.entries(savedPaytrEnv ?? {})) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it("resolves CountryCapabilityResolver through real Nest DI via CommonModule", () => {
