@@ -10,7 +10,10 @@ import { DeliveryConfigService } from "./delivery-config.service";
 import { DeliveryOrderService } from "./delivery-order.service";
 import { AdapterFactory } from "../adapters/adapter-factory";
 import { BaseAdapter } from "../adapters/base.adapter";
-import { DeliveryPlatform } from "../constants/platform.enum";
+import {
+  AVAILABLE_DELIVERY_PLATFORMS,
+  DeliveryPlatform,
+} from "../constants/platform.enum";
 import {
   NormalizedOrder,
   NormalizedOrderItem,
@@ -64,9 +67,7 @@ export class DeliveryTestService {
    * REFUSES unless the platform's config exists and is sandbox-environment.
    */
   async simulateOrder(tenantId: string, platform: string) {
-    if (
-      !Object.values(DeliveryPlatform).includes(platform as DeliveryPlatform)
-    ) {
+    if (!AVAILABLE_DELIVERY_PLATFORMS.includes(platform as DeliveryPlatform)) {
       throw new BadRequestException(`Unknown delivery platform: ${platform}`);
     }
 
