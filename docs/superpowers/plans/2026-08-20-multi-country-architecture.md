@@ -888,6 +888,37 @@ Expected: FAIL — UZ vakaları düşer, çünkü bant bugün sabit `[0, 1, 10, 
 
 `accounting.enum.ts`'te `TaxRate` enum'u **kalır** (TR bantlarının adlandırılmış hâli, hâlâ okunabilir) ama üstüne bir yorum: bunlar yalnız TR içindir ve doğruluk kaynağı `COUNTRY_PROFILES.TR.taxRates`'tir. `DEFAULT_TAX_RATE` profilden türetilir.
 
+- [ ] **Step 4b: The FRONTEND dropdown — without this the task's goal is not met**
+
+Backend'in %12'yi kabul etmesi tek başına hiçbir işe yaramaz: operatör onu **seçemiyorsa** ürün yine girilemez. İki yerde sabit liste var:
+
+- `frontend/src/pages/admin/ProductEditorPage.tsx:579-591` — elle yazılmış `<option value={0}>%0</option> … %20`
+- `frontend/src/pages/admin/menuManagement/MenuDraftReviewGrid.tsx:7` — `export const TAX_RATES = [0, 1, 10, 20]`
+
+Backend `SETTINGS_SELECT` zaten `countryCode` döndürüyor ama `taxRates` döndürmüyor. Doğruluk kaynağı backend'de kalsın diye oranları **backend yayınlasın**: ayarlar yanıtına ülkenin profilinden `taxRates` (ve `defaultTaxRate`) eklenir — kolon değil, türetilmiş alan.
+
+Frontend'de `useCountryProfile()` kancası oluşturulur:
+
+```ts
+// frontend/src/hooks/useCountryProfile.ts
+export function useCountryProfile() {
+  const { data } = useTenantSettings();
+  return {
+    countryCode: data?.countryCode ?? "TR",
+    taxRates: data?.taxRates ?? [0, 1, 10, 20],
+    defaultTaxRate: data?.defaultTaxRate ?? 10,
+  };
+}
+```
+
+Her iki bileşen de listeyi bu kancadan üretir. **Task 7 bu kancayı `currency` ve `displayDecimals` ile genişletecek** — sıfırdan yazmayacak.
+
+Fallback'ler bilerek Türk değerleri: ayarlar henüz yüklenmemişken bugünkü davranış görünür.
+
+- [ ] **Step 4c: Remove the duplicated fallback**
+
+`resolveCountryProfile()` ile `CountryService.forCode()` aynı fallback ternary'sinin **iki ayrı kopyasını** taşıyor — tam olarak bu projenin ortadan kaldırmaya çalıştığı drift. `forCode()` `resolveCountryProfile()`'a delege etsin ve kendi log'unu üstüne eklesin. `resolveCountryProfile`'ın docstring'i "tüm kod tabanında tek uygulama" diyor; delege edilene kadar bu **yanlış**.
+
 - [ ] **Step 5: Pin the platform-billing decision in code**
 
 `billing.service.ts:64-74` ve `quote.service.ts:313-317`'deki yorumları, bunun bilinçli bir hukuki ayrım olduğunu söyleyecek şekilde güncelle — bir sonraki okuyucunun "eksik kalmış, ülkeye bağlayalım" diye düşünmemesi için. Kod değişmiyor.
@@ -1187,7 +1218,7 @@ olduğu için istemcide sabit bir pattern yanlış olur; mesaj sunucudan gelir."
 **Files:**
 - Modify: `frontend/src/hooks/useCurrency.ts`
 - Modify: `frontend/src/hooks/useFormatCurrency.ts`
-- Create: `frontend/src/hooks/useCountryProfile.ts`
+- Modify: `frontend/src/hooks/useCountryProfile.ts` — **Task 4 bu kancayı zaten oluşturdu** (`countryCode`, `taxRates`, `defaultTaxRate`); bu görev `currency` ve `displayDecimals` ekliyor
 - Modify: `backend/src/common/constants/currencies.const.ts`
 - Modify: `backend/src/modules/tenants/dto/update-tenant-settings.dto.ts` — `currency` alanı **kaldırılır**
 - Modify: `frontend/src/hooks/useCurrency.ts` — `UpdateTenantSettingsDto.currency` kaldırılır
