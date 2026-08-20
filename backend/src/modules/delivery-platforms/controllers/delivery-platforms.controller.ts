@@ -30,7 +30,7 @@ import { UpdatePlatformConfigDto } from "../dto/update-platform-config.dto";
 // delivery add-on (integration.delivery=[vendor]) OR a plan that already
 // includes delivery (feature.deliveryIntegration=true, via
 // INTEGRATION_COVERED_BY_FEATURE) — so a BASIC tenant who buys
-// delivery_yemeksepeti/getir/trendyol_yemek actually unlocks this
+// delivery_platforms actually unlocks this
 // controller, which @RequiresFeature(DELIVERY_INTEGRATION) alone never did
 // (the add-on grants integration.delivery, not feature.deliveryIntegration).
 @ApiTags("delivery-platforms")

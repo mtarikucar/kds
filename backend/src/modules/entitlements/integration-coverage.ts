@@ -8,8 +8,9 @@
  * Why this exists (DEF-3): `PlanProjectorService.FEATURE_COLUMNS` only ever
  * projects `feature.*` grants for a tenant's plan — it never writes
  * `integration.*` grants (see plan-projector.service.ts's projection loop).
- * Meanwhile the delivery add-ons (`delivery_yemeksepeti` / `delivery_getir` /
- * `delivery_trendyol_yemek`) grant `integration.delivery: [<vendor>]`. Two
+ * Meanwhile the delivery package (`delivery_platforms`, v3.6.8 — it replaced
+ * the three per-platform SKUs) grants
+ * `integration.delivery: ["yemeksepeti","getir","trendyol_yemek","migros"]`. Two
  * consumers need to know these are the SAME capability under two different
  * keys:
  *

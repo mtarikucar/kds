@@ -989,10 +989,13 @@ const PROVIDERS = [
 async function main() {
   console.log("[seed-marketplace] starting");
 
-  // Retire the pre-3.3 device-capacity products. ARCHIVED, never deleted:
+  // Retire every code in RETIRED_ADDON_CODES. ARCHIVED, never deleted:
   // `code` is not reusable and TenantAddOn.addOnId is onDelete: Restrict.
-  // All three granted limit.kdsScreens / limit.kdsStations / limit.tablets —
-  // keys no enforcement code has ever read.
+  // The list started as the pre-3.3 device-capacity products (they granted
+  // limit.kdsScreens / limit.kdsStations / limit.tablets, keys no enforcement
+  // code has ever read); v3.6.7 added priority_support + fiscal_efatura when
+  // they folded into the licence, and v3.6.8 added the three per-platform
+  // delivery SKUs when they folded into `delivery_platforms`.
   const retired = await prisma.marketplaceAddOn.updateMany({
     where: { code: { in: [...RETIRED_ADDON_CODES] }, status: { not: "archived" } },
     data: { status: "archived" },
