@@ -66,7 +66,11 @@
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-import { COUNTRY_PROFILES, DEFAULT_COUNTRY } from "./country-profile.const";
+import {
+  COUNTRY_PROFILES,
+  DEFAULT_COUNTRY,
+  CountryProfileCode,
+} from "./country-profile.const";
 
 describe("COUNTRY_PROFILES", () => {
   it("has TR and UZ", () => {
@@ -126,6 +130,51 @@ describe("COUNTRY_PROFILES", () => {
     expect(COUNTRY_PROFILES[DEFAULT_COUNTRY]).toBeDefined();
   });
 
+  it("names the exact provider ids the adapters register under", () => {
+    // These four strings were ALL wrong in the first draft ("generic",
+    // "hugin", "nilvera", "eskiz"). They are plain strings, so nothing but
+    // an explicit assertion catches a typo here. Task 9 adds the stronger
+    // check that walks these against the live registries.
+    const tr = COUNTRY_PROFILES.TR.capabilities;
+    expect(tr.escposBuilderId).toBe("escpos-tr");        // escpos-builder.service.ts
+    expect(tr.fiscalProviderIds).toContain("fiscal_hugin"); // hugin-fiscal-provider.ts
+    expect(tr.paymentProviderIds).toEqual(["paytr"]);    // paytr-payment-provider.ts
+    expect(tr.eDocumentAdapterId).toBe("NILVERA");       // AccountingProvider enum
+    expect(tr.smsProviderId).toBe("netgsm");             // SMS_PROVIDER value
+  });
+
+  it("lists fiscal providers as a SET, because the device is a tenant choice", () => {
+    // Turkey has four registered fiscal adapters; naming one in the country
+    // profile would silently pick a device the restaurant may not own.
+    expect(COUNTRY_PROFILES.TR.capabilities.fiscalProviderIds.length).toBeGreaterThan(1);
+  });
+
+  it("UZ declares nothing it has not built — no silent fallback to Turkish providers", () => {
+    const uz = COUNTRY_PROFILES.UZ.capabilities;
+    expect(uz.fiscalProviderIds).toEqual([]);
+    expect(uz.paymentProviderIds).toEqual([]);
+    expect(uz.eDocumentAdapterId).toBeNull();
+    expect(uz.smsProviderId).toBeNull();
+  });
+
+  it("CountryProfileCode narrows to the real keys, not to string", () => {
+    // Guards the `satisfies` form. With a Record<string, …> annotation this
+    // compiles, and every downstream task loses compile-time safety.
+    const codes: CountryProfileCode[] = ["TR", "UZ"];
+    // @ts-expect-error "XX" is not a country we have a profile for
+    const bad: CountryProfileCode = "XX";
+    expect(codes).toHaveLength(2);
+    expect(bad).toBe("XX");
+  });
+
+  it("every profile's locale fields are populated", () => {
+    for (const p of Object.values(COUNTRY_PROFILES)) {
+      expect(p.defaultLocale).toBeTruthy();
+      expect(p.intlLocale).toBeTruthy();
+      expect(p.defaultTimezone).toBeTruthy();
+    }
+  });
+
   it("no profile declares a storage minor-unit exponent — storage is always x100", () => {
     for (const p of Object.values(COUNTRY_PROFILES)) {
       expect(p).not.toHaveProperty("storageMinorExponent");
@@ -171,16 +220,22 @@ export interface CountryTaxIdRule {
 }
 
 export interface CountryCapabilities {
-  /** FiscalProviderRegistry id, or null where no fiscal device applies yet. */
-  fiscalProviderId: string | null;
-  /** PaymentProviderRegistry ids, in preference order. */
+  /**
+   * FiscalProviderRegistry ids that are LEGAL in this country. Plural on
+   * purpose: which fiscal device a restaurant owns is a tenant fact, not a
+   * country fact — Turkey alone has four registered adapters. The country
+   * constrains the legal set; the tenant picks from within it.
+   * Empty = no fiscal device applies here yet.
+   */
+  fiscalProviderIds: string[];
+  /** PaymentProviderRegistry ids, in preference order. Empty = none built. */
   paymentProviderIds: string[];
-  /** AccountingAdapter id for e-invoicing, or null. */
+  /** AccountingProvider enum value for e-invoicing, or null where none. */
   eDocumentAdapterId: string | null;
   /** EscPosBuilderRegistry id. */
   escposBuilderId: string;
-  /** SMS provider id. */
-  smsProviderId: string;
+  /** SMS_PROVIDER value, or null where no local provider is built yet. */
+  smsProviderId: string | null;
 }
 
 export interface CountryProfile {
@@ -201,7 +256,10 @@ export interface CountryProfile {
   capabilities: CountryCapabilities;
 }
 
-export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
+// `satisfies` rather than a `Record<string, …>` annotation: the annotation
+// widens the key type to `string`, so `CountryCode` would accept any string
+// and every downstream task would lose compile-time safety.
+export const COUNTRY_PROFILES = {
   TR: {
     code: "TR",
     currency: "TRY",
@@ -219,11 +277,15 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     intlLocale: "tr-TR",
     defaultTimezone: "Europe/Istanbul",
     capabilities: {
-      fiscalProviderId: "hugin",
+      // Every id below is verbatim what the adapter registers itself under.
+      // Task 9 adds a test that walks every profile and asserts the registry
+      // actually has each id — a typo here is otherwise invisible until a
+      // payment or a receipt fails in production.
+      fiscalProviderIds: ["fiscal_hugin", "fiscal_paygo", "fiscal_beko", "efatura"],
       paymentProviderIds: ["paytr"],
-      eDocumentAdapterId: "nilvera",
-      escposBuilderId: "generic",
-      smsProviderId: "netgsm",
+      eDocumentAdapterId: "NILVERA", // AccountingProvider enum value, upper-case
+      escposBuilderId: "escpos-tr",
+      smsProviderId: "netgsm", // the SMS_PROVIDER value sms.service.ts checks
     },
   },
 
@@ -239,6 +301,11 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     taxRates: [0, 6, 12],
     defaultTaxRate: 12,
     phoneRegion: "UZ",
+    // UNVERIFIED AGAINST A PRIMARY SOURCE. The repo's own Uzbekistan
+    // benchmark corroborates the currency, the 12% QQS, the 6% catering
+    // rate, the timezone and the phone region — but NOT these two digit
+    // counts. Confirm with the local partner before the first UZ tenant
+    // takes real money.
     taxIdRules: [
       { name: "STIR", pattern: /^\d{9}$/, labelKey: "country.taxId.stir" },
       { name: "PINFL", pattern: /^\d{14}$/, labelKey: "country.taxId.pinfl" },
@@ -247,27 +314,34 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     intlLocale: "uz-UZ",
     defaultTimezone: "Asia/Tashkent",
     capabilities: {
-      // No Uzbek fiscal/payment/e-document adapter exists yet — those are
-      // P3/P4/P5 and each waits on a local legal entity. Null here is
+      // No Uzbek fiscal/payment/e-document/SMS adapter exists yet — those are
+      // P3+ and each waits on a local legal entity. Empty/null here is
       // honest: the resolver refuses rather than silently falling back to
       // the Turkish provider.
-      fiscalProviderId: null,
+      fiscalProviderIds: [],
       paymentProviderIds: [],
       eDocumentAdapterId: null,
-      escposBuilderId: "generic",
-      smsProviderId: "eskiz",
+      // The ESC/POS builder is shared for now; Task 13 gives it a codepage
+      // that does not turn Cyrillic into '?'.
+      escposBuilderId: "escpos-tr",
+      smsProviderId: null,
     },
   },
-};
+} satisfies Record<string, CountryProfile>;
 
 export const DEFAULT_COUNTRY = "TR";
-export type CountryCode = keyof typeof COUNTRY_PROFILES;
+/**
+ * Named CountryProfileCode, not CountryCode: libphonenumber-js already
+ * exports a `CountryCode` that normalize-phone.ts imports, and two different
+ * `CountryCode`s in the same codebase is a foot-gun for Task 5.
+ */
+export type CountryProfileCode = keyof typeof COUNTRY_PROFILES;
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country/country-profile.const.spec.ts`
-Expected: PASS (9 test)
+Expected: PASS (15 test)
 
 - [ ] **Step 5: Commit**
 
@@ -1024,7 +1098,7 @@ Atılabilir bir veritabanında 100.000.000 so'm'luk bir toplamın saklanabildiğ
 
 **Interfaces:**
 - Consumes: `CountryService`, `PaymentProviderRegistry`, `FiscalProviderRegistry`, `EscPosBuilderRegistry`
-- Produces: `paymentProviderFor(tenantId): Promise<PaymentProvider>`, `fiscalProviderFor(tenantId)`, `escposBuilderFor(tenantId)`, `smsProviderIdFor(tenantId)`
+- Produces: `paymentProviderFor(tenantId): Promise<PaymentProvider>`, `fiscalProviderFor(tenantId)` (kiracının seçtiği cihazı ülkenin izinli kümesine karşı doğrular), `escposBuilderFor(tenantId)`, `smsProviderIdFor(tenantId)`
 
 **Kritik davranış:** profil bir yetenek için `null` diyorsa çözücü **açık bir hata fırlatır**, sessizce Türk sağlayıcısına düşmez. UZ'de bugün `fiscalProviderId: null` — bu doğru ve dürüst; o kafe yasal fiş kesemez ve sistem bunu saklamamalı.
 
@@ -1039,6 +1113,30 @@ it("REFUSES for a UZ tenant instead of silently falling back to PayTR", async ()
 });
 it("throws a clear error when a profile names a provider the registry does not have", async () => {
   // A typo in the profile must fail loudly at call time, not 404 deep inside a payment.
+});
+
+// THE IMPORTANT ONE. Task 1's review caught four wrong ids ("generic" vs
+// "escpos-tr", "hugin" vs "fiscal_hugin", "nilvera" vs "NILVERA", and an
+// "eskiz" that existed nowhere) that no unit test could see, because a
+// profile is just strings. This test walks every profile against the real
+// DI container and closes that hole for every country added later.
+it("every id named by every profile actually exists in its registry", async () => {
+  for (const profile of Object.values(COUNTRY_PROFILES)) {
+    for (const id of profile.capabilities.fiscalProviderIds) {
+      expect(fiscalRegistry.list().map((p) => p.id)).toContain(id);
+    }
+    for (const id of profile.capabilities.paymentProviderIds) {
+      expect(paymentRegistry.list().map((p) => p.id)).toContain(id);
+    }
+    expect(escposRegistry.list().map((b) => b.id)).toContain(
+      profile.capabilities.escposBuilderId,
+    );
+    if (profile.capabilities.eDocumentAdapterId) {
+      expect(Object.values(AccountingProvider)).toContain(
+        profile.capabilities.eDocumentAdapterId,
+      );
+    }
+  }
 });
 ```
 
