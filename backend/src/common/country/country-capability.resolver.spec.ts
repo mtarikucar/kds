@@ -51,6 +51,7 @@ function makeHarness(tenantCountry: Record<string, string>) {
   fiscalRegistry.register(fakeFiscal("fiscal_beko"));
   fiscalRegistry.register(fakeFiscal("efatura"));
   escposRegistry.register(fakeEscpos("escpos-tr"));
+  escposRegistry.register(fakeEscpos("escpos-uz"));
 
   const resolver = new CountryCapabilityResolver(
     country,
@@ -117,10 +118,14 @@ describe("CountryCapabilityResolver", () => {
       expect(builder.id).toBe("escpos-tr");
     });
 
-    it("UZ also resolves it today — the profile names one (no refusal here)", async () => {
+    it("UZ resolves its OWN Cyrillic-capable builder (Task 13) — not the shared TR one", async () => {
+      // was: expect(builder.id).toBe("escpos-tr") — that shared builder's
+      // CP857 codepage can't represent Cyrillic; UZ now has its own
+      // registered dialect (escpos-uz, CP866) instead of silently reusing
+      // Turkey's.
       const { resolver } = makeHarness({ "uz-tenant": "UZ" });
       const builder = await resolver.escposBuilderFor("uz-tenant");
-      expect(builder.id).toBe("escpos-tr");
+      expect(builder.id).toBe("escpos-uz");
     });
 
     it("throws a clear error when the profile names an unregistered builder id", async () => {

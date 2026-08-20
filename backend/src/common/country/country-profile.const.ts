@@ -132,9 +132,12 @@ export const COUNTRY_PROFILES = {
       fiscalProviderIds: [],
       paymentProviderIds: [],
       eDocumentAdapterId: null,
-      // The ESC/POS builder is shared for now; Task 13 gives it a codepage
-      // that does not turn Cyrillic into '?'.
-      escposBuilderId: "escpos-tr",
+      // Task 13: was "escpos-tr" (the shared Turkish builder) — its CP857
+      // codepage cannot represent Cyrillic at all, so any Cyrillic product
+      // name printed as a row of '?'. "escpos-uz" (escpos-builder-uz.
+      // service.ts) selects CP866 instead; see that file's class doc
+      // comment for why CP866 over CP1251.
+      escposBuilderId: "escpos-uz",
       smsProviderId: null,
     },
   },

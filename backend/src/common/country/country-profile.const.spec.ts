@@ -89,6 +89,16 @@ describe("COUNTRY_PROFILES", () => {
     expect(uz.smsProviderId).toBeNull();
   });
 
+  it("UZ has its OWN ESC/POS builder — Task 13, no longer shares the CP857 (Turkish) one", () => {
+    // escpos-tr's CP857 codepage cannot represent Cyrillic at all; sharing
+    // it silently turned every Cyrillic product name into '?'. escpos-uz
+    // (escpos-builder-uz.service.ts) selects CP866 instead.
+    expect(COUNTRY_PROFILES.UZ.capabilities.escposBuilderId).toBe("escpos-uz");
+    expect(COUNTRY_PROFILES.UZ.capabilities.escposBuilderId).not.toBe(
+      COUNTRY_PROFILES.TR.capabilities.escposBuilderId,
+    );
+  });
+
   it("CountryProfileCode narrows to the real keys, not to string", () => {
     // NOTE: the real proof is the `_CountryCodeIsNarrow` type in
     // country-profile.const.ts, NOT this test. tsconfig.json excludes

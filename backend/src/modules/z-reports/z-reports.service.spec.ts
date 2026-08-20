@@ -559,3 +559,107 @@ describe('ZReportsService.generateReport (characterization — aggregation total
     ]);
   });
 });
+
+/**
+ * Task 13: the Z-Report email context used to hardcode `.toFixed(2)` for
+ * every amount and look up a currency symbol that silently fell back to
+ * "$" for anything not in a fixed map (UZS included). Both now come from
+ * `resolveCountryProfile(tenant.countryCode)` via the shared
+ * common/country/money-format.ts formatter, embedded directly into each
+ * amount field — the template no longer prepends a separate
+ * `{{currencySymbol}}`.
+ */
+describe('ZReportsService.sendReportEmail (Task 13 — country-profile money)', () => {
+  let prisma: MockPrismaClient;
+  let email: any;
+  let svc: ZReportsService;
+
+  const report: any = {
+    id: 'zr-1',
+    reportNumber: 'Z-001',
+    reportDate: new Date('2026-06-01T00:00:00Z'),
+    createdAt: new Date('2026-06-01T20:00:00Z'),
+    closingTime: new Date('2026-06-01T23:00:00Z'),
+    closedById: 'user-1',
+    totalOrders: 12,
+    totalSales: 1500,
+    totalDiscount: 50,
+    totalRefunds: 0,
+    netSales: 1450,
+    dineInSales: 900,
+    dineInOrders: 8,
+    takeawaySales: 400,
+    takeawayOrders: 3,
+    deliverySales: 200,
+    deliveryOrders: 1,
+    cashPayments: 800,
+    cashPaymentCount: 5,
+    cardPayments: 600,
+    cardPaymentCount: 6,
+    digitalPayments: 100,
+    digitalPaymentCount: 1,
+    openingCash: 200,
+    expectedCash: 1000,
+    countedCash: 990,
+    cashInOut: 0,
+    cashDifference: -10,
+    cancelledOrders: 0,
+    cancelledOrdersAmount: 0,
+    topProducts: [],
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    email = { sendEmail: jest.fn().mockResolvedValue(true) };
+    svc = new ZReportsService(
+      prisma as any,
+      email,
+      { render: jest.fn() } as any,
+      new ZReportAggregator(),
+    );
+    (prisma.zReport.findFirst as any).mockResolvedValue(report);
+    (prisma.user.findUnique as any).mockResolvedValue({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+    });
+    (prisma.zReport.updateMany as any).mockResolvedValue({ count: 1 });
+  });
+
+  const scope = { tenantId: 't1', branchId: 'b1', userId: 'user-1', role: 'ADMIN' } as any;
+
+  it("a TR tenant's email amounts keep their exact pre-existing shape (₺, 2dp, ungrouped)", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      name: 'Acme Diner',
+      currency: 'TRY',
+      countryCode: 'TR',
+      reportEmails: ['owner@example.com'],
+    });
+
+    await svc.sendReportEmail('zr-1', scope);
+
+    const context = (email.sendEmail as any).mock.calls[0][0].context;
+    expect(context.totalSales).toBe('₺1500.00');
+    expect(context.netSales).toBe('₺1450.00');
+    expect(context.currencySymbol).toBeUndefined();
+  });
+
+  it("a UZ tenant's email amounts render with ZERO decimals and the real so'm glyph — never '$'", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      name: 'Choyxona',
+      // Stale mirror field — must NOT drive rendering; only countryCode does.
+      currency: 'TRY',
+      countryCode: 'UZ',
+      reportEmails: ['owner@example.com'],
+    });
+
+    await svc.sendReportEmail('zr-1', scope);
+
+    const context = (email.sendEmail as any).mock.calls[0][0].context;
+    const allValues = Object.values(context).filter(
+      (v) => typeof v === 'string',
+    ) as string[];
+    expect(allValues.some((v) => v.includes('$'))).toBe(false);
+    expect(context.totalSales).toBe('1500 soʻm');
+    expect(context.totalSales).not.toContain('.00');
+  });
+});

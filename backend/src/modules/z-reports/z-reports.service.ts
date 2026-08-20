@@ -20,7 +20,8 @@ import { paginated } from "../../common/pagination";
 import { format } from "date-fns";
 import { ZReportPdfService } from "./services/z-report-pdf.service";
 import { ZReportAggregator } from "./services/z-report-aggregator.service";
-import { CURRENCY_SYMBOLS } from "./currency-symbols";
+import { resolveCountryProfile } from "../../common/country/country.service";
+import { formatMoneyForDocument } from "../../common/country/money-format";
 
 @Injectable()
 export class ZReportsService {
@@ -531,8 +532,15 @@ export class ZReportsService {
       );
     }
 
-    // Get currency symbol
-    const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || "$";
+    // Country-profile-driven money (Task 13) — see this method's class doc
+    // comment. Deliberately NOT `tenant.currency` (a written mirror, never
+    // the truth). Each amount field below now carries its symbol/suffix
+    // embedded (e.g. "₺1500.00" / "1500 soʻm") — the template no longer
+    // prepends a separate `{{currencySymbol}}` (removed from emailContext
+    // and from templates/emails/z-report-summary.hbs together).
+    const profile = resolveCountryProfile(tenant.countryCode);
+    const money = (amount: unknown) =>
+      formatMoneyForDocument(Number(amount), profile);
 
     // Parse top products from JSON
     const topProducts = (report.topProducts as any[]) || [];
@@ -556,51 +564,50 @@ export class ZReportsService {
       closedByName: closedBy
         ? `${closedBy.firstName} ${closedBy.lastName}`
         : "System",
-      currencySymbol,
 
       // Sales summary
-      totalSales: Number(report.totalSales).toFixed(2),
-      totalDiscount: Number(report.totalDiscount).toFixed(2),
-      totalRefunds: Number(report.totalRefunds).toFixed(2),
-      netSales: Number(report.netSales).toFixed(2),
+      totalSales: money(report.totalSales),
+      totalDiscount: money(report.totalDiscount),
+      totalRefunds: money(report.totalRefunds),
+      netSales: money(report.netSales),
       totalOrders: report.totalOrders,
 
       // Order types
-      dineInSales: Number(report.dineInSales).toFixed(2),
+      dineInSales: money(report.dineInSales),
       dineInOrders: report.dineInOrders,
-      takeawaySales: Number(report.takeawaySales).toFixed(2),
+      takeawaySales: money(report.takeawaySales),
       takeawayOrders: report.takeawayOrders,
-      deliverySales: Number(report.deliverySales).toFixed(2),
+      deliverySales: money(report.deliverySales),
       deliveryOrders: report.deliveryOrders,
 
       // Payment methods
-      cashPayments: Number(report.cashPayments).toFixed(2),
+      cashPayments: money(report.cashPayments),
       cashPaymentCount: report.cashPaymentCount,
-      cardPayments: Number(report.cardPayments).toFixed(2),
+      cardPayments: money(report.cardPayments),
       cardPaymentCount: report.cardPaymentCount,
-      digitalPayments: Number(report.digitalPayments).toFixed(2),
+      digitalPayments: money(report.digitalPayments),
       digitalPaymentCount: report.digitalPaymentCount,
 
       // Cash drawer
-      openingCash: Number(report.openingCash).toFixed(2),
-      expectedCash: Number(report.expectedCash).toFixed(2),
-      countedCash: Number(report.countedCash).toFixed(2),
-      cashInOut: Number(report.cashInOut).toFixed(2),
-      cashDifference: cashDiff.toFixed(2),
-      cashDifferenceAbs: Math.abs(cashDiff).toFixed(2),
+      openingCash: money(report.openingCash),
+      expectedCash: money(report.expectedCash),
+      countedCash: money(report.countedCash),
+      cashInOut: money(report.cashInOut),
+      cashDifference: money(cashDiff),
+      cashDifferenceAbs: money(Math.abs(cashDiff)),
       cashDifferenceClass,
       isNegativeDifference,
       isPositiveDifference,
 
       // Cancelled orders
       cancelledOrders: report.cancelledOrders,
-      cancelledOrdersAmount: Number(report.cancelledOrdersAmount).toFixed(2),
+      cancelledOrdersAmount: money(report.cancelledOrdersAmount),
 
       // Top products
       topProducts: topProducts.slice(0, 5).map((p: any) => ({
         name: p.name || p.productName,
         quantity: p.quantity,
-        revenue: Number(p.revenue).toFixed(2),
+        revenue: money(p.revenue),
       })),
 
       currentYear: new Date().getFullYear(),

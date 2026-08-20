@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import * as iconv from "iconv-lite";
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
@@ -19,98 +20,104 @@ import {
   asciiCurrencySuffix,
 } from "../../common/country/money-format";
 
-/** Pre-existing hardcoded defaults (Task 13) — reproduced exactly when a
- * caller omits the corresponding EscPosReceiptOptions field, so the byte
- * stream for a Turkish tenant is unchanged. */
-const DEFAULT_INTL_LOCALE = "tr-TR";
-const DEFAULT_DISPLAY_DECIMALS = 2;
-const DEFAULT_TIMEZONE = "Europe/Istanbul";
+// ──────────────────────────────────────────────────────────────────────────
+// UZ ESC/POS byte builder (Task 13). Registers as "escpos-uz" — a SEPARATE
+// dialect from the shared "escpos-tr" builder (escpos-builder.service.ts),
+// which every UZ tenant used before this task. That builder's CP857
+// (Turkish) codepage cannot represent Cyrillic AT ALL: any character it
+// doesn't recognise degrades to a literal '?', so a Cyrillic product name —
+// entirely plausible on a Tashkent receipt, given Uzbekistan's substantial
+// Russian-speaking population — printed as a row of question marks.
+//
+// CODEPAGE DECISION — CP866 over CP1251, and why:
+//
+// The two usual ESC/POS Cyrillic candidates are CP866 (DOS Cyrillic #2) and
+// CP1251 (Windows Cyrillic). Both cover the same character repertoire (the
+// standard Russian alphabet, which is what Uzbek Cyrillic also uses for its
+// shared letters). The difference that matters here is which numeric value
+// `ESC t n` needs to SELECT the table on real hardware — and that number is
+// NOT standardised across ESC/POS printer vendors (verified by cross-
+// checking multiple sources rather than assumed): the official Star
+// Micronics ESC/POS Command Specification (rev 2.52) lists CP866 at n=17 in
+// BOTH of its documented `ESC t n` tables ("Spec A" and "Spec B"), the same
+// n=17 commonly cited for Epson-compatible firmware — but CP1251's value
+// varies BY VENDOR (34 in that same Star spec; other vendor docs list 46 or
+// 23 for the same "WPC1251" table). Printing on a codepage the firmware
+// doesn't actually have at that address doesn't fail loudly — it silently
+// selects whatever page 17/34/46/23 happens to mean on THAT printer,
+// printing garbage. Given "a wrong byte here prints garbage on real paper"
+// and no physical UZ hardware available to verify against, CP866's n=17 is
+// the one value with cross-vendor agreement, so it is the responsible
+// choice. (This mirrors the existing TR builder's own `ESC t 19` for
+// CP857 — also unverified against physical hardware, also left untouched
+// by this task; see that file's CMD_CODEPAGE_CP857 comment. If it later
+// turns out the specific printer models this fleet uses number CP866
+// differently, only THIS builder's `CMD_CODEPAGE_CP866` constant needs to
+// change — the dialect-per-id structure this and the TR builder share is
+// exactly what makes that a one-line fix instead of a redesign.)
+//
+// SCOPE — Uzbek Latin covered, receipt LABELS transliterated, not
+// translated:
+//
+// Uzbek Latin's only non-ASCII characters are the oʻ/gʻ modifier-apostrophe
+// letters (U+02BB/U+02BC, sometimes typed as a curly quote) — neither CP866
+// nor CP1251 can represent them (they're Latin Extended, not Cyrillic), so
+// `enc()` below normalises them to a plain ASCII apostrophe before encoding
+// rather than let them degrade to '?'. This task's scope (per its brief) is
+// codepage + timestamp + money — NOT localising the receipt's fixed field
+// labels ("Ödeme", "Fiş No", …) into Uzbek/Russian. Those labels are still
+// Turkish WORDS here, but spelled WITHOUT their Turkish diacritics (ş/ğ/ı/
+// ö/ü/ç all have CP857 codepoints but NONE of them exist in CP866 — the
+// same single-byte-table ceiling that rules out combining "Turkish labels"
+// and "Cyrillic product data" on one printer codepage at all), so they
+// survive CP866 intact instead of turning "Fiş No" into "Fi?No". Full
+// label localisation is future work; this keeps every character on the
+// page — labels, Latin product names, and Cyrillic product names alike —
+// printable today.
+// ──────────────────────────────────────────────────────────────────────────
 
-// ──────────────────────────────────────────────────────────────────────────
-// ESC/POS control codes (Epson TM-T spec; the de-facto standard every cheap
-// 80mm Chinese head clones). Named constants rather than magic bytes so the
-// command stream reads like the spec.
-// ──────────────────────────────────────────────────────────────────────────
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
 
-/** ESC @  — initialise printer (clears mode, codepage, justification). */
 const CMD_INIT = [ESC, 0x40] as const;
 
-/** ESC t n — select character code table. n=19 → PC857 (Turkish). */
-const CMD_CODEPAGE_CP857 = [ESC, 0x74, 19] as const;
+/** ESC t n — select character code table. n=17 → PC866 (Cyrillic #2). See
+ * the class doc comment above for why 17/CP866 rather than CP1251. */
+const CMD_CODEPAGE_CP866 = [ESC, 0x74, 17] as const;
 
-/** ESC a n — justification. 0=left 1=center (2=right unused: prices are
- * flush-right via space-padding inside the left-justified column instead). */
 const alignLeft = () => [ESC, 0x61, 0];
 const alignCenter = () => [ESC, 0x61, 1];
-
-/** ESC E n — emphasised (bold) on/off. */
 const boldOn = () => [ESC, 0x45, 1];
 const boldOff = () => [ESC, 0x45, 0];
-
-/** GS ! n — character size. low-nibble=height multiplier, high-nibble=width. */
 const sizeNormal = () => [GS, 0x21, 0x00];
 const sizeDoubleHeight = () => [GS, 0x21, 0x01];
 const sizeDoubleBoth = () => [GS, 0x21, 0x11];
-
-/** GS V m — paper cut. m=66 (full cut after feed) via the function-B form. */
 const cutPaper = () => [GS, 0x56, 66, 0x00];
-
-/**
- * ESC p m t1 t2 — generate drawer-kick pulse on connector pin `m`
- * (0 → pin 2, 1 → pin 5). t1/t2 = on/off pulse widths × 2 ms. 50/250 ms is the
- * standard cash-drawer solenoid pulse.
- */
 const drawerKickBytes = (pin: 0 | 1) => [ESC, 0x70, pin, 25, 250];
 
-// ──────────────────────────────────────────────────────────────────────────
-// CP857 (PC857, "Multilingual Latin V" — Turkish) high-half encoding table.
-// The low half (0x00–0x7F) is plain ASCII. We only need the mapping for the
-// Turkish letters a Turkish fiş actually contains; everything else falls
-// through to a "?" so the byte stream never carries an un-encodable char that
-// would desync the printer's column counter.
-// ──────────────────────────────────────────────────────────────────────────
-const CP857: Record<string, number> = {
-  // Uppercase
-  Ç: 0x80,
-  Ü: 0x9a,
-  É: 0x90,
-  Ä: 0x8e,
-  Ö: 0x99,
-  Ğ: 0xa6,
-  İ: 0x98, // dotted capital I (CP857 maps Ÿ slot to İ)
-  Ş: 0x9e,
-  // Lowercase
-  ç: 0x87,
-  ü: 0x81,
-  é: 0x82,
-  ö: 0x94,
-  ı: 0x8d, // dotless lowercase i
-  ğ: 0xa7,
-  ş: 0x9f,
-  â: 0x83,
-  î: 0x8c,
-  û: 0x96,
-  // Currency / symbols
-  "£": 0x9c,
-  "₺": 0x54, // no native TRY glyph in CP857 → fall back to ASCII 'T' is wrong;
-  // we instead emit the literal "TL" string upstream (see money()), so this
-  // entry is only a defensive last resort and intentionally maps to 'T'.
+/**
+ * Uzbek Latin's modifier-apostrophe letters (oʻ / gʻ) have no CP866
+ * codepoint. Normalising them to a plain ASCII apostrophe first means
+ * "o'sha"/"g'alati" print readably instead of degrading to "o?sha"/
+ * "g?alati" — cheap, deterministic, and doesn't require inventing a byte
+ * mapping the printer firmware doesn't have.
+ */
+const UZ_APOSTROPHE_NORMALIZE: Record<string, string> = {
+  ʻ: "'", // ʻ MODIFIER LETTER TURNED COMMA — the standard oʻ/gʻ glyph
+  ʼ: "'", // ʼ MODIFIER LETTER APOSTROPHE — a common alternate
+  "‘": "'", // ' LEFT SINGLE QUOTATION MARK — common substitute in typed text
+  "’": "'", // ' RIGHT SINGLE QUOTATION MARK — common substitute
 };
 
 @Injectable()
-export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
-  readonly id = "escpos-tr";
-  private readonly logger = new Logger(EscPosBuilderService.name);
+export class EscPosBuilderUzService implements EscPosBuilder, OnModuleInit {
+  readonly id = "escpos-uz";
+  private readonly logger = new Logger(EscPosBuilderUzService.name);
 
   constructor(private readonly registry: EscPosBuilderRegistry) {}
 
   onModuleInit(): void {
-    // Mirror the fiscal adapter: self-register so callers resolve by dialect
-    // id. Unlike the sandbox fiscal provider this is a pure, side-effect-free
-    // byte builder, so it registers in every environment (incl. production).
     this.registry.register(this);
   }
 
@@ -121,26 +128,21 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     options: EscPosReceiptOptions = {},
   ): EscPosJob {
     const cols = this.columns(options);
-    // Country-profile-driven formatting (Task 13). Defaults reproduce the
-    // pre-existing hardcoded tr-TR/2dp/Istanbul behaviour exactly when the
-    // caller passes none of these — see the DEFAULT_* constants above.
-    const intlLocale = options.intlLocale ?? DEFAULT_INTL_LOCALE;
-    const displayDecimals = options.displayDecimals ?? DEFAULT_DISPLAY_DECIMALS;
-    const timezone = options.timezone ?? DEFAULT_TIMEZONE;
+    const intlLocale = options.intlLocale ?? "uz-UZ";
+    const displayDecimals = options.displayDecimals ?? 0;
+    const timezone = options.timezone ?? "Asia/Tashkent";
     const b = new ByteWriter();
     this.preamble(b);
 
-    // Header — restaurant name, big + centered + bold.
     b.push(alignCenter(), boldOn(), sizeDoubleBoth());
     b.line(this.enc(snapshot.restaurant.name), cols);
     b.push(sizeNormal(), boldOff());
-    b.line(this.enc("ADİSYON / FİŞ"), cols);
+    b.line(this.enc("ADISYON / FIS"), cols);
     b.push(alignLeft());
     this.rule(b, cols);
 
-    // Order meta.
-    b.line(this.enc(`Fiş No : ${snapshot.order.orderNumber}`), cols);
-    b.line(this.enc(`Tür    : ${this.orderType(snapshot.order.type)}`), cols);
+    b.line(this.enc(`Fis No : ${snapshot.order.orderNumber}`), cols);
+    b.line(this.enc(`Tur    : ${this.orderType(snapshot.order.type)}`), cols);
     if (snapshot.order.tableNumber) {
       b.line(this.enc(`Masa   : ${snapshot.order.tableNumber}`), cols);
     }
@@ -152,7 +154,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     );
     this.rule(b, cols);
 
-    // Items — "qty x name" left, line total right.
     for (const item of snapshot.items) {
       const left = `${item.quantity} x ${item.name}`;
       const right = this.money(
@@ -171,7 +172,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     }
     this.rule(b, cols);
 
-    // Totals + KDV breakdown.
     const cur = snapshot.restaurant.currency;
     const money = (amount: string) =>
       this.money(amount, cur, intlLocale, displayDecimals);
@@ -181,7 +181,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     );
     if (this.nonZero(snapshot.totals.discount)) {
       b.line(
-        this.encTwoCol("İndirim", `-${money(snapshot.totals.discount)}`, cols),
+        this.encTwoCol("Indirim", `-${money(snapshot.totals.discount)}`, cols),
         cols,
       );
     }
@@ -198,13 +198,12 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     b.push(sizeNormal(), boldOff());
     this.rule(b, cols);
 
-    // Payment.
     b.line(
-      this.enc(`Ödeme  : ${this.payMethod(snapshot.payment.method)}`),
+      this.enc(`Odeme  : ${this.payMethod(snapshot.payment.method)}`),
       cols,
     );
     if (snapshot.payment.transactionId) {
-      b.line(this.enc(`İşlem  : ${snapshot.payment.transactionId}`), cols);
+      b.line(this.enc(`Islem  : ${snapshot.payment.transactionId}`), cols);
     }
 
     this.footer(b, cols, options);
@@ -219,8 +218,8 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     options: EscPosReceiptOptions = {},
   ): EscPosJob {
     const cols = this.columns(options);
-    const intlLocale = options.intlLocale ?? DEFAULT_INTL_LOCALE;
-    const timezone = options.timezone ?? DEFAULT_TIMEZONE;
+    const intlLocale = options.intlLocale ?? "uz-UZ";
+    const timezone = options.timezone ?? "Asia/Tashkent";
     const b = new ByteWriter();
     this.preamble(b);
 
@@ -230,7 +229,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     b.line(this.enc(`#${snapshot.order.orderNumber}`), cols);
     b.push(boldOff(), alignLeft());
 
-    b.line(this.enc(`Tür  : ${this.orderType(snapshot.order.type)}`), cols);
+    b.line(this.enc(`Tur  : ${this.orderType(snapshot.order.type)}`), cols);
     if (snapshot.order.tableNumber) {
       b.push(boldOn());
       b.line(this.enc(`MASA : ${snapshot.order.tableNumber}`), cols);
@@ -242,14 +241,8 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     );
     this.rule(b, cols);
 
-    // Items — large qty, no prices.
     for (const item of snapshot.items) {
       b.push(boldOn(), sizeDoubleHeight());
-      // sizeDoubleHeight() doubles HEIGHT only — glyphs stay normal WIDTH, so
-      // the wrap/truncate width is the full `cols`. Passing doubleWidthCols(cols)
-      // (half) here clipped every kitchen-ticket item name at ~half the paper
-      // width, so the line cooks read was cut off. doubleWidthCols is only
-      // correct for sizeDoubleBoth() text (double width).
       b.line(this.enc(`${item.quantity} x ${item.name}`), cols);
       b.push(sizeNormal(), boldOff());
       for (const mod of item.modifiers) {
@@ -275,8 +268,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
 
   drawerKick(pin: 0 | 1 = 0): EscPosJob {
     const b = new ByteWriter();
-    // No ESC @ here: a drawer kick must not reset an in-progress print job's
-    // mode. It's a bare pulse the bridge sends to the printer's drawer port.
     b.push(drawerKickBytes(pin));
     return this.job("drawer_kick", b);
   }
@@ -312,7 +303,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     const buf = Buffer.from(bytes);
     return {
       artifact,
-      codepage: "CP857",
+      codepage: "CP866",
       bytes,
       base64: buf.toString("base64"),
       byteLength: bytes.length,
@@ -320,11 +311,10 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
   }
 
   private preamble(b: ByteWriter): void {
-    b.push(CMD_INIT, CMD_CODEPAGE_CP857);
+    b.push(CMD_INIT, CMD_CODEPAGE_CP866);
   }
 
   private finish(b: ByteWriter, options: EscPosReceiptOptions): void {
-    // Feed a few lines so the cut clears the print head, then cut.
     b.push([LF, LF, LF]);
     if (options.qr) this.qr(b, options.qr.data, options.qr.size ?? 6);
     if (options.cut !== false) b.push(cutPaper());
@@ -335,10 +325,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     cols: number,
     options: EscPosReceiptOptions,
   ): void {
-    const lines = options.footerLines ?? [
-      "Bizi tercih ettiğiniz için",
-      "teşekkür ederiz.",
-    ];
+    const lines = options.footerLines ?? ["Tashrifingiz uchun", "rahmat."];
     if (lines.length === 0) return;
     this.rule(b, cols);
     b.push(alignCenter());
@@ -346,15 +333,8 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     b.push(alignLeft());
   }
 
-  /**
-   * GS ( k — print a model-2 QR. Stores the data then prints it. Sequence:
-   *   set module size → set model → store data → print.
-   */
   private qr(b: ByteWriter, data: string, size: number): void {
     const bytes = Array.from(Buffer.from(data, "utf8"));
-    // GS ( k store-data length is a 16-bit field (pL/pH). Guard so an oversized
-    // payload can't overflow it and desync the printer. 0xfffc leaves room for
-    // the +3 protocol header bytes (len stays <= 0xffff).
     if (bytes.length > 0xfffc) {
       throw new Error(
         `QR payload too large: ${bytes.length} bytes (max ${0xfffc})`,
@@ -364,9 +344,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     const pL = len & 0xff;
     const pH = (len >> 8) & 0xff;
     b.push(alignCenter());
-    // Model 2.
     b.push([GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
-    // Module size.
     b.push([
       GS,
       0x28,
@@ -377,11 +355,8 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
       0x43,
       Math.min(Math.max(size, 1), 16),
     ]);
-    // Error correction level M.
     b.push([GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]);
-    // Store the data.
     b.push([GS, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30], bytes);
-    // Print.
     b.push([GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
     b.push(alignLeft());
   }
@@ -396,7 +371,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     return options.paperWidth === "58mm" ? 32 : 42;
   }
 
-  /** Column budget when text is printed double-width. */
   private doubleWidthCols(cols: number): number {
     return Math.floor(cols / 2);
   }
@@ -416,7 +390,7 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
       CARD: "Kart",
       QR: "QR",
       VOUCHER: "Kupon",
-      TICKET: "Yemek Kartı",
+      TICKET: "Yemek Karti",
     };
     return map[method?.toUpperCase()] ?? method;
   }
@@ -426,16 +400,12 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
   }
 
   /**
-   * Money is rendered as "1.234,56 TL" for TR (Turkish grouping + the
-   * literal "TL" suffix — the ₺ glyph has no CP857 codepoint, so we never
-   * try to print it; "TL" is the conventional fiş suffix anyway). Grouping
-   * and decimal-place count come from `intlLocale`/`displayDecimals` (Task
-   * 13: the tenant's country profile), never hardcoded — the shared
-   * server-side money formatter (common/country/money-format.ts) does the
-   * actual `Intl.NumberFormat` call, so this stays in lockstep with the
-   * Z-Report PDF/email and with the frontend's useFormatCurrency(). Only
-   * the ASCII-safe suffix (vs. a real Unicode currency glyph) is specific
-   * to this codepage-constrained caller.
+   * Same shared server-side money formatter the TR builder uses
+   * (common/country/money-format.ts) — grouping and decimal-place count
+   * come from `intlLocale`/`displayDecimals` (this dialect defaults to
+   * "uz-UZ"/0, so'm is quoted whole), never hardcoded. The suffix is the
+   * currency's own ASCII-safe ISO code (`asciiCurrencySuffix` — "TL" only
+   * for TRY, "UZS" here) rather than a Unicode glyph CP866 can't encode.
    */
   private money(
     amount: string,
@@ -447,14 +417,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     return `${grouped} ${asciiCurrencySuffix(currency)}`;
   }
 
-  /**
-   * `intlLocale` for grouping/month-day-year order, `timezone` for the
-   * wall-clock hour — both supplied by the caller (Task 13: intlLocale from
-   * the tenant's country profile, timezone from the order's BRANCH, never a
-   * hardcoded "Europe/Istanbul"). A branch can legitimately run in a
-   * different timezone than its tenant's country default, so this must
-   * read the branch's own field, not re-derive from the country profile.
-   */
   private formatDateTime(
     iso: string,
     intlLocale: string,
@@ -472,13 +434,6 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
     }).format(d);
   }
 
-  /**
-   * Lay out a label on the left and a value flush-right within `cols`
-   * characters. If they collide, the value wins (truncate the label) so the
-   * money column never wraps. Operates on the DECODED string (char count),
-   * then is CP857-encoded by the caller — CP857 is single-byte so 1 char =
-   * 1 column.
-   */
   private encTwoCol(left: string, right: string, cols: number): Uint8Array {
     const pad = cols - right.length - left.length;
     let text: string;
@@ -492,31 +447,33 @@ export class EscPosBuilderService implements EscPosBuilder, OnModuleInit {
   }
 
   /**
-   * Encode a JS string to CP857 bytes. ASCII passes through; mapped Turkish
-   * letters use their CP857 codepoint; anything else degrades to "?" so the
-   * column counter stays in sync with what prints.
+   * Encode a JS string to CP866 bytes via iconv-lite (a battle-tested,
+   * third-party-verified codepage table — see the class doc comment for
+   * why this task uses a library table here rather than hand-transcribing
+   * one: a hand-typed 256-entry table is exactly the kind of "wrong byte
+   * that prints garbage on real paper" this task warns against). Uzbek
+   * Latin's modifier-apostrophe letters are normalised to a plain ASCII
+   * apostrophe first (see UZ_APOSTROPHE_NORMALIZE); anything iconv-lite
+   * still can't map degrades to '?' — the SAME single-byte-table fallback
+   * the TR builder uses, so the "1 char in the decoded string = 1 column"
+   * invariant `encTwoCol` relies on holds here too.
    */
   private enc(text: string): Uint8Array {
-    const out: number[] = [];
-    for (const ch of text) {
-      const code = ch.codePointAt(0)!;
-      if (code <= 0x7f) {
-        out.push(code);
-        continue;
+    let normalized = text;
+    for (const [from, to] of Object.entries(UZ_APOSTROPHE_NORMALIZE)) {
+      if (normalized.includes(from)) {
+        normalized = normalized.split(from).join(to);
       }
-      const mapped = CP857[ch];
-      out.push(mapped ?? 0x3f /* '?' */);
     }
-    return Uint8Array.from(out);
+    return iconv.encode(normalized, "cp866");
   }
 }
 
-/**
- * Tiny append-only byte buffer. Accepts raw control sequences (number[] /
- * readonly number[]) and pre-encoded text runs (Uint8Array), and writes a
- * trailing LF after a text `line`. Kept local to the builder so the ESC/POS
- * command stream reads top-to-bottom.
- */
+/** Identical tiny append-only byte buffer to the TR builder's — see that
+ * file's ByteWriter doc comment. Kept as a separate copy rather than a
+ * shared import so this dialect's file has zero coupling to the TR
+ * builder's internals (the byte-identical TR regression pin stays trivially
+ * safe: nothing here can perturb that file). */
 class ByteWriter {
   private readonly chunks: number[] = [];
 
@@ -526,7 +483,6 @@ class ByteWriter {
     }
   }
 
-  /** Append an already-encoded text run, optionally clamped to `cols`, + LF. */
   line(encoded: Uint8Array, cols?: number): void {
     const run =
       cols != null && encoded.length > cols

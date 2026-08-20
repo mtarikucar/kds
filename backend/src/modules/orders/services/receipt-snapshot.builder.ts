@@ -10,6 +10,20 @@ export const RECEIPT_SNAPSHOT_VERSION = 1 as const;
 
 type DecimalLike = Prisma.Decimal | string | number;
 
+/**
+ * Serialises a money value into this versioned snapshot's WIRE string —
+ * always 2 fraction digits, matching the underlying `Decimal(14,2)` DB
+ * columns this reads from (totalAmount/finalAmount/taxAmount/etc., and the
+ * combo-line math above). This is lossless and currency-agnostic: it's the
+ * storage-adjacent precision, not the DISPLAY precision. A UZS amount is
+ * still exactly representable as "150000.00" here; the country-profile-
+ * driven `displayDecimals` (0 for UZS, "so'm is quoted whole") is applied
+ * downstream by the money formatter that actually renders text — see
+ * common/country/money-format.ts's `formatMoneyNumber`, consumed by
+ * EscPosBuilderService.money() — never here. Task 13's inventory named
+ * this function as a feeder for that formatter, not as something that
+ * itself needed a currency-aware decimal count.
+ */
 const fmt = (value: DecimalLike | null | undefined): string =>
   new Prisma.Decimal(value ?? 0).toFixed(2);
 
