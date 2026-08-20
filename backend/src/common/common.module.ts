@@ -6,9 +6,6 @@ import { CLOCK, SystemClock } from "./time/clock";
 import { ID_GENERATOR, SystemIdGenerator } from "./ids/id-generator";
 import { CountryService } from "./country/country.service";
 import { CountryCapabilityResolver } from "./country/country-capability.resolver";
-import { PaymentsCoreModule } from "../modules/payments-core/payments-core.module";
-import { FiscalCoreModule } from "../modules/fiscal-core/fiscal-core.module";
-import { DeviceMeshModule } from "../modules/device-mesh/device-mesh.module";
 
 /**
  * Global common module
@@ -22,24 +19,24 @@ import { DeviceMeshModule } from "../modules/device-mesh/device-mesh.module";
   // module's dependency graph honest, same posture as EntitlementsModule /
   // LicensingModule / OutboxModule / CreditsModule.
   //
-  // PaymentsCoreModule and FiscalCoreModule are @Global() too (their
-  // registries would resolve here regardless), but CountryCapabilityResolver
-  // genuinely depends on PaymentProviderRegistry/FiscalProviderRegistry, so
-  // they're imported explicitly for the same "honest graph" reason. DeviceMeshModule
-  // is NOT @Global() — importing it here is the only way
-  // CountryCapabilityResolver can inject EscPosBuilderRegistry at all.
-  // One-way edge, verified: neither DeviceMeshModule nor its own imports
-  // (PrismaModule, CommandQueueModule, LocalBridgeModule, SubscriptionsModule
-  // and what THEY import) ever import CommonModule back — grepping every
-  // `*.module.ts` for `CommonModule` turns up only app.module.ts,
-  // common.module.ts itself, metrics.module.ts, reservations.module.ts and
-  // z-reports.module.ts, none of which sit in this chain.
-  imports: [
-    PrismaModule,
-    PaymentsCoreModule,
-    FiscalCoreModule,
-    DeviceMeshModule,
-  ],
+  // CountryCapabilityResolver (below) also depends on PaymentProviderRegistry
+  // / FiscalProviderRegistry / EscPosBuilderRegistry, but those are NOT
+  // imported here. All three live in their own small @Global() modules
+  // (payments-core, fiscal-core, printing-core) that are already part of the
+  // app graph via AppModule — a @Global() module's exports are ambient
+  // everywhere once loaded ONCE anywhere, so adding them here would only add
+  // graph edges, not change resolution (fix round 1: they used to be listed
+  // here, which is exactly the mistake being corrected).
+  //
+  // CommonModule is itself @Global(), which puts every module in the app
+  // downstream of it — so it must never import a feature module (that
+  // inverts the dependency direction and is one edge away from a real
+  // cycle the moment that feature module's own subtree grows to need
+  // anything CommonModule provides). DeviceMeshModule briefly lived in this
+  // imports array for EscPosBuilderRegistry; it was removed once
+  // EscPosBuilderRegistry got its own leaf @Global() module (printing-core)
+  // to depend on instead, mirroring payments-core/fiscal-core.
+  imports: [PrismaModule],
   providers: [
     EmailService,
     {
@@ -59,7 +56,8 @@ import { DeviceMeshModule } from "../modules/device-mesh/device-mesh.module";
     // at bootstrap the moment anything tried to inject it.
     CountryService,
     // Task 9 (Phase 2, capability routing). Depends on CountryService above
-    // plus the three registries pulled in via the imports just added.
+    // and on the three @Global() registries described in the imports
+    // comment — resolved ambiently, no explicit import needed.
     CountryCapabilityResolver,
   ],
   exports: [

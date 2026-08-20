@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+} from "../orders/services/receipt-snapshot.builder";
 import {
   EscPosArtifact,
   EscPosBuilder,

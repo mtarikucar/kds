@@ -8,11 +8,16 @@ import { DevicesController } from "./devices.controller";
 import { BranchesController } from "./branches.controller";
 import { DeviceTokenGuard } from "./device-token.guard";
 import { DeviceMeshScheduler } from "./device-mesh.scheduler";
-import { EscPosBuilderRegistry } from "./printing/escpos-builder.registry";
-import { EscPosBuilderService } from "./printing/escpos-builder.service";
 // v2.8.88: BranchesController POST/PATCH/DELETE now gates on the
 // MULTI_LOCATION feature via PlanFeatureGuard.
 import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
+// Task 9 fix round 1: EscPosBuilderRegistry/Service moved out to their own
+// small @Global() module (mirrors payments-core/fiscal-core) so a consumer
+// that only needs the registry doesn't have to pull in this module's much
+// larger graph. Re-exported below (as the whole module, not the bare
+// tokens — see the exports comment) so existing consumers that reach the
+// registry THROUGH DeviceMeshModule keep resolving unchanged.
+import { PrintingCoreModule } from "../printing-core/printing-core.module";
 
 /**
  * Device mesh module — registry, pairing, heartbeat, command queue.
@@ -32,6 +37,7 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
     CommandQueueModule,
     LocalBridgeModule,
     SubscriptionsModule,
+    PrintingCoreModule,
   ],
   controllers: [DevicesController, BranchesController],
   providers: [
@@ -39,8 +45,6 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
     BranchesService,
     DeviceTokenGuard,
     DeviceMeshScheduler,
-    EscPosBuilderRegistry,
-    EscPosBuilderService,
   ],
   exports: [
     DeviceService,
@@ -49,8 +53,16 @@ import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
     CommandQueueModule,
     BranchesService,
     DeviceTokenGuard,
-    EscPosBuilderRegistry,
-    EscPosBuilderService,
+    // Same re-export pattern as CommandQueueModule above: Nest only allows
+    // exporting a token this module OWNS (declares in its own `providers`)
+    // or a whole MODULE it imports — EscPosBuilderRegistry/Service now live
+    // in PrintingCoreModule, so the module itself is what gets re-exported,
+    // not the bare tokens (re-exporting is actually redundant with
+    // PrintingCoreModule's own @Global() status, but kept explicit so a
+    // standalone test that only imports DeviceMeshModule — not the whole
+    // app graph — still resolves them, same "honest graph" posture as the
+    // rest of this file).
+    PrintingCoreModule,
   ],
 })
 export class DeviceMeshModule {}

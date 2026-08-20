@@ -5,8 +5,8 @@ import { PaymentProviderRegistry } from "../../modules/payments-core/payment-pro
 import { PaymentProvider } from "../../modules/payments-core/payment-provider.interface";
 import { FiscalProviderRegistry } from "../../modules/fiscal-core/fiscal-provider.registry";
 import { FiscalProvider } from "../../modules/fiscal-core/fiscal-provider.interface";
-import { EscPosBuilderRegistry } from "../../modules/device-mesh/printing/escpos-builder.registry";
-import { EscPosBuilder } from "../../modules/device-mesh/printing/escpos.types";
+import { EscPosBuilderRegistry } from "../../modules/printing-core/escpos-builder.registry";
+import { EscPosBuilder } from "../../modules/printing-core/escpos.types";
 
 /**
  * Turns "this tenant's country" into "this provider instance": looks up the

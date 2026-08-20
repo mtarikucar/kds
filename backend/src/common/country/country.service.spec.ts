@@ -6,7 +6,9 @@ import { Test } from "@nestjs/testing";
 import { CountryService, resolveCountryProfile } from "./country.service";
 import { mockPrismaClient, MockPrismaClient } from "../test/prisma-mock.service";
 import { PrismaService } from "../../prisma/prisma.service";
-import { LicensingService } from "../../modules/licensing/licensing.service";
+import { PaymentProviderRegistry } from "../../modules/payments-core/payment-provider.registry";
+import { FiscalProviderRegistry } from "../../modules/fiscal-core/fiscal-provider.registry";
+import { EscPosBuilderRegistry } from "../../modules/printing-core/escpos-builder.registry";
 
 /**
  * Structural drift guard (same idiom as branch-scope-contract.spec.ts):
@@ -161,29 +163,36 @@ describe("CountryService", () => {
 class StubConfigGlobalsModule {}
 
 /**
- * Task 9 made CommonModule also import PaymentsCoreModule/FiscalCoreModule/
- * DeviceMeshModule (so CountryCapabilityResolver can inject their
- * registries), and FiscalCoreModule pulls in SubscriptionsModule ->
- * EntitlementsModule, whose EntitlementOfferResolver needs LicensingService.
- * LicensingModule is @Global() in production (ambient, never imported by
- * name in this chain) but pulling in the REAL one would drag in
- * CheckoutModule -> Catalog/Marketplace/Legal — none of which this test
- * (or CountryService) has anything to do with. Same posture as
- * StubConfigGlobalsModule above.
+ * Task 9 made CommonModule also provide CountryCapabilityResolver, whose
+ * constructor needs PaymentProviderRegistry/FiscalProviderRegistry/
+ * EscPosBuilderRegistry — Nest instantiates every provider in a compiled
+ * module, not just the one this test calls .get() on, so compile() below
+ * would fail without them. This test is about CountryService resolving
+ * through DI, not about capability routing (see
+ * country-capability.resolver.spec.ts for that), so bare, adapter-less
+ * registry instances are enough — all three classes take no constructor
+ * args, so a tiny stand-in @Global() module is all that's needed. No need
+ * to pull in payments-core/fiscal-core/printing-core themselves (and, via
+ * fiscal-core, SubscriptionsModule/OutboxModule) just for this.
  */
 @Global()
 @Module({
-  providers: [{ provide: LicensingService, useValue: {} }],
-  exports: [LicensingService],
+  providers: [
+    PaymentProviderRegistry,
+    FiscalProviderRegistry,
+    EscPosBuilderRegistry,
+  ],
+  exports: [
+    PaymentProviderRegistry,
+    FiscalProviderRegistry,
+    EscPosBuilderRegistry,
+  ],
 })
-class StubLicensingGlobalsModule {}
+class StubCapabilityRegistriesModule {}
 
 describe("CountryService module registration", () => {
   it("resolves through real Nest DI via CommonModule", async () => {
     const { CommonModule } = await import("../common.module");
-    const { OutboxModule } = await import(
-      "../../modules/outbox/outbox.module"
-    );
 
     // overrideProvider, not a stand-in @Global() module: CommonModule
     // imports PrismaModule directly, and a concrete provider from an
@@ -192,16 +201,10 @@ describe("CountryService module registration", () => {
     // whenever DATABASE_URL is absent, which is exactly the CI unit-test
     // job (no database). This test is about CountryService resolving, not
     // about Prisma.
-    //
-    // OutboxModule is @Global() in production (imported once by AppModule);
-    // this standalone graph doesn't include AppModule, so its export
-    // (DomainEventBus, consumed transitively via EntitlementsModule) needs
-    // to be pulled in explicitly too — same reason as the Licensing stub.
     const moduleRef = await Test.createTestingModule({
       imports: [
         StubConfigGlobalsModule,
-        StubLicensingGlobalsModule,
-        OutboxModule,
+        StubCapabilityRegistriesModule,
         CommonModule,
       ],
     })

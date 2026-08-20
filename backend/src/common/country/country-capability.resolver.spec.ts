@@ -10,12 +10,15 @@ import { PaymentProviderRegistry } from "../../modules/payments-core/payment-pro
 import { PaymentProvider } from "../../modules/payments-core/payment-provider.interface";
 import { FiscalProviderRegistry } from "../../modules/fiscal-core/fiscal-provider.registry";
 import { FiscalProvider } from "../../modules/fiscal-core/fiscal-provider.interface";
-import { EscPosBuilderRegistry } from "../../modules/device-mesh/printing/escpos-builder.registry";
-import { EscPosBuilder } from "../../modules/device-mesh/printing/escpos.types";
+import { EscPosBuilderRegistry } from "../../modules/printing-core/escpos-builder.registry";
+import { EscPosBuilder } from "../../modules/printing-core/escpos.types";
 import { AccountingProvider } from "../../modules/accounting/constants/accounting.enum";
 import { OutboxModule } from "../../modules/outbox/outbox.module";
 import { OutboxWorkerService } from "../../modules/outbox/outbox-worker.service";
 import { LicensingService } from "../../modules/licensing/licensing.service";
+import { PaymentsCoreModule } from "../../modules/payments-core/payments-core.module";
+import { FiscalCoreModule } from "../../modules/fiscal-core/fiscal-core.module";
+import { PrintingCoreModule } from "../../modules/printing-core/printing-core.module";
 
 const fakePayment = (id: string): PaymentProvider =>
   ({ id, modes: ["online"] }) as unknown as PaymentProvider;
@@ -269,21 +272,37 @@ describe("CountryCapabilityResolver — real DI wiring", () => {
     const { CommonModule } = await import("../common.module");
 
     // overrideProvider, not a stand-in module: several modules in this graph
-    // (PaymentsCoreModule, FiscalCoreModule, DeviceMeshModule) import
-    // PrismaModule directly, and a concrete provider from an imported module
-    // beats a same-token global stub — so without this the REAL PrismaService
-    // is constructed and `new PrismaClient()` throws whenever DATABASE_URL is
-    // absent (the CI unit-test job has no live database).
+    // import PrismaModule directly, and a concrete provider from an imported
+    // module beats a same-token global stub — so without this the REAL
+    // PrismaService is constructed and `new PrismaClient()` throws whenever
+    // DATABASE_URL is absent (the CI unit-test job has no live database).
     moduleRef = await Test.createTestingModule({
-      // OutboxModule is @Global() in production (imported once by AppModule)
-      // but this standalone test graph doesn't include AppModule, so its
-      // exports (DomainEventBus, OutboxService — consumed transitively via
-      // EntitlementsModule/CommandQueueService) need to be pulled in
-      // explicitly here too.
+      // Fix round 1: CommonModule went back to importing only PrismaModule
+      // (PaymentsCoreModule/FiscalCoreModule are @Global() — importing them
+      // there did nothing but add graph edges; DeviceMeshModule was removed
+      // outright, see printing-core.module.ts). So THIS test — not
+      // CommonModule — is now the place that explicitly assembles every
+      // registry-owning module it verifies: PaymentsCoreModule,
+      // FiscalCoreModule and PrintingCoreModule (the mirrored @Global()
+      // module the EscPosBuilderRegistry/Service moved into), alongside
+      // CommonModule for CountryService + CountryCapabilityResolver
+      // themselves.
+      //
+      // FiscalCoreModule itself still imports SubscriptionsModule +
+      // DeviceMeshModule (unrelated to Task 9 — it needs SubscriptionsModule
+      // for FiscalController's plan guard and DeviceMeshModule for the GMP-3
+      // command queue), which is what actually pulls in EntitlementsModule
+      // (-> LicensingService) and OutboxModule's DomainEventBus. OutboxModule
+      // is @Global() in production (imported once by AppModule) but this
+      // standalone graph doesn't include AppModule, so it's pulled in here
+      // explicitly too.
       imports: [
         StubConfigGlobalsModule,
         StubLicensingGlobalsModule,
         OutboxModule,
+        PaymentsCoreModule,
+        FiscalCoreModule,
+        PrintingCoreModule,
         CommonModule,
       ],
     })

@@ -13,7 +13,7 @@
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+} from "../orders/services/receipt-snapshot.builder";
 
 /**
  * Which physical artefact a built byte stream targets. Maps 1:1 onto the

@@ -3,7 +3,7 @@ import { EscPosBuilderRegistry } from "./escpos-builder.registry";
 import type {
   ReceiptSnapshotV1,
   KitchenTicketSnapshotV1,
-} from "../../orders/services/receipt-snapshot.builder";
+} from "../orders/services/receipt-snapshot.builder";
 
 /**
  * Spec for the cloud-side ESC/POS byte builder (the REAL impl behind the
