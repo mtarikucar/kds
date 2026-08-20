@@ -110,6 +110,12 @@ export enum PlanFeature {
   RESERVATION_SYSTEM = "reservationSystem",
   // Paid module: module_personnel.
   PERSONNEL_MANAGEMENT = "personnelManagement",
+  // Paid module: module_personnel_card_shift (₺4.000 one-time). RFID card
+  // clock-in on TOP of module_personnel — the guard on /personnel/attendance/
+  // card-tap and /personnel/cards/* lists BOTH flags, because a method-level
+  // @RequiresFeature OVERRIDES the class-level one (entitlement.guard.ts:62-66)
+  // rather than adding to it.
+  CARD_SHIFT = "cardShift",
   // Paid: set by any delivery-platform integration product. Which vendors are
   // connected lives in `integration.delivery`, not in this flag.
   DELIVERY_INTEGRATION = "deliveryIntegration",

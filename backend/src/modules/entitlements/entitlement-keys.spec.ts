@@ -31,6 +31,17 @@ describe("entitlement key vocabulary", () => {
     expect(extra).toEqual(["license"]);
   });
 
+  it("carries cardShift on BOTH sides of the pin", () => {
+    // The two implicit assertions above already catch a one-sided add, but
+    // only as a diff of two lists — which reads as "some key is missing".
+    // This one names the key, so the next person to grep `cardShift` finds
+    // the contract instead of inferring it.
+    expect(PlanFeature.CARD_SHIFT).toBe("cardShift");
+    expect(FEATURE_KEYS as readonly string[]).toContain("cardShift");
+    expect(isKnownGrantKey("feature.cardShift")).toBe(true);
+    expect(featureKey("cardShift")).toBe("feature.cardShift");
+  });
+
   it("has no duplicates in any namespace", () => {
     for (const list of [FEATURE_KEYS, LIMIT_KEYS, CREDIT_KINDS]) {
       expect(new Set(list).size).toBe(list.length);

@@ -47,6 +47,14 @@ export const FEATURE_KEYS = [
   "apiAccess",
   "externalDisplay",
   "prioritySupport",
+  /**
+   * RFID staff-card clock-in. Granted ONLY by `module_personnel_card_shift`
+   * (₺4.000 one-time), which itself depends on `module_personnel` — the card
+   * rail writes onto that module's Attendance rows rather than owning any.
+   * requiresLicense: true, so a lapsed licence darkens it like every other
+   * paid module; the ownership row and the card assignments survive.
+   */
+  "cardShift",
   /** Granted as a side effect of buying any delivery-platform integration. */
   "deliveryIntegration",
 ] as const;

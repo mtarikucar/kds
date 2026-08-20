@@ -76,6 +76,15 @@ export class FeatureOverridesDto {
   @IsOptional()
   @IsBoolean()
   aiContentGeneration?: boolean | null;
+
+  // Not optional decoration: ValidationPipe runs with whitelist:true, so a
+  // field that is not declared here is SILENTLY STRIPPED from the body. An
+  // operator toggling Card Shift on a tenant would see the switch move and
+  // the override never arrive.
+  @StringToBoolean()
+  @IsOptional()
+  @IsBoolean()
+  cardShift?: boolean | null;
 }
 
 /**
