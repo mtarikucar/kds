@@ -33,6 +33,7 @@ Personel modülü, ekibinizin **çalışma zamanını** yönetir: kim ne zaman g
 | **Vardiya Şablonları (Shift Templates)** | Tekrar eden vardiyaları tanımlayın (örn. "Sabah 09:00–17:00") |
 | **Çizelge (Schedule)** | Şablonları kişilere/günlere atayın — haftalık plan |
 | **Performans (Performance)** | Personel performans göstergeleri |
+| **Kartlı Vardiya (Card Shift)** | RFID kart ataması — personel başına tek satır, yalnız son 4 hane |
 
 ## Tipik kullanım
 
@@ -46,6 +47,26 @@ Personel modülü, ekibinizin **çalışma zamanını** yönetir: kim ne zaman g
 - **Önce kullanıcıları açın:** Personelin sistemde hesabı (Kullanıcılar ekranından) yoksa vardiya/yoklama izlemek anlamsız kalır — önce rolüyle birlikte kullanıcıyı tanımlayın.
 - **Şablon = tekrar eden iş:** Aynı vardiyayı her hafta elle girmek yerine şablon kurun, çizelgede tek tıkla atayın.
 - **Performansı raporlarla birleştirin:** Raporlar ekranındaki **Personel** sekmesi (aynı `personnelManagement` ile görünür) satışa dayalı performansı gösterir; iki ekranı birlikte okuyun.
+
+## Kart ile giriş-çıkış yapma
+
+`personnelManagement`'a **ek olarak** **Kartlı Vardiya** modülünü
+(`cardShift`, ₺4.000 tek seferlik, lisans ön koşuluyla) gerektirir.
+
+1. **Kartları atayın.** Ekip → Kartlı Vardiya → "Kart ata", ardından kartı
+   odaklanan alana okutun. Ekranda yalnız son dört hane görünür.
+2. **İstasyon ekranını açın.** Sol menü → Kartlı Vardiya (`/card-shift`),
+   okuyucunun takılı olduğu tablet veya PC'de. Ekranı açık bırakın.
+3. **Okutma.** Günün ilk okutması giriş, ikincisi çıkış damgalar; moladayken
+   okutma molayı bitirir. Mola başlatmak uygulama içinden yapılır.
+4. **Tekrarlanan okutmalar.** 10 saniye içindeki ikinci okutma yok sayılır —
+   bazı okuyucular tek okutmada iki kez yazar.
+5. **Tanınmayan kartlar.** Kimseye ait olmayan (veya pasifleştirilmiş bir
+   personele ait) kart "Kart tanınmadı" gösterir. Numara ekranda hiçbir yerde
+   gösterilmez ve log'a yazılmaz.
+
+Bir kartı iptal etmek geçmişteki tüm puantaj kayıtlarını korur — kartla
+damgalandığı bilgisi dahil.
 
 ## İlgili ekranlar
 

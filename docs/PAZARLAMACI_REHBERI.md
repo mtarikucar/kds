@@ -73,6 +73,7 @@ Yukarıdaki 1. bölümdeki listenin tamamı. Ücreti yok, süresi yok, lisans ge
 | Stok & Maliyet Yönetimi | **₺3.900** | Reçete, sayım, satın alma siparişi, fire takibi, tedarikçi, şubeler arası transfer |
 | Rezervasyon Sistemi | **₺990** | Rezervasyon takvimi, müsaitlik hesabı, halka açık online rezervasyon sayfası |
 | Personel Yönetimi | **₺990** | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
+| Kartlı Vardiya (tek seferlik) | **₺4.000** | RFID kart okutarak personel giriş-çıkışı; Personel Yönetimi modülü ön koşuldur, yenileme ücreti yoktur |
 | AI Menü Stüdyosu | **₺1.990** | AI ile ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretimler kontörle harcanır) |
 | API & Webhook Erişimi | **₺2.490** | REST API anahtarları, giden webhook'lar |
 | Partner Ekran API | **₺1.990** | Üçüncü taraf ekranların menüyü göstermesi için ekran bazlı API |
@@ -110,6 +111,12 @@ Kontörler yıllık yenilemeye girmez. Bittiğinde müşteri yenisini alır.
 | Hizmet | Tutar | İçerik |
 |---|---:|---|
 | Yerinde Kurulum & Eğitim | **₺7.500** | Tam gün yerinde kurulum, cihaz devreye alma, personel eğitimi |
+
+### Donanım (tek seferlik, kargolu)
+
+| Donanım | Tutar | İçerik |
+|---|---:|---|
+| RFID Personel Kart Okuyucu (USB HID) + 10 Kart | **₺1.290** | Kartlı Vardiya modülü için masaüstü 13.56 MHz okuyucu ve 10 personel kartı |
 
 ### Tipik sepetler (fiyat konuşmasında kullan)
 

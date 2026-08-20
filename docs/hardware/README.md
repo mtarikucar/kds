@@ -32,6 +32,7 @@ Genelde HummyBox köprüsü arkasında yerel çevre birimi olarak çalışan cih
 - [Para Çekmecesi (Cash Drawer)](./07-para-cekmecesi.md) — AFANDA LB-405K; kendi `Device.kind`'ı olmayan, fiş yazıcısının `cash_drawer` capability'siyle modellenen çekmece (drawer-kick + CashDrawerService sayım/onay akışı).
 - [Barkod / QR Okuyucu (Scanner)](./05-barkod-okuyucu.md) — Honeywell Voyager 1450g ve Zebra DS2208 el tipi USB-HID okuyucular; stok/menü/QR akışlarındaki rolü ve host-üzerinden device-mesh provizyonu.
 - [Arayan Numara Cihazı (Caller ID)](./06-arayan-numara.md) — Cidshow CID602 2-hat Caller ID; analog hattaki FSK/DTMF sinyalini konnektör aracılığıyla HMAC-imzalı webhook ile HummyTummy'ye iletir (caller eklentisiyle kapılı).
+- [RFID Personel Kart Okuyucu (USB HID)](./10-kart-okuyucu.md) — 13.56 MHz Mifare, sürücüsüz HID; Kartlı Vardiya modülüyle çalışır, mali cihaz DEĞİLDİR.
 
 ## 4. Ağ (Network)
 
