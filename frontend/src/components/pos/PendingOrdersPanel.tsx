@@ -12,7 +12,10 @@ import Spinner from '../ui/Spinner';
 import { useTranslation } from 'react-i18next';
 import DeliveryOrderBadge from '../delivery-platforms/DeliveryOrderBadge';
 import DeliveryOrderModerationPanel from '../delivery-platforms/DeliveryOrderModerationPanel';
-import { PLATFORM_DISPLAY } from '../delivery-platforms/platformDisplay';
+import {
+  PLATFORM_DISPLAY,
+  ORDERABLE_PLATFORM_KEYS,
+} from '../delivery-platforms/platformDisplay';
 // Active-window statuses + delivery predicate are shared with the persistent
 // header DeliveryInboxButton (same query key → single cache entry).
 import { DELIVERY_INBOX_ACTIVE_STATUSES, isDeliveryOrder } from './deliveryInbox';
@@ -22,7 +25,7 @@ interface PendingOrdersPanelProps {
   onClose: () => void;
 }
 
-const PLATFORM_FILTERS = ['ALL', ...Object.keys(PLATFORM_DISPLAY)];
+const PLATFORM_FILTERS = ['ALL', ...ORDERABLE_PLATFORM_KEYS];
 
 const STATUS_PILL: Record<string, string> = {
   [OrderStatus.PENDING_APPROVAL]: 'bg-amber-100 text-amber-700',

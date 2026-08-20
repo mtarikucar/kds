@@ -185,7 +185,12 @@
       "GETIR": "Polling-based integration (every 15s)",
       "YEMEKSEPETI": "Webhook-based integration (real-time)",
       "TRENDYOL": "Webhook + polling integration",
-      "MIGROS": "Polling-based integration (every 20s)"
+      "MIGROS": "Polling-based integration (every 20s)",
+      "SEMT": "Semt orders will flow into the POS and the kitchen. Integration coming soon."
+    },
+    "availability": {
+      "comingSoon": "Coming soon · Free",
+      "comingSoonNote": "This platform cannot be connected yet. It will be enabled free of charge when ready."
     },
     "aria": {
       "enablePlatform": "Enable {{name}}",

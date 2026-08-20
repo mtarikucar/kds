@@ -15,7 +15,9 @@ import {
 import { toast } from 'sonner';
 import PlatformStatusBadge from './PlatformStatusBadge';
 import PlatformCredentialsForm from './PlatformCredentialsForm';
+import Badge from '../ui/Badge';
 import type { DeliveryPlatformConfig } from '../../types';
+import { PLATFORM_AVAILABILITY } from '../../types';
 import {
   useUpdatePlatformConfig,
   useCreatePlatformConfig,
@@ -93,6 +95,15 @@ const PLATFORM_INFO: Record<string, PlatformInfo> = {
     color: 'text-green-700',
     bgColor: 'bg-green-50',
   },
+  // Semt has no adapter yet. It gets an entry here — and NOT in
+  // REQUIRED_CREDENTIALS or PLATFORMS_WITH_REAL_SANDBOX — because the card
+  // still renders and `info.bgColor` would otherwise throw.
+  SEMT: {
+    name: 'Semt',
+    platform: 'SEMT',
+    color: 'text-sky-700',
+    bgColor: 'bg-sky-50',
+  },
 };
 
 interface PlatformCardProps {
@@ -103,6 +114,10 @@ interface PlatformCardProps {
 const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   const { t } = useTranslation('settings');
   const info = PLATFORM_INFO[platform];
+  // A coming-soon platform is a shop-window entry, not a connectable one: the
+  // backend answers 400 on POST /delivery-platforms/configs and 503 from the
+  // adapter factory. The UI must not offer an action that can only fail.
+  const comingSoon = PLATFORM_AVAILABILITY[platform] === 'coming_soon';
   const [expanded, setExpanded] = useState(false);
   const [credentials, setCredentials] = useState<Record<string, any>>(
     (config?.credentials as Record<string, any>) || {},
@@ -148,6 +163,7 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   const hasRealSandbox = platformHasRealSandbox(platform);
 
   const handleToggleEnabled = async () => {
+    if (comingSoon) return;
     if (!config) {
       if (!hasCredentials) {
         toast.error(t('onlineOrders.fillCredentials'));
@@ -176,6 +192,7 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   };
 
   const handleSave = async () => {
+    if (comingSoon) return;
     if (!config) {
       await createConfig.mutateAsync({
         platform,
@@ -224,6 +241,7 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
   };
 
   const handleTestConnection = async () => {
+    if (comingSoon) return;
     if (!hasCredentials) {
       toast.error(t('onlineOrders.fillCredentialsFirst'));
       return;
@@ -292,8 +310,14 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
     <div className="border border-slate-200 rounded-xl overflow-hidden">
       {/* Header */}
       <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        className={`flex items-center justify-between p-4 transition-colors ${
+          comingSoon ? '' : 'cursor-pointer hover:bg-slate-50'
+        }`}
+        data-availability={comingSoon ? 'coming_soon' : 'available'}
+        onClick={() => {
+          if (comingSoon) return;
+          setExpanded(!expanded);
+        }}
       >
         <div className="flex items-center gap-3">
           <div
@@ -314,10 +338,20 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
                 lastError={config?.lastError}
                 hasCredentials={hasCredentials}
               />
+              {comingSoon && (
+                <Badge variant="default">
+                  {t('onlineOrders.availability.comingSoon')}
+                </Badge>
+              )}
             </div>
             <p className="text-xs text-slate-500">
               {t(`onlineOrders.platformDescriptions.${platform}`)}
             </p>
+            {comingSoon && (
+              <p className="text-xs text-sky-700">
+                {t('onlineOrders.availability.comingSoonNote')}
+              </p>
+            )}
           </div>
         </div>
 
@@ -328,6 +362,8 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
               e.stopPropagation();
               handleToggleEnabled();
             }}
+            disabled={comingSoon}
+            aria-disabled={comingSoon}
             aria-label={
               config?.isEnabled
                 ? t('onlineOrders.aria.disablePlatform', { name: info.name })
@@ -335,7 +371,7 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
             }
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               config?.isEnabled ? 'bg-primary-600' : 'bg-slate-300'
-            }`}
+            } ${comingSoon ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             <span
               className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -344,11 +380,12 @@ const PlatformCard = ({ platform, config }: PlatformCardProps) => {
             />
           </button>
 
-          {expanded ? (
-            <ChevronUp className="h-4 w-4 text-slate-400" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-slate-400" />
-          )}
+          {!comingSoon &&
+            (expanded ? (
+              <ChevronUp className="h-4 w-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-slate-400" />
+            ))}
         </div>
       </div>
 

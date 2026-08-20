@@ -671,7 +671,7 @@ export interface Order {
   items: OrderItem[];
   orderItems?: OrderItem[];
   payments?: Payment[];
-  source?: string | null; // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS (null = internal/POS)
+  source?: string | null; // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS, SEMT (null = internal/POS)
   externalOrderId?: string | null; // Platform's order ID
   tenantId: string;
   createdAt: string;
@@ -694,7 +694,23 @@ export enum DeliveryPlatform {
   GETIR = 'GETIR',
   TRENDYOL = 'TRENDYOL',
   MIGROS = 'MIGROS',
+  SEMT = 'SEMT',
 }
+
+export type PlatformAvailability = 'available' | 'coming_soon';
+
+// Mirror of backend/src/modules/delivery-platforms/constants/platform.enum.ts.
+// Drift guard: scripts/check-contract-drift.mjs -> "DeliveryPlatform".
+// The API never returns availability — it is not a DTO field (main.ts runs
+// ValidationPipe({ whitelist: true }), so an undeclared field is dropped
+// silently); the UI reads it from this mirror.
+export const PLATFORM_AVAILABILITY: Record<string, PlatformAvailability> = {
+  YEMEKSEPETI: 'available',
+  GETIR: 'available',
+  TRENDYOL: 'available',
+  MIGROS: 'available',
+  SEMT: 'coming_soon',
+};
 
 export interface DeliveryPlatformConfig {
   id: string;

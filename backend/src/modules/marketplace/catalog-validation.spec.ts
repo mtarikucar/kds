@@ -253,15 +253,23 @@ describe("the shipped à-la-carte catalog", () => {
     ]);
   });
 
-  it("lights up the delivery feature flag on every delivery platform", () => {
+  it("ships exactly one delivery product covering all four platforms", () => {
+    // Per-platform pricing was fiction: the route gate is domain-wide
+    // (@RequiresIntegration("delivery") with no provider), so buying ANY one
+    // platform already unlocked all four. One honest ₺2.499 line replaces it.
     const delivery = ALACARTE_CATALOG.filter((p) =>
       p.code.startsWith("delivery_"),
     );
-    expect(delivery.length).toBe(3);
-    for (const p of delivery) {
-      expect(p.grants["feature.deliveryIntegration"]).toBe(true);
-      expect(p.grants["integration.delivery"]).toHaveLength(1);
-    }
+    expect(delivery.map((p) => p.code)).toEqual(["delivery_platforms"]);
+    const bundle = delivery[0];
+    expect(bundle.grants["feature.deliveryIntegration"]).toBe(true);
+    expect(bundle.grants["integration.delivery"]).toEqual([
+      "yemeksepeti",
+      "getir",
+      "trendyol_yemek",
+      "migros",
+    ]);
+    expect(bundle.priceCents).toBe(249_900);
   });
 
   it("does not resurrect a retired code", () => {

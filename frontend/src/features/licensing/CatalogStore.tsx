@@ -27,6 +27,36 @@ const COUNTABLE_KINDS = new Set(['capacity', 'credit']);
 const LICENCE_CODE = 'license_annual';
 
 /**
+ * Semt is in the delivery bundle's future, not in the catalog.
+ *
+ * It has no `marketplace_addons` row, no price and nothing to tick: a
+ * published zero-price row would punch straight through purchase()'s payment
+ * gate (catalog-validation.ts:242-250). So the storefront advertises it as a
+ * static, unbuyable line — no button, no checkbox, no network call.
+ */
+const SemtComingSoonRow = () => {
+  const { t } = useTranslation(['licensing', 'common']);
+  return (
+    <li
+      data-testid="semt-coming-soon"
+      className="flex items-start justify-between gap-4 px-4 py-3"
+    >
+      <div>
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {t('licensing:store.semt.title')}
+        </p>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+          {t('licensing:store.semt.description')}
+        </p>
+      </div>
+      <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200/60 dark:bg-sky-950/40 dark:text-sky-300">
+        {t('licensing:store.semt.badge')}
+      </span>
+    </li>
+  );
+};
+
+/**
  * The à-la-carte storefront, built as a bill rather than a wall of cards.
  *
  * Products are sold individually, and buying them one card at a time meant one
@@ -181,7 +211,17 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
   }
 
   if (grouped.size === 0) {
-    return <p className="text-sm text-gray-500">{t('licensing:store.empty')}</p>;
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-gray-500">{t('licensing:store.empty')}</p>
+        {/* Second render site, and not optional: a tenant whose filtered
+            catalog is empty takes this branch and would otherwise never see
+            that Semt is coming. */}
+        <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
+          <SemtComingSoonRow />
+        </ul>
+      </div>
+    );
   }
 
   return (
@@ -208,6 +248,7 @@ const CatalogStore = ({ focusCode }: { focusCode?: string }) => {
               {t(`licensing:store.kind.${kind}`)}
             </h2>
             <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900">
+              {kind === 'integration' && <SemtComingSoonRow />}
               {grouped.get(kind)!.map((product) => {
                 // Credits and extra branches are bought repeatedly; a module is
                 // owned once, so owning it takes it off the menu.

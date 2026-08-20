@@ -53,6 +53,16 @@ describe('DeliveryTestService', () => {
     expect(orderService.processIncomingOrder).not.toHaveBeenCalled();
   });
 
+  it('rejects a coming-soon platform before touching the config', async () => {
+    // Semt is in the enum but has no adapter; the simulator must refuse it at
+    // the same place it refuses a typo, before findOneInternal is reached.
+    await expect(svc.simulateOrder('t1', 'SEMT')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(configService.findOneInternal).not.toHaveBeenCalled();
+    expect(orderService.processIncomingOrder).not.toHaveBeenCalled();
+  });
+
   it('REFUSES a production-configured platform (sandbox-only guard)', async () => {
     configService.findOneInternal.mockResolvedValue({
       id: 'cfg-1',

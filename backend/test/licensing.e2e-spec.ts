@@ -223,3 +223,95 @@ describe("Licensing gate (HTTP, real DB, real guards)", () => {
     }
   });
 });
+
+/**
+ * The delivery package, end to end.
+ *
+ * Two claims are only checkable here. First, that ONE purchase lights up all
+ * four vendors — the observable proof that Migros needed no SKU of its own,
+ * which is the whole argument for collapsing three products into one. Second,
+ * that Semt is refused at the DTO before any config row can exist, because
+ * the enum now contains it and @IsEnum would have waved it straight through.
+ */
+describe("Delivery bundle (HTTP, real DB, real guards)", () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let tenant: Awaited<ReturnType<typeof seedLiveTenant>>;
+  let token: string;
+
+  beforeAll(async () => {
+    ({ app, prisma } = await bootHttpApp());
+    await resetDb(prisma);
+    tenant = await seedLiveTenant(prisma);
+    await grantLicence(prisma, tenant.tenantId);
+    const bundle = await upsertProduct(prisma, {
+      code: "delivery_platforms",
+      name: "Paket Servis Entegrasyonları",
+      kind: "integration",
+      priceCents: 249_900,
+      grants: {
+        "integration.delivery": [
+          "yemeksepeti",
+          "getir",
+          "trendyol_yemek",
+          "migros",
+        ],
+        "feature.deliveryIntegration": true,
+      },
+      requiresLicense: true,
+    });
+    await ownProduct(prisma, tenant.tenantId, bundle.id);
+    await project(app, tenant.tenantId);
+    token = await loginAs(app, tenant.email, tenant.password);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it("grants all four vendors from the single package", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/entitlements/me")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    // The engine folds integration.* with UNION and returns them sorted.
+    expect(res.body.integrations["integration.delivery"]).toEqual([
+      "getir",
+      "migros",
+      "trendyol_yemek",
+      "yemeksepeti",
+    ]);
+    // EntitlementSet.features is keyed by the FULL prefixed key, not the
+    // bare name — see entitlement.service.spec.ts and entitlement.types.ts.
+    // (The brief's literal snippet used the bare key; that was a bug in the
+    // snippet, not in the product — the flag itself folds to true exactly
+    // as expected.)
+    expect(res.body.features["feature.deliveryIntegration"]).toBe(true);
+  });
+
+  it("opens the delivery settings route", async () => {
+    await request(app.getHttpServer())
+      .get("/api/delivery-platforms/configs")
+      .set("Authorization", `Bearer ${token}`)
+      .set("X-Branch-Id", tenant.branchId)
+      .expect(200);
+  });
+
+  it("refuses a config for the coming-soon platform", async () => {
+    await request(app.getHttpServer())
+      .post("/api/delivery-platforms/configs")
+      .set("Authorization", `Bearer ${token}`)
+      .set("X-Branch-Id", tenant.branchId)
+      .send({ platform: "SEMT", credentials: { apiKey: "x" } })
+      .expect(400);
+  });
+
+  it("accepts a Migros config — the observable proof that the package covers it", async () => {
+    await request(app.getHttpServer())
+      .post("/api/delivery-platforms/configs")
+      .set("Authorization", `Bearer ${token}`)
+      .set("X-Branch-Id", tenant.branchId)
+      .send({ platform: "MIGROS", credentials: { apiKey: "x" } })
+      .expect(201);
+  });
+});

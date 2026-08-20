@@ -706,6 +706,10 @@
         {
           "name": "Migros Yemek",
           "description": "Migros Yemek buyurtmalari ham o'sha hovuzga qo'shiladi va oshxonaga avtomatik uzatiladi."
+        },
+        {
+          "name": "Semt",
+          "description": "Semt integratsiyasi tez orada — tayyor bo'lganda bepul yoqiladi."
         }
       ],
       "note": "Platforma integratsiyalari ixtiyoriy pullik modullar; asosiy tizim (POS, oshxona ekrani, menyu, QR menyu) bepul."

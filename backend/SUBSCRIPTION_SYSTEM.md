@@ -101,7 +101,7 @@ superadmin-editable at runtime — the constants file holds the launch defaults.
 |---|---|
 | `license` | `license_annual` — the singleton prerequisite |
 | `module` | `advanced_reports`, `module_inventory`, `module_reservations`, `module_personnel`, `module_ai_studio`, `api_access`, `module_external_display`, `priority_support` |
-| `integration` | `delivery_yemeksepeti`, `delivery_getir`, `delivery_trendyol_yemek`, `fiscal_efatura`, `fiscal_hugin`, `caller_id_integration`, `sms_integration` |
+| `integration` | `delivery_platforms` (v3.6.8: üç `delivery_*` SKU'sunun yerini aldı), `fiscal_hugin`, `caller_id_integration`, `sms_integration` |
 | `capacity` | `extra_branch` (quantity-based, ceiling 100) |
 | `credit` | `credit_ai_photo_100`, `credit_ai_video_20`, `credit_ai_3d_10`, `credit_sms_500` |
 | `service` | `onsite_install_full` |

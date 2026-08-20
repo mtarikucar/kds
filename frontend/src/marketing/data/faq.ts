@@ -29,7 +29,7 @@ export const FAQ: QA[] = [
   },
   {
     q: "Teslimat platformlarıyla entegre mi?",
-    a: "Evet. Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panelde toplanır; siparişleri ayrı ayrı ekranlarda takip etmek zorunda kalmazsınız. Platform entegrasyonu yıllık ücretli bir kalemdir (lisans ön koşuluyla); katalogda Yemeksepeti, Getir ve Trendyol Yemek ayrı ayrı satılır, Migros Yemek ise ayrı bir ürün olarak satılmaz, delivery entegrasyonuna dahildir. Entegrasyon açmadan da siparişleri POS’a kendiniz girip aynı adisyon akışında toplayabilirsiniz — sipariş yönetimi ücretsiz çekirdeğin parçasıdır.",
+    a: "Evet. Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri tek panelde toplanır; siparişleri ayrı ayrı ekranlarda takip etmek zorunda kalmazsınız. Dört platform tek bir yıllık kalemde satılır: Paket Servis Entegrasyonları (lisans ön koşuluyla) — platform başına ayrı ücret yoktur. Semt entegrasyonu yakında geliyor ve ücretsiz dahil edilecek. Entegrasyon açmadan da siparişleri POS’a kendiniz girip aynı adisyon akışında toplayabilirsiniz — sipariş yönetimi ücretsiz çekirdeğin parçasıdır.",
   },
   {
     q: "e-Fatura kesebiliyor muyum?",

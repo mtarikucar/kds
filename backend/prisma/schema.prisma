@@ -3029,7 +3029,7 @@ model EdgeDevice {
 model DeliveryPlatformConfig {
   id String @id @default(uuid())
 
-  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS, SEMT (SEMT: coming_soon, config yazılamaz)
   isEnabled Boolean @default(false)
 
   // Authentication (all three fields hold AES-256-GCM-encrypted JSON;
@@ -3096,7 +3096,7 @@ model DeliveryPlatformConfig {
 model DeliveryPlatformLog {
   id String @id @default(uuid())
 
-  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS, SEMT (SEMT: coming_soon, config yazılamaz)
   direction String // INBOUND, OUTBOUND
   action    String // e.g., ORDER_RECEIVED, ORDER_ACCEPTED, STATUS_UPDATE, AUTH_REFRESH
 
@@ -3138,7 +3138,7 @@ model DeliveryPlatformLog {
 model MenuItemMapping {
   id String @id @default(uuid())
 
-  platform       String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  platform       String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS, SEMT (SEMT: coming_soon, config yazılamaz)
   externalItemId String // Platform's product/item ID
 
   // Sync data

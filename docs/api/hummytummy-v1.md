@@ -154,8 +154,8 @@ catalog rows:
 ```json
 { "feature.advancedReports": true }                          // advanced_reports (module)
 { "limit.maxBranches": 1, "feature.multiLocation": true }     // extra_branch (capacity)
-{ "integration.delivery": ["yemeksepeti"],
-  "feature.deliveryIntegration": true }                       // delivery_yemeksepeti (integration)
+{ "integration.delivery": ["yemeksepeti","getir","trendyol_yemek","migros"],
+  "feature.deliveryIntegration": true }                       // delivery_platforms (integration)
 ```
 
 Numeric grants are multiplied by `quantity` at projection time. `-1` propagates as unlimited.

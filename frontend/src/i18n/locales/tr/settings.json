@@ -185,7 +185,12 @@
       "GETIR": "Sorgulama (polling) tabanlı entegrasyon (15 sn'de bir)",
       "YEMEKSEPETI": "Webhook tabanlı entegrasyon (gerçek zamanlı)",
       "TRENDYOL": "Webhook + sorgulama (polling) entegrasyonu",
-      "MIGROS": "Sorgulama (polling) tabanlı entegrasyon (20 sn'de bir)"
+      "MIGROS": "Sorgulama (polling) tabanlı entegrasyon (20 sn'de bir)",
+      "SEMT": "Semt siparişleri POS ve mutfağa düşecek. Entegrasyon yakında."
+    },
+    "availability": {
+      "comingSoon": "Yakında · Ücretsiz",
+      "comingSoonNote": "Bu platform henüz bağlanamıyor. Hazır olduğunda ücretsiz açılacak."
     },
     "aria": {
       "enablePlatform": "{{name}} entegrasyonunu etkinleştir",

@@ -86,7 +86,7 @@ const ANSWERS = [
   "Çekirdek süresiz ücretsiz, kredi kartı gerekmez",
   "Dakikalar içinde kurulum, sezgisel arayüz",
   "Her cihazın tarayıcısında, bulutta çalışır",
-  "Yemeksepeti/Getir/Trendyol/Migros tek panelde",
+  "Yemeksepeti/Getir/Trendyol/Migros tek panelde, Semt yakında",
 ];
 
 export default function LandingPage() {

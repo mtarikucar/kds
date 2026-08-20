@@ -42,6 +42,8 @@ function roleListValues(source, constName, file) {
 
 const BACKEND_ROLES = "backend/src/common/constants/roles.enum.ts";
 const BACKEND_ORDER = "backend/src/common/constants/order-status.enum.ts";
+const BACKEND_DELIVERY =
+  "backend/src/modules/delivery-platforms/constants/platform.enum.ts";
 const FRONTEND_TYPES = "frontend/src/types/index.ts";
 const FRONTEND_ROLES = "frontend/src/types/roles.ts";
 
@@ -78,6 +80,17 @@ const CHECKS = [
       enumValues(read(BACKEND_ORDER), "PaymentStatus", BACKEND_ORDER),
     frontend: () =>
       enumValues(read(FRONTEND_TYPES), "PaymentStatus", FRONTEND_TYPES),
+  },
+  {
+    // Hand-mirrored on both sides with no guard until v3.6.8. Adding SEMT to
+    // one side only makes PlatformCard read PLATFORM_INFO[platform] as
+    // undefined and blow up on info.bgColor — a TypeError, in settings, for
+    // every tenant.
+    name: "DeliveryPlatform",
+    backend: () =>
+      enumValues(read(BACKEND_DELIVERY), "DeliveryPlatform", BACKEND_DELIVERY),
+    frontend: () =>
+      enumValues(read(FRONTEND_TYPES), "DeliveryPlatform", FRONTEND_TYPES),
   },
 ];
 

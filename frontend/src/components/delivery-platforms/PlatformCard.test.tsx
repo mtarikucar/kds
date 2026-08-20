@@ -17,6 +17,10 @@ const h = vi.hoisted(() => ({
   // can assert on / reject the update mutation across renders.
   updateMutateAsync: vi.fn(),
   createMutate: vi.fn(),
+  // Hoisted like updateMutateAsync: handleToggleEnabled/handleSave call
+  // createConfig.mutateAsync, and the coming-soon guard has to be provable
+  // against the SAME fn across renders.
+  createMutateAsync: vi.fn(),
   testMutate: vi.fn(),
   toggleMutate: vi.fn(),
   sendTestOrderMutate: vi.fn(),
@@ -36,7 +40,11 @@ vi.mock('../../features/delivery-platforms/deliveryPlatformsApi', () => ({
     mutateAsync: h.updateMutateAsync,
     isPending: false,
   }),
-  useCreatePlatformConfig: () => mutationStub(h.createMutate),
+  useCreatePlatformConfig: () => ({
+    mutate: h.createMutate,
+    mutateAsync: h.createMutateAsync,
+    isPending: false,
+  }),
   useTestPlatformConnection: () => mutationStub(h.testMutate),
   useToggleRestaurant: () => mutationStub(h.toggleMutate),
   useSendTestOrder: () => mutationStub(h.sendTestOrderMutate),
@@ -80,6 +88,8 @@ beforeEach(() => {
   Object.values(h).forEach((fn) =>
     (fn as ReturnType<typeof vi.fn>).mockReset(),
   );
+  h.createMutateAsync.mockResolvedValue(undefined);
+  h.updateMutateAsync.mockResolvedValue(undefined);
 });
 
 function renderExpanded(platform: string, config?: DeliveryPlatformConfig) {
@@ -216,5 +226,73 @@ describe('PlatformCard save-before-test (probe tests STORED credentials)', () =>
 
     await waitFor(() => expect(h.updateMutateAsync).toHaveBeenCalledTimes(1));
     expect(h.testMutate).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlatformCard coming-soon (Semt)', () => {
+  it('shows the free/coming-soon badge and disables connecting', () => {
+    render(<PlatformCard platform="SEMT" />);
+    expect(
+      screen.getByText('onlineOrders.availability.comingSoon'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('onlineOrders.availability.comingSoonNote'),
+    ).toBeInTheDocument();
+    const toggle = screen.getByRole('button', {
+      name: 'onlineOrders.aria.enablePlatform',
+    }) as HTMLButtonElement;
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('does not expand into the credentials form when clicked', () => {
+    render(<PlatformCard platform="SEMT" />);
+    fireEvent.click(screen.getByRole('heading', { level: 3 }));
+    // The credentials form renders the platform's field labels; for a
+    // coming-soon platform the card must stay collapsed entirely.
+    expect(screen.queryByText('onlineOrders.autoAccept')).toBeNull();
+  });
+
+  it('never reaches createConfig, through the toggle or the header', () => {
+    // Two paths, two assertions. `fireEvent.click` on a DISABLED button does
+    // not fire onClick at all, so the toggle line alone proves little — it is
+    // the header click that actually exercises the `if (comingSoon) return;`
+    // guard in handleToggleEnabled/handleSave, because the header is a live
+    // div whose onClick runs and must no-op.
+    render(<PlatformCard platform="SEMT" />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'onlineOrders.aria.enablePlatform' }),
+    );
+    fireEvent.click(screen.getByRole('heading', { level: 3 }));
+    expect(h.createMutateAsync).not.toHaveBeenCalled();
+    expect(h.updateMutateAsync).not.toHaveBeenCalled();
+    expect(h.createMutate).not.toHaveBeenCalled();
+    expect(h.updateMutate).not.toHaveBeenCalled();
+    // And nothing opened that could take credentials.
+    expect(screen.queryByText('onlineOrders.autoAccept')).toBeNull();
+  });
+
+  it('still creates a config for a live platform — the guard is not a blanket off-switch', () => {
+    // Control case. Without it, the assertions above would pass even if the
+    // guard accidentally short-circuited every platform.
+    render(<PlatformCard platform="MIGROS" />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'onlineOrders.aria.enablePlatform' }),
+    );
+    // No credentials yet, so the card asks for them instead of posting — the
+    // point is that it REACHED handleToggleEnabled's body at all.
+    expect(h.toastError).toHaveBeenCalledWith('onlineOrders.fillCredentials');
+  });
+
+  it('marks the header with data-availability for the four live platforms too', () => {
+    const { container, unmount } = render(<PlatformCard platform="SEMT" />);
+    expect(
+      container.querySelector('[data-availability="coming_soon"]'),
+    ).not.toBeNull();
+    unmount();
+    const live = render(<PlatformCard platform="GETIR" />);
+    expect(
+      live.container.querySelector('[data-availability="available"]'),
+    ).not.toBeNull();
   });
 });

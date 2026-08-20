@@ -105,21 +105,19 @@ gün bazında orantılanır (bkz. [Lisans & Ödeme API](/tr/developer/billing-ap
 
 | Kod | Fiyat | Grant | Lisans ön koşulu |
 | --- | --- | --- | --- |
-| `delivery_yemeksepeti` | ₺2.490/yıl | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ |
-| `delivery_getir` | ₺2.490/yıl | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ |
-| `delivery_trendyol_yemek` | ₺2.490/yıl | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ |
+| `delivery_platforms` | ₺2.499/yıl | `integration.delivery` += `yemeksepeti`, `getir`, `trendyol_yemek`, `migros`; `feature.deliveryIntegration` | ✅ |
 | `fiscal_efatura` | — | `integration.fiscal` += `efatura` | **v3.6.7 arşivlendi** — `license_annual` içine alındı |
 | `fiscal_hugin` | ₺2.990/yıl | `integration.fiscal` += `hugin` | ✅ |
 | `caller_id_integration` | ₺1.490/yıl | `integration.caller` += `generic` | ✅ |
 | `sms_integration` | ₺990/yıl | `integration.sms` += `*` | ✅ |
 
 <Callout type="info">
-  Üç `delivery_*` ürünü aynı `integration.delivery` anahtarına yazar ve UNION
-  edilir; yanına aldıkları `feature.deliveryIntegration` bayrağı OR ile
-  katlandığı için ikinci platformu almak bu bayrak açısından idempotenttir.
-  `fiscal_hugin`'in eski `plan:PRO` bağımlılığı **kaldırıldı** — planlar
-  emekliye ayrıldığı için katalog doğrulaması artık `plan:` önekli her
-  bağımlılığı yazma anında reddediyor.
+  Teslimat artık **tek** ürün: `delivery_platforms` `integration.delivery`
+  anahtarına dört vendor id'sini birden yazar. UNION katlaması hâlâ
+  geçerlidir ama artık yalnız `fiscal_*` ailesinde gözlemlenir (lisansın
+  `["efatura"]`'sı ile `fiscal_hugin`'in `["hugin"]`'i birleşir). Teslimat
+  kapısı zaten alan-geneliydi (`@RequiresIntegration("delivery")`, sağlayıcı
+  taşımaz) — tek paket satılanı gerçekte teslim edilenle hizalar.
 </Callout>
 
 ### Kapasite

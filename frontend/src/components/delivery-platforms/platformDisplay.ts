@@ -1,3 +1,5 @@
+import { PLATFORM_AVAILABILITY } from '../../types';
+
 /**
  * Single source of truth for delivery-platform branding (label + pill colours)
  * shared across the KDS card, the admin delivery-orders queue and the POS
@@ -35,6 +37,11 @@ export const PLATFORM_DISPLAY: Record<string, PlatformDisplay> = {
     className: 'bg-green-100 text-green-700 ring-1 ring-green-200',
     kioskClassName: 'bg-green-500/20 text-green-200 ring-1 ring-green-500/40',
   },
+  SEMT: {
+    label: 'Semt',
+    className: 'bg-sky-100 text-sky-700 ring-1 ring-sky-200',
+    kioskClassName: 'bg-sky-500/20 text-sky-200 ring-1 ring-sky-500/40',
+  },
 };
 
 export function getPlatformDisplay(source: string): PlatformDisplay {
@@ -46,3 +53,16 @@ export function getPlatformDisplay(source: string): PlatformDisplay {
     }
   );
 }
+
+/**
+ * Platforms that can actually produce an order today — the source of the POS
+ * delivery-inbox filter chips.
+ *
+ * A `coming_soon` platform has no adapter and no webhook route, so a chip for
+ * it would be permanently empty. It still keeps its PLATFORM_DISPLAY entry so
+ * that the day its orders start arriving they render branded rather than
+ * falling back to slate.
+ */
+export const ORDERABLE_PLATFORM_KEYS: string[] = Object.keys(
+  PLATFORM_DISPLAY,
+).filter((p) => PLATFORM_AVAILABILITY[p] !== 'coming_soon');

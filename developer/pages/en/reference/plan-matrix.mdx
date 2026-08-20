@@ -106,20 +106,20 @@ account anniversary — see the
 
 | Code | Price | Grants | Requires licence |
 | --- | --- | --- | --- |
-| `delivery_yemeksepeti` | ₺2,490/yr | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ |
-| `delivery_getir` | ₺2,490/yr | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ |
-| `delivery_trendyol_yemek` | ₺2,490/yr | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ |
+| `delivery_platforms` | ₺2,499/yr | `integration.delivery` += `yemeksepeti`, `getir`, `trendyol_yemek`, `migros`; `feature.deliveryIntegration` | ✅ |
 | `fiscal_efatura` | — | `integration.fiscal` += `efatura` | **archived v3.6.7** — folded into `license_annual` |
 | `fiscal_hugin` | ₺2,990/yr | `integration.fiscal` += `hugin` | ✅ |
 | `caller_id_integration` | ₺1,490/yr | `integration.caller` += `generic` | ✅ |
 | `sms_integration` | ₺990/yr | `integration.sms` += `*` | ✅ |
 
 <Callout type="info">
-  All three `delivery_*` products write to the same `integration.delivery` key
-  and are union-ed; the `feature.deliveryIntegration` flag they carry alongside
-  folds with OR, so buying a second platform is idempotent for that flag.
-  `fiscal_hugin`'s old `plan:PRO` dependency is **gone** — plans are retired, so
-  catalog validation now rejects any `plan:`-prefixed dep at write time.
+  Delivery is now a **single** product: `delivery_platforms` writes all four
+  vendor ids into the `integration.delivery` key at once. UNION folding is
+  still real, but it's now only observed in the `fiscal_*` family (the
+  licence's `["efatura"]` merges with `fiscal_hugin`'s `["hugin"]`). The
+  delivery gate was already domain-wide (`@RequiresIntegration("delivery")`,
+  provider-agnostic) — the single package just aligns what's sold with what's
+  actually delivered.
 </Callout>
 
 ### Capacity

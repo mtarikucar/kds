@@ -40,8 +40,20 @@ const DOWN_SQL = join(
  * changes a catalog price or retires a product.
  */
 const FOLLOW_UP_SQL = [
+  // ALWAYS ordered by migration folder stamp. Insert, never append: the fold
+  // lets a later row overwrite an earlier one, so an out-of-order entry makes
+  // the composed state disagree with what `prisma migrate deploy` produces.
   "20260820120000_reprice_licence_and_stock/migration.sql",
+  "20260820140000_delivery_platforms_bundle/migration.sql",
 ].map((rel) => join(__dirname, "../../../prisma/migrations", rel));
+
+// Addressed BY NAME, never by index. `FOLLOW_UP_SQL[1]` points at a different
+// migration the moment someone inserts one above it, and the assertions below
+// would then silently verify the wrong file.
+const BUNDLE_UP = FOLLOW_UP_SQL.find((f) =>
+  f.includes("delivery_platforms_bundle"),
+)!;
+const BUNDLE_DOWN = BUNDLE_UP.replace("migration.sql", "down.sql");
 
 interface ParsedRow {
   code: string;
@@ -134,8 +146,14 @@ describe("à-la-carte catalog migration", () => {
   );
   const archivedLater = new Set(followUps.flatMap(parseArchived));
 
+  // Codes a follow-up migration INSERTS (not just reprices/archives). Before
+  // v3.6.8 every catalog row was born in the base migration, so the fold only
+  // needed reprice + archive; `delivery_platforms` is the first row introduced
+  // by a follow-up.
+  const insertedLater = followUps.flatMap(parseUpserts);
+
   /** What a fully migrated database actually holds, as sellable rows. */
-  const effective = parsed
+  const effective = [...parsed, ...insertedLater]
     .filter((r) => !archivedLater.has(r.code))
     .map((r) => ({ ...r, priceCents: reprices.get(r.code) ?? r.priceCents }));
 
@@ -268,7 +286,13 @@ describe("à-la-carte catalog migration", () => {
       "priority_support",
       "onsite_install_full",
     ]);
-    const introduced = ALACARTE_CATALOG.map((p) => p.code)
+    // The codes the BASE migration actually created. Deriving them from the
+    // catalog constant is wrong: every code a FOLLOW-UP migration inserts
+    // (delivery_platforms today, the card-shift row next) would join this list
+    // and then be looked for in P1's down — which never created it, so it can
+    // never delete it. `parsed` is the base file's own INSERTs.
+    const introduced = parsed
+      .map((r) => r.code)
       .filter((c) => !preExisting.has(c))
       .sort();
     const deleteBlock = downOnly.slice(downOnly.indexOf("DELETE FROM"));
@@ -279,5 +303,81 @@ describe("à-la-carte catalog migration", () => {
     for (const code of preExisting) {
       expect(deleteBlock).not.toContain(`'${code}'`);
     }
+  });
+
+  it("keeps every follow-up migration on snake_case table names", () => {
+    // A hand-written migration that says "TenantAddOn" takes 42P01 in
+    // production and passes every test that runs against a db-push database.
+    for (const f of followUps) {
+      expect(executableSql(f)).not.toMatch(
+        /"MarketplaceAddOn"|"TenantAddOn"|"Tenant"|"RenewalCycle"|"CheckoutIntent"|"AuditLog"/,
+      );
+    }
+  });
+
+  it("moves delivery ownership instead of stranding it at renewal", () => {
+    // Archiving alone keeps the grant (the projector never reads the catalog
+    // row's status) but silently drops the line from the renewal invoice:
+    // RenewalCycleService builds the cart from owned codes, QuoteService drops
+    // an unpublished row with "addon_not_purchasable", the sweeper expires the
+    // ownership row, and addon-purchasability then BLOCKS buying the package
+    // with ADDON_ALREADY_GRANTED. So ownership has to move.
+    const exec = executableSql(readFileSync(BUNDLE_UP, "utf8"));
+    expect(exec).toMatch(/UPDATE "tenant_addons"[\s\S]*SET "addOnId"/);
+    expect(exec).toContain("'migratedFrom'");
+    expect(exec).toMatch(/DELETE FROM "renewal_cycles"[\s\S]*'open'/);
+  });
+
+  it("guards the bundle up against in-flight checkout intents", () => {
+    // A paid-but-unprovisioned intent names an archived SKU; settlement
+    // re-quotes, the row drops out, the 1-kuruş tolerance blows and provision
+    // is REFUSED with the card already charged (checkout.service.ts:233-243).
+    // There is no automatic refund rail, so the migration must refuse to run.
+    const exec = executableSql(readFileSync(BUNDLE_UP, "utf8"));
+    expect(exec).toMatch(/"checkout_intents"[\s\S]*RAISE EXCEPTION/);
+  });
+
+  it("only deletes renewal cycles the 06:00 generator can rebuild", () => {
+    // nextAnniversary() (anniversary.ts:114-121) jumps to NEXT year once today
+    // >= the anniversary, so deleting an already-due open cycle destroys both
+    // the invoice and the only trigger lapseUnpaidCycles has.
+    const exec = executableSql(readFileSync(BUNDLE_UP, "utf8"));
+    const del = exec.slice(exec.indexOf('DELETE FROM "renewal_cycles"'));
+    expect(del).toMatch(/"anniversaryAt"\s*>\s*NOW\(\)/);
+  });
+
+  it("never deletes a marketplace_addons row from the bundle up", () => {
+    expect(executableSql(readFileSync(BUNDLE_UP, "utf8"))).not.toMatch(
+      /DELETE FROM "marketplace_addons"/,
+    );
+  });
+
+  it("guards the bundle down's delete with a tenant_addons NOT EXISTS", () => {
+    const down = executableSql(readFileSync(BUNDLE_DOWN, "utf8"));
+    expect(down).toMatch(
+      /DELETE FROM "marketplace_addons"[\s\S]*NOT EXISTS[\s\S]*"tenant_addons"/,
+    );
+  });
+
+  it("restores the archived catalog rows to their stamped prior status", () => {
+    // The down must NOT write 'published' unconditionally: the up only
+    // archives rows that WERE published, so a row an operator archived before
+    // the migration must not come back on sale. The stamp lives in audit_logs
+    // because marketplace_addons has no free-form meta column.
+    const up = executableSql(readFileSync(BUNDLE_UP, "utf8"));
+    const down = executableSql(readFileSync(BUNDLE_DOWN, "utf8"));
+    expect(up).toMatch(/INSERT INTO "audit_logs"[\s\S]*migratedPriorStatus/);
+    expect(down).toContain("migratedPriorStatus");
+    expect(down).not.toMatch(/SET "status" = 'published'/);
+  });
+
+  it("restores the dedupe timestamps instead of nulling them", () => {
+    // A faithful inverse writes the pre-migration cancelledAt/endedAt back
+    // from the stamp. The negative lookahead matters: NULLIF(...) legitimately
+    // starts with NULL, and a bare /= NULL/ would flag the correct code.
+    const down = executableSql(readFileSync(BUNDLE_DOWN, "utf8"));
+    expect(down).toContain("migratedPriorCancelledAt");
+    expect(down).toContain("migratedPriorEndedAt");
+    expect(down).not.toMatch(/"cancelledAt"\s*=\s*NULL(?![A-Z])/);
   });
 });

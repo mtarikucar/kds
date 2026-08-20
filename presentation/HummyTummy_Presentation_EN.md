@@ -573,9 +573,7 @@ Every paid item is annual unless marked otherwise, and every module requires the
 
 | Integration | Price |
 |---|---:|
-| Yemeksepeti | ₺2.490/year |
-| Getir | ₺2.490/year |
-| Trendyol Yemek | ₺2.490/year |
+| Delivery Platforms (Yemeksepeti, Getir, Trendyol Yemek, Migros Yemek) | ₺2.499/year |
 | Fiscal printer / ÖKC (Hugin) | ₺2.990/year |
 | Caller-ID | ₺1.490/year |
 | SMS | ₺990/year |
@@ -637,10 +635,9 @@ Bought mid-year, each module is prorated to the anniversary, so the first invoic
 |---|---:|
 | Maintenance, Support & Updates | ₺4.900 |
 | Inventory & Cost Management | ₺3.900 |
-| Yemeksepeti | ₺2.490 |
-| Getir | ₺2.490 |
+| Delivery Platforms (all four) | ₺2.499 |
 | Advanced Reports & Analytics | ₺1.290 |
-| **Total, first full year** | **₺15.070** |
+| **Total, first full year** | **₺12.589** |
 
 ### A three-branch operation
 
@@ -701,10 +698,10 @@ The configurations below describe what different kinds of venue actually switch 
 **What they turn on:** free core + licence + the delivery platforms actually used.
 
 - Yemeksepeti, Getir and/or Trendyol Yemek orders land straight in the POS and the kitchen
-- Each platform is a separate ₺2.490/year integration — buy only the ones you sell on
+- All four platforms come in one ₺2.499/year package
 - Caller-ID (₺1.490/year) recognises a phone customer and opens the order in one click
 
-**Annual cost:** ₺4.900 maintenance & support + ₺2.490 per platform.
+**Annual cost:** ₺4.900 maintenance & support + ₺2.499 for all delivery platforms.
 
 ---
 
@@ -824,7 +821,7 @@ Yes, and it is not a trial. POS, kitchen display, menu, tables and floor plan, Q
 There is no trial period, because there is nothing to trial into. The core does not expire. If you want to look before registering, there is a shared demo restaurant you can open without an account.
 
 ### How much do the paid parts cost?
-Maintenance, Support & Updates is ₺4.900/year and is the prerequisite for any paid module; priority support and e-invoice filing are inside it. Modules run from ₺990 to ₺2.490/year, delivery-platform integrations are ₺2.490/year each, an extra branch is ₺3.990/year, credit packs are one-time from ₺490, and on-site installation and training is a one-time ₺7.500. Every price includes VAT. The full catalogue is in the Pricing section above.
+Maintenance, Support & Updates is ₺4.900/year and is the prerequisite for any paid module; priority support and e-invoice filing are inside it. Modules run from ₺990 to ₺2.490/year, the delivery-platform package is ₺2.499/year for all four, an extra branch is ₺3.990/year, credit packs are one-time from ₺490, and on-site installation and training is a one-time ₺7.500. Every price includes VAT. The full catalogue is in the Pricing section above.
 
 ### What are the payment methods?
 Card payment through PayTR. No card is stored and nothing is charged automatically.

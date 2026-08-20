@@ -706,6 +706,10 @@
         {
           "name": "Migros Yemek",
           "description": "Migros Yemek siparişleri de aynı havuzda birleşir, mutfağa otomatik iletilir."
+        },
+        {
+          "name": "Semt",
+          "description": "Semt entegrasyonu yakında — hazır olduğunda ücretsiz açılacak."
         }
       ],
       "note": "Platform entegrasyonları isteğe bağlı ücretli modüllerdir; çekirdek sistem (POS, mutfak ekranı, menü, QR menü) ücretsizdir."

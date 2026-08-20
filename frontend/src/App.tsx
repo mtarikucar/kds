@@ -733,8 +733,8 @@ function App() {
                     integration={{ domain: "delivery" }}
                     mode="any"
                     fallback={
-                      /* Üç platform modülünden herhangi biri bu ekranı açar;
-                         fiyat/isim en ucuz teklife göre çözülür. */
+                      /* Tek `delivery_platforms` paketi bu ekranı açar;
+                         fiyat/isim tek satırdan çözülür. */
                       <UpsellCard featureKey="deliveryIntegration" />
                     }
                   >
