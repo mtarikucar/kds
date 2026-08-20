@@ -3,7 +3,21 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { CatalogService } from "../catalog/catalog.service";
 import { AddOnCatalogService } from "../marketplace/addon-catalog.service";
 import { LicensingService } from "../licensing/licensing.service";
-import { Cart, CartQuote, PricedLine, QuoteWarning } from "./checkout.types";
+import {
+  Cart,
+  CartItemService,
+  CartQuote,
+  PricedLine,
+  Print3dLineSnapshot,
+  QuoteWarning,
+} from "./checkout.types";
+import {
+  PRINT3D_BASE_SKU,
+  PRINT3D_ITEM_SKU,
+  PRINT3D_MAX_ITEMS,
+  PRINT3D_MIN_ITEMS,
+  PRINT3D_SERVICE_TYPE,
+} from "../print3d/print3d.const";
 
 /**
  * Pure-ish pricing engine. Given a Cart, returns line-by-line pricing plus a
@@ -74,6 +88,10 @@ export class QuoteService {
     // that DEFINES the anniversary, so every line must be priced against one
     // resolved anchor.
     const licensing = await this.licensing.loadContext(tenantId, now);
+
+    // v3.7.0 — 3D baskı seçimi TEK SEFERDE, satırlar fiyatlanmadan ÖNCE
+    // çözülür: adet sunucu-otoriterdir ve çapraz-kiracı id burada durdurulur.
+    const print3d = await this.resolvePrint3dSelection(cart, tenantId);
 
     for (const item of cart.items) {
       const qty = Math.max(1, "qty" in item && item.qty ? item.qty : 1);
@@ -287,13 +305,24 @@ export class QuoteService {
           continue;
         }
         currency = resolved.currency;
+        // Adet SUNUCU-OTORİTER. print3d_item için istemcinin qty'si YOK
+        // SAYILIR ve seçilen ürün sayısından türetilir; print3d_base her
+        // zaman 1'dir. İstemci qty'sine güvenmek 50 figürü ₺50'ye satar.
+        const isPrint3d =
+          (resolved.serviceMeta as { serviceType?: string } | null | undefined)
+            ?.serviceType === PRINT3D_SERVICE_TYPE;
+        const effectiveQty = !isPrint3d
+          ? qty
+          : item.code === PRINT3D_ITEM_SKU
+            ? (print3d?.productIds.length ?? 0)
+            : 1;
         lines.push({
           type: "service",
           code: item.code,
           name: resolved.name,
-          qty,
+          qty: effectiveQty,
           unitCents: resolved.priceCents,
-          subtotalCents: resolved.priceCents * qty,
+          subtotalCents: resolved.priceCents * effectiveQty,
           cadence: "oneTime",
           meta: {
             branchId: item.branchId,
@@ -305,9 +334,40 @@ export class QuoteService {
             saleMode: resolved.saleMode,
             preferredDates: item.preferredDates,
             notes: item.notes,
+            ...(isPrint3d && item.code === PRINT3D_ITEM_SKU
+              ? {
+                  print3dProductIds: print3d!.productIds,
+                  print3dSnapshots: print3d!.snapshots,
+                }
+              : {}),
           },
         });
       }
+    }
+
+    // print3d taban/kalem AYRILAMAZ. Bu kontrol döngüden SONRA, ÜRETİLMİŞ
+    // SATIRLAR üzerinde çalışır; böylece hem "istemci satırı göndermedi" hem
+    // de "satır bir katalog uyarısıyla düşürüldü" (service_not_purchasable /
+    // service_not_directly_purchasable / unknown_service) durumlarını yakalar.
+    // Düşürülen taban satırı = alıcı ürün başına ₺50 ödeyip hizmeti almıyor;
+    // düşürülen kalem satırı = ürünsüz ₺1.500.
+    //
+    // `some` DEĞİL, SAYIM: sepette tekillik kısıtı yok. baseCount > 1 iki kez
+    // ₺1.500 tahsil eder. (Çift KALEM satırını resolvePrint3dSelection daha
+    // döngüden önce PRINT3D_DUPLICATE_LINE ile keser; taban satırının
+    // productIds'i olmadığı için çözücüye hiç uğramaz — iki kapı birbirinin
+    // yedeği değil, tamamlayıcısıdır.)
+    const print3dBaseCount = lines.filter(
+      (l) => l.code === PRINT3D_BASE_SKU,
+    ).length;
+    const print3dItemCount = lines.filter(
+      (l) => l.code === PRINT3D_ITEM_SKU,
+    ).length;
+    if (print3dBaseCount !== print3dItemCount || print3dBaseCount > 1) {
+      throw new BadRequestException({
+        code: "PRINT3D_INCOMPLETE_CART",
+        message: "3D baskı siparişi eksik; lütfen sihirbazı yeniden başlatın.",
+      });
     }
 
     // Line prices are KDV-INCLUSIVE (gross) — see billing/kdv.helper. The tax is
@@ -346,6 +406,106 @@ export class QuoteService {
       totalCents: grossLines + shippingCents,
       warnings,
       isPureRecurring: lines.every((l) => l.type === "addon"),
+    };
+  }
+
+  /**
+   * 3D baskı seçimini TEK SEFERDE çözer: adet sunucu-otoriterdir ve ürünlerin
+   * kiracıya ait olduğu satır fiyatlanmadan ÖNCE doğrulanır.
+   *
+   * Sepette bir print3d_item satırı yoksa null döner — eşleşme kontrolü
+   * döngüden sonra ayrıca çalışır.
+   */
+  private async resolvePrint3dSelection(
+    cart: Cart,
+    tenantId: string,
+  ): Promise<{
+    productIds: string[];
+    snapshots: Print3dLineSnapshot[];
+  } | null> {
+    // TAM SAYIM, `find` DEĞİL. CartDto.items yalnızca ArrayMinSize(1)/
+    // ArrayMaxSize(50) taşır — TEKİLLİK KISITI YOK. `find` kullanılsaydı iki
+    // print3d_item satırı gönderen bir istemci İKİSİNİ de ilk satırın
+    // productIds.length'iyle fiyatlatır, provizyon ise YALNIZ BİRİNİ basardı:
+    // alıcı 2N figür öder, N alır.
+    const itemLines = cart.items.filter(
+      (i) => i.type === "service" && i.code === PRINT3D_ITEM_SKU,
+    ) as CartItemService[];
+    if (itemLines.length === 0) return null;
+    if (itemLines.length > 1) {
+      throw new BadRequestException({
+        code: "PRINT3D_DUPLICATE_LINE",
+        message: "3D baskı siparişi eksik; lütfen sihirbazı yeniden başlatın.",
+      });
+    }
+    const itemLine = itemLines[0];
+
+    // Tekilleştirme BURADA yapılır. @@unique([jobId, productId]) yalnızca
+    // ikincil bir kemerdir: productId nullable + SetNull ve Postgres UNIQUE
+    // indeksinde NULL'lar ayrı sayılır, yani snapshot'ı alınmış ürünler
+    // silindiğinde indeks hiçbir şey zorlamaz. Belde tutan bu Set'tir.
+    const ids = [...new Set(itemLine.productIds ?? [])];
+    if (ids.length < PRINT3D_MIN_ITEMS) {
+      throw new BadRequestException({
+        code: "PRINT3D_NO_PRODUCTS",
+        message: "En az bir menü ürünü seçmelisiniz.",
+      });
+    }
+    if (ids.length > PRINT3D_MAX_ITEMS) {
+      throw new BadRequestException({
+        code: "PRINT3D_TOO_MANY_PRODUCTS",
+        message: `En fazla ${PRINT3D_MAX_ITEMS} ürün seçebilirsiniz.`,
+      });
+    }
+
+    const rows = await this.prisma.product.findMany({
+      where: { id: { in: ids }, tenantId },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        model3dUrl: true,
+        productImages: {
+          select: { image: { select: { url: true } } },
+          orderBy: { order: "asc" },
+          take: 1,
+        },
+      },
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const missing = ids.filter((id) => !byId.has(id));
+
+    if (missing.length > 0) {
+      // "Eksik" iki farklı olgu olabilir ve MUAMELELERİ ZITTIR:
+      //   a) satır BAŞKA bir kiracıya ait -> güvenlik ihlali, HER ZAMAN reddet;
+      //   b) satır hiç yok (silinmiş)     -> yerleşim anındaki yeniden
+      //      fiyatlama sırasında olabilir. Burada FIRLATMAK "kart çekildi,
+      //      hiçbir şey sağlanmadı" demektir; fiyat zaten ids.length'ten
+      //      türediği için tutar DEĞİŞMEZ. Kaydı bozulmuş snapshot'la sürdür.
+      const foreign = await this.prisma.product.findMany({
+        where: { id: { in: missing } },
+        select: { id: true },
+      });
+      if (foreign.length > 0) {
+        throw new BadRequestException({
+          code: "PRINT3D_FOREIGN_PRODUCT",
+          message: "Seçilen ürünlerden biri bu restorana ait değil.",
+        });
+      }
+    }
+
+    return {
+      productIds: ids,
+      snapshots: ids.map((id, i) => {
+        const r = byId.get(id);
+        return {
+          productId: r ? r.id : null,
+          name: r?.name ?? "Silinmiş ürün",
+          imageUrl: r?.productImages?.[0]?.image?.url ?? r?.image ?? null,
+          model3dUrl: r?.model3dUrl ?? null,
+          position: i,
+        };
+      }),
     };
   }
 }
