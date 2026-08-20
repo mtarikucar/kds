@@ -29,6 +29,12 @@ export interface TenantSettings {
   /** Turkish tax identifier (Vergi No / TC Kimlik No) — required for
    *  KDV-compliant invoices. */
   taxId?: string;
+  /** DERIVED from the country profile (backend/src/modules/tenants/tenants.service.ts),
+   *  never a stored column — the tenant's OWN allowed tax band, e.g. TR's
+   *  [0, 1, 10, 20] or UZ's [0, 6, 12]. See useCountryProfile(). */
+  taxRates?: number[];
+  /** DERIVED — the country profile's own default rate (TR: 10, UZ: 12). */
+  defaultTaxRate?: number;
 }
 
 export interface UpdateTenantSettingsDto {

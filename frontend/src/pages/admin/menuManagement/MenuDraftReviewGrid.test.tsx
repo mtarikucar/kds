@@ -1,8 +1,19 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import MenuDraftReviewGrid from "./MenuDraftReviewGrid";
 import { useMenuDraft } from "./useMenuDraft";
 import { renderHook, act } from "@testing-library/react";
+
+const h = vi.hoisted(() => ({
+  countryProfile: { countryCode: "TR", taxRates: [0, 1, 10, 20], defaultTaxRate: 10 },
+}));
+
+// The review grid's KDV/QQS <select> must offer the TENANT'S OWN band, not
+// a hardcoded Turkish one — a UZ operator reviewing an imported draft could
+// otherwise never set the 12% QQS row the backend now accepts.
+vi.mock("../../../hooks/useCountryProfile", () => ({
+  useCountryProfile: () => h.countryProfile,
+}));
 
 // Interpolates {{var}} against whichever argument carries the values —
 // this codebase calls t() both as t(key, optionsWithDefaultValue) and as
@@ -211,6 +222,10 @@ describe("useMenuDraft", () => {
 });
 
 describe("MenuDraftReviewGrid", () => {
+  beforeEach(() => {
+    h.countryProfile = { countryCode: "TR", taxRates: [0, 1, 10, 20], defaultTaxRate: 10 };
+  });
+
   const controls = {
     draft: {
       categories: [
@@ -255,6 +270,30 @@ describe("MenuDraftReviewGrid", () => {
     render(<MenuDraftReviewGrid controls={controls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
     expect(screen.getByTestId("description-0-0")).not.toBeDisabled();
     expect(screen.getByTestId("tax-rate-0-0")).not.toBeDisabled();
+  });
+
+  describe("taxRate <select> is country-scoped, not a hardcoded Turkish list", () => {
+    it("offers exactly the Turkish band for a TR tenant", () => {
+      h.countryProfile = { countryCode: "TR", taxRates: [0, 1, 10, 20], defaultTaxRate: 10 };
+      render(<MenuDraftReviewGrid controls={controls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
+      const select = screen.getByTestId("tax-rate-0-0");
+      const values = within(select)
+        .getAllByRole("option")
+        .map((o) => (o as HTMLOptionElement).value);
+      expect(values).toEqual(["0", "1", "10", "20"]);
+    });
+
+    it("offers UZ's OWN band (0/6/12) for a UZ tenant — 12% QQS was unreachable before", () => {
+      h.countryProfile = { countryCode: "UZ", taxRates: [0, 6, 12], defaultTaxRate: 12 };
+      render(<MenuDraftReviewGrid controls={controls as any} onCommit={vi.fn()} onCancel={vi.fn()} isCommitting={false} />);
+      const select = screen.getByTestId("tax-rate-0-0");
+      const values = within(select)
+        .getAllByRole("option")
+        .map((o) => (o as HTMLOptionElement).value);
+      expect(values).toEqual(["0", "6", "12"]);
+      // Turkey's 20 must NOT be offered to a UZ tenant.
+      expect(values).not.toContain("20");
+    });
   });
 
   const updatePriceControls = {

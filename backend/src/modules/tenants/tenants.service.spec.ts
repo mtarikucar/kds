@@ -242,6 +242,43 @@ describe('TenantsService.findSettings / findAllPublic', () => {
     );
   });
 
+  /**
+   * The product editor / menu-import review grid need the tenant's ACTUAL
+   * allowed tax band to offer as <option>s, not a hardcoded Turkish one —
+   * otherwise a UZ operator can enter 12% via the API (backend validator)
+   * but never see it as a choice in the UI. Derived from the country
+   * profile, not a new column.
+   */
+  it('findSettings adds taxRates + defaultTaxRate DERIVED from the TR profile', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'TR',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 1, 10, 20]);
+    expect(settings.defaultTaxRate).toBe(10);
+  });
+
+  it("findSettings adds the UZ tenant's OWN band (0/6/12), not Turkey's", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: 'UZ',
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 6, 12]);
+    expect(settings.defaultTaxRate).toBe(12);
+  });
+
+  it('findSettings falls back to the TR band when countryCode is missing (legacy row)', async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      id: 't-1',
+      countryCode: null,
+    });
+    const settings = await svc.findSettings('t-1');
+    expect(settings.taxRates).toEqual([0, 1, 10, 20]);
+    expect(settings.defaultTaxRate).toBe(10);
+  });
+
   it('findAllPublic only returns ACTIVE tenants ordered by name', async () => {
     (prisma.tenant.findMany as any).mockResolvedValue([]);
     await svc.findAllPublic();

@@ -45,16 +45,17 @@ export class CountryService {
   constructor(private readonly prisma: PrismaService) {}
 
   forCode(code: string | null | undefined): CountryProfile {
-    const profile = code
-      ? COUNTRY_PROFILES[code as keyof typeof COUNTRY_PROFILES]
-      : undefined;
-    if (!profile) {
-      if (code) {
-        this.logger.warn(
-          `Unknown countryCode "${code}" — using ${DEFAULT_COUNTRY}`,
-        );
-      }
-      return COUNTRY_PROFILES[DEFAULT_COUNTRY];
+    // Delegates the actual fallback DECISION to resolveCountryProfile() —
+    // this method's only remaining job is the warning log, decided by
+    // comparing the input to what came back rather than re-indexing
+    // COUNTRY_PROFILES itself (that would just be a second copy of the
+    // same fallback this refactor exists to remove). Before this, forCode()
+    // carried its own independent "known code ?? TR" ternary.
+    const profile = resolveCountryProfile(code);
+    if (code && profile.code !== code) {
+      this.logger.warn(
+        `Unknown countryCode "${code}" — using ${DEFAULT_COUNTRY}`,
+      );
     }
     return profile;
   }

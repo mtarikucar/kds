@@ -14,6 +14,7 @@ import {
   isSubdomainQuarantined,
   reserveSubdomain,
 } from "../../common/helpers/subdomain.helper";
+import { resolveCountryProfile } from "../../common/country/country.service";
 
 const SETTINGS_SELECT = {
   id: true,
@@ -110,7 +111,17 @@ export class TenantsService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
-    return tenant;
+    // DERIVED, not stored — the product editor and the menu-import review
+    // grid need the tenant's ACTUAL allowed tax band to offer as <option>s,
+    // not a hardcoded Turkish one. Nothing new is written to the Tenant
+    // row; COUNTRY_PROFILES (via resolveCountryProfile) stays the single
+    // source of truth, mirroring @IsCountryTaxRate on the backend DTOs.
+    const profile = resolveCountryProfile(tenant.countryCode);
+    return {
+      ...tenant,
+      taxRates: profile.taxRates,
+      defaultTaxRate: profile.defaultTaxRate,
+    };
   }
 
   async updateSettings(

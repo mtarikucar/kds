@@ -37,6 +37,7 @@ import {
   type ProductFormData,
 } from "./menuManagement/menuSchemas";
 import { getImageUrl } from "./menuManagement/imageUrl";
+import { useCountryProfile } from "../../hooks/useCountryProfile";
 import type { Product, ProductImage, ComboGroupInput } from "../../types";
 
 // ISO <-> <input type="datetime-local"> (local-time) conversion for campaign
@@ -116,6 +117,10 @@ export default function ProductEditorPage({
   const { data: categories } = useCategories();
   const { data: fetchedProduct } = useProduct(routeProductId ?? "");
   const { data: allProducts } = useProducts();
+  // Country-scoped, not a fixed Turkish list — see country-tax-rate.validator.ts
+  // on the backend, which this dropdown mirrors. Falls back to the TR band
+  // while settings are loading (today's existing behaviour).
+  const { taxRates, defaultTaxRate } = useCountryProfile();
   const { mutateAsync: createProduct, isPending: isCreating } =
     useCreateProduct();
   const { mutateAsync: updateProduct, isPending: isUpdating } =
@@ -139,7 +144,7 @@ export default function ProductEditorPage({
     defaultValues: {
       isAvailable: true,
       stockTracked: false,
-      taxRate: 10,
+      taxRate: defaultTaxRate,
       price: 0,
       categoryId: defaultCategoryId ?? searchParams.get("categoryId") ?? "",
     },
@@ -198,7 +203,7 @@ export default function ProductEditorPage({
       imageIds: imgs.map((img) => img.id),
       isAvailable: fetchedProduct.isAvailable ?? true,
       stockTracked: fetchedProduct.stockTracked ?? false,
-      taxRate: fetchedProduct.taxRate != null ? Number(fetchedProduct.taxRate) : 10,
+      taxRate: fetchedProduct.taxRate != null ? Number(fetchedProduct.taxRate) : defaultTaxRate,
       productType: fetchedProduct.productType ?? "STANDARD",
       campaignPrice:
         fetchedProduct.campaignPrice != null
@@ -238,7 +243,7 @@ export default function ProductEditorPage({
       ...rest,
       ...stockPatch,
       price: Number(data.price),
-      taxRate: data.taxRate != null ? Number(data.taxRate) : 10,
+      taxRate: data.taxRate != null ? Number(data.taxRate) : defaultTaxRate,
       imageIds: productImages.map((img) => img.id),
       productType,
       // Combo slots (replace-all). Empty for STANDARD so switching a combo
@@ -579,15 +584,15 @@ export default function ProductEditorPage({
                       {t("menu.taxRate")}
                     </label>
                     <select
+                      data-testid="tax-rate-select"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       {...productForm.register("taxRate", {
                         valueAsNumber: true,
                       })}
                     >
-                      <option value={0}>%0</option>
-                      <option value={1}>%1</option>
-                      <option value={10}>%10</option>
-                      <option value={20}>%20</option>
+                      {taxRates.map((r) => (
+                        <option key={r} value={r}>%{r}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

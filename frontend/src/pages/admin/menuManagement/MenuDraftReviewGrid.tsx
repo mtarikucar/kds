@@ -3,8 +3,8 @@ import { Trash2, Plus, Loader2, CheckCircle2, AlertOctagon } from "lucide-react"
 import { Button } from "../../../components/ui/Button";
 import type { ConflictPolicy } from "../../../features/menu/menuApi";
 import type { MenuDraftControls } from "./useMenuDraft";
+import { useCountryProfile } from "../../../hooks/useCountryProfile";
 
-export const TAX_RATES = [0, 1, 10, 20];
 export const cellCls =
   "w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500";
 
@@ -34,6 +34,10 @@ export default function MenuDraftReviewGrid({
   isCommitting: boolean;
 }) {
   const { t } = useTranslation(["menu", "common"]);
+  // Country-scoped, not a fixed Turkish list — a UZ tenant reviewing an
+  // imported draft must be able to set the 12% QQS / 6% catering rate the
+  // backend now accepts (@IsCountryTaxRate).
+  const { taxRates, defaultTaxRate } = useCountryProfile();
   const {
     draft,
     totalItems,
@@ -169,13 +173,13 @@ export default function MenuDraftReviewGrid({
                 />
                 <select
                   data-testid={`tax-rate-${ci}-${pi}`}
-                  value={p.taxRate ?? 10}
+                  value={p.taxRate ?? defaultTaxRate}
                   onChange={(e) => updateProduct(ci, pi, { taxRate: Number(e.target.value) })}
                   disabled={priceOnly}
                   title={priceOnlyTitle}
                   className={`${cellCls} col-span-1 ${priceOnly ? "cursor-not-allowed bg-gray-100 text-gray-400" : ""}`}
                 >
-                  {TAX_RATES.map((r) => (
+                  {taxRates.map((r) => (
                     <option key={r} value={r}>%{r}</option>
                   ))}
                 </select>

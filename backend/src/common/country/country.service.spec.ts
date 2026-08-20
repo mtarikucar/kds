@@ -1,9 +1,48 @@
+import * as fs from "fs";
+import * as path from "path";
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import { CountryService, resolveCountryProfile } from "./country.service";
 import { mockPrismaClient, MockPrismaClient } from "../test/prisma-mock.service";
 import { PrismaService } from "../../prisma/prisma.service";
+
+/**
+ * Structural drift guard (same idiom as branch-scope-contract.spec.ts):
+ * forCode() and resolveCountryProfile() must not carry two independent
+ * copies of "what an unknown/missing code resolves to". A black-box
+ * input/output test cannot tell "two implementations that happen to agree
+ * today" apart from "one delegates to the other" — they return identical
+ * values either way — so this asserts DELEGATION directly by reading the
+ * method body: forCode() must call resolveCountryProfile(), and must not
+ * index COUNTRY_PROFILES a second time itself.
+ */
+describe("CountryService.forCode delegates to resolveCountryProfile (no second fallback copy)", () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "./country.service.ts"),
+    "utf8",
+  );
+  // Body of `forCode(...) { ... }` up to the next same-indent method.
+  // The leading "\n  " requires this to be the METHOD DECLARATION line
+  // (2-space class-member indent), not just any substring match — the
+  // file's own module-doc comment mentions "CountryService.forCode()" in
+  // prose, which a bare /forCode\(/ would also (wrongly) match.
+  const match = source.match(/\n  forCode\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+
+  it("finds forCode in the source (sanity check the regex still matches)", () => {
+    expect(match).not.toBeNull();
+  });
+
+  it("forCode's body calls resolveCountryProfile(...)", () => {
+    const body = match?.[1] ?? "";
+    expect(body).toMatch(/resolveCountryProfile\(/);
+  });
+
+  it("forCode's body does NOT index COUNTRY_PROFILES a second, independent time", () => {
+    const body = match?.[1] ?? "";
+    expect(body).not.toMatch(/COUNTRY_PROFILES\[/);
+  });
+});
 
 describe("resolveCountryProfile (non-DI pure resolver)", () => {
   // Used by code that cannot reach the DI container — class-validator
