@@ -567,7 +567,7 @@ göre çözülür."
 
 **Interfaces:**
 - Consumes: `CountryService.forTenant` (Task 2)
-- Produces: `RequestContextStore.countryCode?: string` — guard zinciri çözüldükten sonra doldurulur, senkron okunabilir.
+- Produces: `RequestContextStore.countryCode?: string` (tip alanını Task 2 zaten ekledi — bu görev onu **dolduruyor**), `CountryService.cachedCodeFor(tenantId): string | null`, `CountryService.invalidate(tenantId): void`
 
 **Neden bu görev var:** `@NormalizePhone("TR")` gibi decorator'lar **tanımlama anında** sabitlenir ve transform **senkron** çalışır — bir DB okuması yapamazlar. Nest'te sıralama guard → interceptor → pipe olduğu için, interceptor `countryCode`'u store'a yazdığında ValidationPipe'ın DTO transform'u onu senkron okuyabilir. Ambient ülkeyi mümkün kılan tek şey bu.
 
@@ -575,6 +575,29 @@ göre çözülür."
 
 ```ts
 import { RequestContext } from "./request-context";
+
+describe("RequestContextInterceptor country resolution", () => {
+  it("does NOT hit the database when the tenant's code is already cached", async () => {
+    // The single most important test in this task. This interceptor runs on
+    // every request; a naive implementation adds a query per request.
+    // Warm the cache, then assert prisma is never touched again.
+    expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(1);
+    // ... second request through the same interceptor ...
+    expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves and caches on the first request for a tenant", async () => {});
+
+  it("passes an anonymous request straight through with no query at all", async () => {
+    expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("invalidate() forces the next request to re-read", async () => {});
+
+  it("still calls next.handle() exactly once on both the cached and uncached paths", async () => {
+    // A switchMap mistake here would either drop the request or run it twice.
+  });
+});
 
 describe("RequestContext.countryCode", () => {
   it("carries a country through the async continuation", async () => {
@@ -619,9 +642,65 @@ Expected: FAIL — `countryCode` tipte yok
   countryCode?: string;
 ```
 
-- [ ] **Step 4: Populate it in the interceptor**
+- [ ] **Step 4: Populate it in the interceptor — WITHOUT adding a query per request**
 
-`request-context.interceptor.ts`'te, `tenantId` store'a yazıldıktan hemen sonra: `CountryService.forTenant(tenantId)` ile profili çöz ve `RequestContext.set({ countryCode: profile.code })` yap. Interceptor `CountryService`'i enjekte eder.
+**Bu adımın planlanmamış bir tuzağı var ve önce onu okuman gerekiyor.** `RequestContextInterceptor` bugün **tamamen senkrondur** — `next.handle()`'ı doğrudan döndürür — ve global `APP_INTERCEPTOR` olarak **her HTTP isteğinde** çalışır. Oraya düz bir `await this.country.forTenant(tenantId)` koymak, bir POS sisteminde her siparişe, her ödemeye, her ekran yenilemesine fazladan bir veritabanı sorgusu eklemek demektir.
+
+**Karar: `CountryService`'e süreç-içi bir önbellek, interceptor'a senkron hızlı yol.**
+
+Bir kiracının ülkesi pratikte hiç değişmez, yani önbellek kiracı başına **süreç ömründe bir kez** ıskalar. Hızlı yol senkron kalır ve interceptor'ın bugünkü şekli korunur:
+
+```ts
+intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  if (context.getType() !== "http") return next.handle();
+
+  const req: any = context.switchToHttp().getRequest();
+  const tenantId = req?.user?.tenantId ?? req?.tenantId;
+  RequestContext.set({
+    tenantId,
+    branchId: req?.scope?.branchId,
+    userId: req?.user?.id ?? req?.user?.sub,
+  });
+
+  if (!tenantId) return next.handle(); // anonymous — ambient() falls back
+
+  // Fast path: a tenant's country never changes in practice, so this misses
+  // exactly once per tenant per process. Keeping it synchronous is the whole
+  // point — this interceptor runs on EVERY request.
+  const cached = this.country.cachedCodeFor(tenantId);
+  if (cached) {
+    RequestContext.set({ countryCode: cached });
+    return next.handle();
+  }
+
+  return from(this.country.forTenant(tenantId)).pipe(
+    switchMap((profile) => {
+      RequestContext.set({ countryCode: profile.code });
+      return next.handle();
+    }),
+  );
+}
+```
+
+`CountryService` kazandığı iki üye:
+
+```ts
+private readonly codeCache = new Map<string, string>();
+
+/** Synchronous peek for the request hot path. Null = not yet resolved. */
+cachedCodeFor(tenantId: string): string | null {
+  return this.codeCache.get(tenantId) ?? null;
+}
+
+/** Called wherever Tenant.countryCode is written, so the cache cannot go stale. */
+invalidate(tenantId: string): void {
+  this.codeCache.delete(tenantId);
+}
+```
+
+`forTenant` bulduğu kodu `codeCache`'e yazar.
+
+**Önbellek bayatlaması:** `countryCode`'u yazan her yer `invalidate(tenantId)` çağırmalı. Bugün onu yazan tek yer kiracı oluşturmadır (varsayılan `'TR'`), ama bir superadmin ileride değiştirebilir — `invalidate` o günün hatasını şimdiden kapatır.
 
 Tenant yoksa (kimliksiz istek) `countryCode` yazılmaz — `ambient()` varsayılana düşer.
 
