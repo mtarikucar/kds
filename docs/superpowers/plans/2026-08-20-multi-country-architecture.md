@@ -1,0 +1,1173 @@
+# Çok ülkeli mimari (P1 + P2) — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Türkiye'yi koddan çıkarıp bir ülke profiline taşımak ve her sağlayıcı seçimini mevcut registry'lerden çözdürmek — böylece ikinci ülke (Özbekistan) bir profil satırı + gerçekten yeni olan adapter'lar, üçüncü ülke ise yalnızca bir satır olur.
+
+**Architecture:** Üç katman. **(1)** `COUNTRY_PROFILES` kod sabiti parametreleri taşır (para birimi, ekran ondalığı, vergi oranları, telefon bölgesi, vergi-no kuralları, yerel ayar, saat dilimi) ve `Tenant.countryCode` hangi profilin geçerli olduğunu söyler. **(2)** Aynı profil sağlayıcı **id'lerini adlandırır**; çağıranlar literal yerine mevcut `PaymentProviderRegistry` / `FiscalProviderRegistry` / `EscPosBuilderRegistry` üzerinden çözer. **(3)** Dağıtım ayrı eksendir ve bu planın kapsamı dışıdır.
+
+**Tech Stack:** NestJS + Prisma + Postgres (backend), React + TanStack Query (frontend), jest / vitest.
+
+**Spec:** `docs/superpowers/specs/2026-08-20-multi-country-architecture-design.md`
+
+## Global Constraints
+
+- **Kabul ölçütü: Türk kiracı için görünen hiçbir şey değişmeyecek.** Her görevin son adımı bunu doğrular.
+- Saklama daima ×100. Bu bir **değişmez**, parametre değil — profilde saklama üssü alanı YOK. Ülkeden türeyen tek şey `displayDecimals`.
+- Ülke kiracıda: `Tenant.countryCode`. Şube ülkeyi kiracısından okur ve ondan sapamaz.
+- `Tenant.currency` yalnız profilden **yazılır**, bağımsız düzenlenemez. Belge modellerindeki `currency` kolonları tarihsel; ellenmez.
+- Şunlar zaten doğru, **dokunulmayacak**: `TaxCalculationService`, `apportionDiscount` (`orders/services/fiscal-line-builder.ts:41-60`), combo apportionment (`orders/services/combo-pricing.ts:224-238`), `prorate()` (`licensing/anniversary.ts:140-208`), `toIntCents` (`common/money/to-int-cents.ts`), `generateInvoiceNumber`.
+- Her migration reversible up/down çifti; down idempotent ve tam olarak up'ın eklediğini geri alır.
+- Backend testi: `cd /home/tarik/Projects/kds/backend && npx jest <path>`; **lint doğrulaması `npm run lint:ci`** (`npm run lint` `--fix` taşır ve hatayı gizler). Boru hattı kullanırken `set -o pipefail` — yoksa `$?` `tail`'in kodudur.
+- Frontend testi: `cd /home/tarik/Projects/kds/frontend && npx vitest run <path>`; `npx tsc --noEmit -p tsconfig.json`; `node scripts/check-i18n-parity.mjs` (repo kökünden).
+- Kullanıcıya görünen her yeni metin beş dile (`tr`, `en`, `ru`, `uz`, `ar`) **gerçek çeviriyle** eklenir. Türkçe `defaultValue` parity'yi geçirir ama dört dile Türkçe gösterir — bu repoda daha önce yaşandı.
+
+---
+
+## File Structure
+
+**Yeni**
+
+| Dosya | Sorumluluk |
+|---|---|
+| `backend/src/common/country/country-profile.const.ts` | `CountryProfile` tipi + `COUNTRY_PROFILES` sabiti (TR, UZ). Tek doğruluk kaynağı. |
+| `backend/src/common/country/country-profile.const.spec.ts` | Profil bütünlüğü invariant'ları. |
+| `backend/src/common/country/country.service.ts` | `forCode()`, `forTenant(tenantId)`, `ambient()` — profil çözümü tek kapı. |
+| `backend/src/common/country/country-capability.resolver.ts` | Profilin adlandırdığı sağlayıcı id'sini registry'den çözer. |
+| `backend/src/common/phone/e164.const.ts` | Tek E.164 kuralı — 23 regex kopyasının yerine. |
+| `backend/src/common/country/tax-id.validator.ts` | Profil kurallarıyla vergi-no doğrulaması — 7 kod sitesinin yerine. |
+| `frontend/src/hooks/useCountryProfile.ts` | Frontend'in profil okuma kapısı. |
+
+**Değişen (ana)**
+
+| Dosya | Değişiklik |
+|---|---|
+| `backend/prisma/schema.prisma` | `Tenant.countryCode`; toplam tutan `Decimal(10,2)` → `Decimal(14,2)` |
+| `backend/src/common/context/request-context.ts` | Store'a `countryCode` |
+| `checkout/quote.service.ts`, `common/helpers/kdv.helper.ts`, `subscriptions/services/billing.service.ts`, `accounting/constants/accounting.enum.ts`, `menu/dto/create-product.dto.ts` | Dört vergi aynası + ürün bandı profilden |
+| `common/dto/normalize-phone.ts` | Varsayılan bölge ambient ülkeden |
+| `customer-orders/services/self-pay-intent.service.ts`, `self-pay-recovery.service.ts`, `checkout/checkout-intent.service.ts` | Somut PayTR yerine registry |
+| `customers/sms.service.ts` | Süreç-tekili yerine kiracı başına sağlayıcı |
+| `common/helpers/env-validation.ts` | PayTR zorunluluğu ülke koşullu |
+| `device-mesh/printing/escpos-builder.service.ts` | Kod sayfası + zaman damgası profilden |
+
+---
+
+## Task 1: Ülke profili sabiti
+
+**Files:**
+- Create: `backend/src/common/country/country-profile.const.ts`
+- Test: `backend/src/common/country/country-profile.const.spec.ts`
+
+**Interfaces:**
+- Consumes: yok (ilk görev)
+- Produces: `export interface CountryProfile`, `export const COUNTRY_PROFILES: Record<string, CountryProfile>`, `export const DEFAULT_COUNTRY = "TR"`, `export type CountryCode = keyof typeof COUNTRY_PROFILES`
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+import { COUNTRY_PROFILES, DEFAULT_COUNTRY } from "./country-profile.const";
+
+describe("COUNTRY_PROFILES", () => {
+  it("has TR and UZ", () => {
+    expect(Object.keys(COUNTRY_PROFILES).sort()).toEqual(["TR", "UZ"]);
+  });
+
+  it("TR keeps today's behaviour exactly — this is the regression pin", () => {
+    const tr = COUNTRY_PROFILES.TR;
+    expect(tr.currency).toBe("TRY");
+    expect(tr.displayDecimals).toBe(2);
+    expect(tr.taxRates).toEqual([0, 1, 10, 20]);
+    expect(tr.defaultTaxRate).toBe(10);
+    expect(tr.phoneRegion).toBe("TR");
+    expect(tr.intlLocale).toBe("tr-TR");
+    expect(tr.defaultTimezone).toBe("Europe/Istanbul");
+  });
+
+  it("UZ carries the Uzbek parameters", () => {
+    const uz = COUNTRY_PROFILES.UZ;
+    expect(uz.currency).toBe("UZS");
+    expect(uz.displayDecimals).toBe(0); // so'm shows no decimals
+    expect(uz.taxRates).toContain(12);  // QQS
+    expect(uz.defaultTaxRate).toBe(12);
+    expect(uz.phoneRegion).toBe("UZ");
+    expect(uz.defaultTimezone).toBe("Asia/Tashkent");
+  });
+
+  it("every profile's defaultTaxRate is one of its own taxRates", () => {
+    for (const [code, p] of Object.entries(COUNTRY_PROFILES)) {
+      expect(p.taxRates).toContain(p.defaultTaxRate);
+    }
+  });
+
+  it("every profile declares at least one tax-id rule", () => {
+    for (const p of Object.values(COUNTRY_PROFILES)) {
+      expect(p.taxIdRules.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("TR tax-id rules accept VKN(10) and TCKN(11) and reject 9 digits", () => {
+    const rules = COUNTRY_PROFILES.TR.taxIdRules;
+    const ok = (v: string) => rules.some((r) => r.pattern.test(v));
+    expect(ok("1234567890")).toBe(true);
+    expect(ok("12345678901")).toBe(true);
+    expect(ok("123456789")).toBe(false);
+  });
+
+  it("UZ tax-id rules accept STIR(9) and PINFL(14)", () => {
+    const rules = COUNTRY_PROFILES.UZ.taxIdRules;
+    const ok = (v: string) => rules.some((r) => r.pattern.test(v));
+    expect(ok("123456789")).toBe(true);
+    expect(ok("12345678901234")).toBe(true);
+    expect(ok("1234567890")).toBe(false);
+  });
+
+  it("DEFAULT_COUNTRY exists in the map", () => {
+    expect(COUNTRY_PROFILES[DEFAULT_COUNTRY]).toBeDefined();
+  });
+
+  it("no profile declares a storage minor-unit exponent — storage is always x100", () => {
+    for (const p of Object.values(COUNTRY_PROFILES)) {
+      expect(p).not.toHaveProperty("storageMinorExponent");
+      expect(p).not.toHaveProperty("minorUnitExponent");
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country/country-profile.const.spec.ts`
+Expected: FAIL — modül yok
+
+- [ ] **Step 3: Implement**
+
+```ts
+/**
+ * Per-country PARAMETERS. The single source of truth for everything that
+ * varies by country but is not a regulation — currency, display precision,
+ * tax bands, phone region, tax-id shapes, locale, timezone — plus the NAMES
+ * of the providers that implement this country's regulations.
+ *
+ * Why a code constant and not a table: this repo already keeps platform
+ * pricing in code (marketplace/alacarte-catalog.const.ts) for the same
+ * reason. Countries change rarely, but a wrong tax rate typed into a
+ * database row is a money incident. A constant goes through review, tests
+ * and a release. The only DATA is Tenant.countryCode.
+ *
+ * NOTE — there is deliberately NO storage minor-unit exponent here. Money is
+ * stored and wired as x100 for EVERY currency, always. That is an invariant,
+ * not a parameter: UZS shows zero decimals but Payme/Uzum expect tiyin
+ * (x100), so the storage boundary is already correct. Making it configurable
+ * would invite someone to change it and silently break the 16 call sites that
+ * cross that boundary. Only DISPLAY varies by country.
+ */
+export interface CountryTaxIdRule {
+  /** Machine name, e.g. "VKN" | "TCKN" | "STIR" | "PINFL". */
+  name: string;
+  pattern: RegExp;
+  /** i18n key for the human label shown next to the field. */
+  labelKey: string;
+}
+
+export interface CountryCapabilities {
+  /** FiscalProviderRegistry id, or null where no fiscal device applies yet. */
+  fiscalProviderId: string | null;
+  /** PaymentProviderRegistry ids, in preference order. */
+  paymentProviderIds: string[];
+  /** AccountingAdapter id for e-invoicing, or null. */
+  eDocumentAdapterId: string | null;
+  /** EscPosBuilderRegistry id. */
+  escposBuilderId: string;
+  /** SMS provider id. */
+  smsProviderId: string;
+}
+
+export interface CountryProfile {
+  code: string;
+  currency: string;
+  /** DISPLAY decimals only. Storage is always x100 — see the note above. */
+  displayDecimals: number;
+  taxRates: number[];
+  defaultTaxRate: number;
+  /** libphonenumber-js region for parsing a locally-typed number. */
+  phoneRegion: string;
+  taxIdRules: CountryTaxIdRule[];
+  /** i18n locale key. */
+  defaultLocale: string;
+  /** Intl.NumberFormat / DateTimeFormat locale. */
+  intlLocale: string;
+  defaultTimezone: string;
+  capabilities: CountryCapabilities;
+}
+
+export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
+  TR: {
+    code: "TR",
+    currency: "TRY",
+    displayDecimals: 2,
+    // KDV bands. Kept EXACTLY as the pre-existing TaxRate enum and the
+    // product DTO's @IsIn — this profile must not change TR behaviour.
+    taxRates: [0, 1, 10, 20],
+    defaultTaxRate: 10,
+    phoneRegion: "TR",
+    taxIdRules: [
+      { name: "VKN", pattern: /^\d{10}$/, labelKey: "country.taxId.vkn" },
+      { name: "TCKN", pattern: /^\d{11}$/, labelKey: "country.taxId.tckn" },
+    ],
+    defaultLocale: "tr",
+    intlLocale: "tr-TR",
+    defaultTimezone: "Europe/Istanbul",
+    capabilities: {
+      fiscalProviderId: "hugin",
+      paymentProviderIds: ["paytr"],
+      eDocumentAdapterId: "nilvera",
+      escposBuilderId: "generic",
+      smsProviderId: "netgsm",
+    },
+  },
+
+  UZ: {
+    code: "UZ",
+    currency: "UZS",
+    // So'm is quoted without decimals in practice even though ISO-4217 gives
+    // it two. Storage stays x100 (tiyin) because that is what Payme/Uzum
+    // expect on the wire.
+    displayDecimals: 0,
+    // QQS is 12% (fixed through 2028). Catering may elect a 6% no-credit
+    // rate from 2026-06, so both are offered plus exempt.
+    taxRates: [0, 6, 12],
+    defaultTaxRate: 12,
+    phoneRegion: "UZ",
+    taxIdRules: [
+      { name: "STIR", pattern: /^\d{9}$/, labelKey: "country.taxId.stir" },
+      { name: "PINFL", pattern: /^\d{14}$/, labelKey: "country.taxId.pinfl" },
+    ],
+    defaultLocale: "uz",
+    intlLocale: "uz-UZ",
+    defaultTimezone: "Asia/Tashkent",
+    capabilities: {
+      // No Uzbek fiscal/payment/e-document adapter exists yet — those are
+      // P3/P4/P5 and each waits on a local legal entity. Null here is
+      // honest: the resolver refuses rather than silently falling back to
+      // the Turkish provider.
+      fiscalProviderId: null,
+      paymentProviderIds: [],
+      eDocumentAdapterId: null,
+      escposBuilderId: "generic",
+      smsProviderId: "eskiz",
+    },
+  },
+};
+
+export const DEFAULT_COUNTRY = "TR";
+export type CountryCode = keyof typeof COUNTRY_PROFILES;
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country/country-profile.const.spec.ts`
+Expected: PASS (9 test)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/src/common/country/
+git commit -m "feat(country): ülke profili sabiti — parametrelerin tek kaynağı
+
+Ülkeye göre değişen ama regülasyon olmayan her şey burada: para birimi,
+ekran ondalığı, vergi bantları, telefon bölgesi, vergi-no şekilleri, yerel
+ayar, saat dilimi. Ayrıca bu ülkenin regülasyonlarını uygulayan sağlayıcı
+ADLARI — sınıflar değil.
+
+Veritabanı değil kod sabiti, çünkü emsali repoda var (alacarte-catalog) ve
+çünkü bir DB satırına yanlış yazılmış vergi oranı para olayıdır.
+
+Saklama üssü BİLEREK yok: para her para biriminde daima x100 saklanır ve
+kablolanır. UZS ekranda 0 ondalık gösterir ama Payme/Uzum tiyin bekler,
+yani sınır zaten doğru yerde. Ayarlanabilir bırakmak o sınırı geçen 16
+çağrı yerini sessizce bozmaya davetiye olurdu."
+```
+
+---
+
+## Task 2: `Tenant.countryCode` + türetilen para birimi
+
+**Files:**
+- Modify: `backend/prisma/schema.prisma` (model `Tenant`)
+- Create: `backend/prisma/migrations/<ver>_tenant_country_code/migration.sql` + `down.sql`
+- Create: `backend/src/common/country/country.service.ts`
+- Test: `backend/src/common/country/country.service.spec.ts`
+
+**Interfaces:**
+- Consumes: `COUNTRY_PROFILES`, `DEFAULT_COUNTRY` (Task 1)
+- Produces: `CountryService.forCode(code: string): CountryProfile`, `CountryService.forTenant(tenantId: string): Promise<CountryProfile>`, `CountryService.ambient(): CountryProfile` (Task 3'te dolar; şimdilik DEFAULT döner)
+
+- [ ] **Step 1: Add the column to the schema**
+
+`model Tenant` içinde, mevcut `currency` satırının hemen üstüne:
+
+```prisma
+  // ISO-3166-1 alpha-2. The single piece of country DATA — everything else
+  // (currency, tax bands, phone region, locale, providers) is derived from
+  // COUNTRY_PROFILES in code. Defaults to TR because every tenant that
+  // existed when this shipped was Turkish.
+  countryCode String @default("TR")
+```
+
+- [ ] **Step 2: Write the reversible migration**
+
+`migration.sql`:
+
+```sql
+ALTER TABLE "tenants"
+  ADD COLUMN IF NOT EXISTS "countryCode" TEXT NOT NULL DEFAULT 'TR';
+```
+
+`down.sql`:
+
+```sql
+ALTER TABLE "tenants" DROP COLUMN IF EXISTS "countryCode";
+```
+
+- [ ] **Step 3: Verify the round trip**
+
+Bunu **atılabilir bir Postgres'te** doğrula, geliştirme veritabanında değil — bu repoda daha önce data migration'ı böyle doğrulamak kural oldu:
+
+```bash
+cd /home/tarik/Projects/kds/backend
+DB=multicountry_migtest
+PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d postgres -c "DROP DATABASE IF EXISTS $DB" 2>/dev/null || true
+DATABASE_URL="postgresql://tarik:Merhabalar06@localhost:5432/$DB?schema=public" npx prisma db push --skip-generate
+PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d $DB -f prisma/migrations/<ver>_tenant_country_code/down.sql
+PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d $DB -f prisma/migrations/<ver>_tenant_country_code/migration.sql
+PGPASSWORD=Merhabalar06 psql -h localhost -U tarik -d $DB -c "\d tenants" | grep countryCode
+```
+Expected: `countryCode | text | not null | 'TR'::text` — up→down→up temiz.
+
+- [ ] **Step 4: Write the failing service test**
+
+```ts
+import { CountryService } from "./country.service";
+import { mockPrismaClient, MockPrismaClient } from "../test/prisma-mock.service";
+
+describe("CountryService", () => {
+  let prisma: MockPrismaClient;
+  let svc: CountryService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    svc = new CountryService(prisma as any);
+  });
+
+  it("forCode returns the profile", () => {
+    expect(svc.forCode("UZ").currency).toBe("UZS");
+  });
+
+  it("forCode falls back to the default for an unknown code rather than throwing", () => {
+    // A tenant row can only hold what we wrote, but a bad manual UPDATE must
+    // not take the whole request down — fall back and log.
+    expect(svc.forCode("XX").code).toBe("TR");
+  });
+
+  it("forTenant reads the tenant's countryCode", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue({ countryCode: "UZ" });
+    const p = await svc.forTenant("t1");
+    expect(p.currency).toBe("UZS");
+  });
+
+  it("forTenant falls back to the default when the tenant is missing", async () => {
+    (prisma.tenant.findUnique as any).mockResolvedValue(null);
+    expect((await svc.forTenant("nope")).code).toBe("TR");
+  });
+
+  it("currencyForTenant is derived from the profile, never read off Tenant.currency", async () => {
+    // Tenant.currency is a WRITTEN mirror; the profile is the truth. A row
+    // whose currency disagrees with its country must resolve to the profile.
+    (prisma.tenant.findUnique as any).mockResolvedValue({
+      countryCode: "UZ",
+      currency: "TRY", // stale/corrupt
+    });
+    expect(await svc.currencyForTenant("t1")).toBe("UZS");
+  });
+});
+```
+
+- [ ] **Step 5: Run it and confirm it fails**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country/country.service.spec.ts`
+Expected: FAIL — modül yok
+
+- [ ] **Step 6: Implement**
+
+```ts
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import {
+  COUNTRY_PROFILES,
+  DEFAULT_COUNTRY,
+  CountryProfile,
+} from "./country-profile.const";
+import { RequestContext } from "../context/request-context";
+
+/**
+ * The one door to a country profile. Nothing else may index COUNTRY_PROFILES
+ * directly — that keeps the fallback behaviour and the logging in one place.
+ */
+@Injectable()
+export class CountryService {
+  private readonly logger = new Logger(CountryService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  forCode(code: string | null | undefined): CountryProfile {
+    const profile = code ? COUNTRY_PROFILES[code] : undefined;
+    if (!profile) {
+      if (code) {
+        this.logger.warn(`Unknown countryCode "${code}" — using ${DEFAULT_COUNTRY}`);
+      }
+      return COUNTRY_PROFILES[DEFAULT_COUNTRY];
+    }
+    return profile;
+  }
+
+  async forTenant(tenantId: string): Promise<CountryProfile> {
+    const t = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { countryCode: true },
+    });
+    return this.forCode(t?.countryCode);
+  }
+
+  /** Currency is DERIVED. Tenant.currency is a written mirror, never the truth. */
+  async currencyForTenant(tenantId: string): Promise<string> {
+    return (await this.forTenant(tenantId)).currency;
+  }
+
+  /**
+   * The profile for the request in flight, resolved synchronously from the
+   * ambient RequestContext. Outside a request (cron, bootstrap) this is the
+   * default profile. Populated by Task 3.
+   */
+  ambient(): CountryProfile {
+    return this.forCode(RequestContext.get()?.countryCode);
+  }
+}
+```
+
+- [ ] **Step 7: Run tests + typecheck**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country && npx tsc --noEmit -p tsconfig.json`
+Expected: PASS, tsc 0
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add backend/prisma/schema.prisma backend/prisma/migrations backend/src/common/country/
+git commit -m "feat(country): Tenant.countryCode + profil çözüm servisi
+
+Ülkenin tek VERİ hâli countryCode; para birimi, vergi, telefon, yerel ayar
+hepsi profilden türer. Mevcut kiracılar TR varsayılanıyla göç ediyor —
+bugünkü her kiracı Türk. Migration up/down çifti atılabilir bir Postgres'te
+tur ettirilerek doğrulandı.
+
+currencyForTenant bilerek Tenant.currency'yi OKUMUYOR: o kolon bundan sonra
+profilden yazılan bir ayna, doğruluk kaynağı değil. Bozuk bir satır profile
+göre çözülür."
+```
+
+---
+
+## Task 3: Ambient ülke — `RequestContext.countryCode`
+
+**Files:**
+- Modify: `backend/src/common/context/request-context.ts`
+- Modify: `backend/src/common/context/request-context.interceptor.ts`
+- Test: `backend/src/common/context/request-context.spec.ts`
+
+**Interfaces:**
+- Consumes: `CountryService.forTenant` (Task 2)
+- Produces: `RequestContextStore.countryCode?: string` — guard zinciri çözüldükten sonra doldurulur, senkron okunabilir.
+
+**Neden bu görev var:** `@NormalizePhone("TR")` gibi decorator'lar **tanımlama anında** sabitlenir ve transform **senkron** çalışır — bir DB okuması yapamazlar. Nest'te sıralama guard → interceptor → pipe olduğu için, interceptor `countryCode`'u store'a yazdığında ValidationPipe'ın DTO transform'u onu senkron okuyabilir. Ambient ülkeyi mümkün kılan tek şey bu.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+import { RequestContext } from "./request-context";
+
+describe("RequestContext.countryCode", () => {
+  it("carries a country through the async continuation", async () => {
+    await RequestContext.run({ tenantId: "t1", countryCode: "UZ" }, async () => {
+      await Promise.resolve();
+      expect(RequestContext.get()?.countryCode).toBe("UZ");
+    });
+  });
+
+  it("is undefined outside a request", () => {
+    expect(RequestContext.get()?.countryCode).toBeUndefined();
+  });
+
+  it("set() merges a country resolved after the guards ran", () => {
+    RequestContext.run({ tenantId: "t1" }, () => {
+      expect(RequestContext.get()?.countryCode).toBeUndefined();
+      RequestContext.set({ countryCode: "UZ" });
+      expect(RequestContext.get()?.countryCode).toBe("UZ");
+    });
+  });
+});
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/context/request-context.spec.ts`
+Expected: FAIL — `countryCode` tipte yok
+
+- [ ] **Step 3: Add the field**
+
+`request-context.ts`, `RequestContextStore` içine:
+
+```ts
+  /**
+   * ISO-3166-1 alpha-2 for the tenant in flight, filled by
+   * RequestContextInterceptor once the guard chain has resolved tenantId.
+   *
+   * This exists so SYNCHRONOUS code — class-transformer decorators,
+   * formatters — can reach the country without a database read. Nest runs
+   * interceptors before pipes, so a DTO transform sees this already set.
+   */
+  countryCode?: string;
+```
+
+- [ ] **Step 4: Populate it in the interceptor**
+
+`request-context.interceptor.ts`'te, `tenantId` store'a yazıldıktan hemen sonra: `CountryService.forTenant(tenantId)` ile profili çöz ve `RequestContext.set({ countryCode: profile.code })` yap. Interceptor `CountryService`'i enjekte eder.
+
+Tenant yoksa (kimliksiz istek) `countryCode` yazılmaz — `ambient()` varsayılana düşer.
+
+- [ ] **Step 5: Run tests**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/context && npx tsc --noEmit -p tsconfig.json`
+Expected: PASS, tsc 0
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/src/common/context/
+git commit -m "feat(country): istek bağlamına ambient ülke
+
+Decorator'lar tanımlama anında sabitlenir ve transform senkron çalışır —
+DB okuyamazlar. Nest sıralaması guard → interceptor → pipe olduğu için,
+interceptor countryCode'u store'a yazdığında DTO transform'u onu senkron
+okuyabiliyor. Telefon bölgesinin ve vergi-no kuralının ülkeden gelmesini
+mümkün kılan tek mekanizma bu."
+```
+
+---
+
+## Task 4: Vergi — dört ayna tek kaynağa
+
+**Files:**
+- Modify: `backend/src/modules/accounting/constants/accounting.enum.ts`
+- Modify: `backend/src/common/helpers/kdv.helper.ts`
+- Modify: `backend/src/modules/checkout/quote.service.ts:35,317`
+- Modify: `backend/src/modules/subscriptions/services/billing.service.ts:68-74`
+- Modify: `backend/src/modules/menu/dto/create-product.dto.ts:217-225`
+- Test: her dosyanın mevcut spec'i + yeni vakalar
+
+**Interfaces:**
+- Consumes: `CountryService.ambient()`, `CountryService.forTenant()`
+- Produces: davranış değişikliği yok (TR), yeni yetenek (UZ)
+
+**Bu görevin özü:** dört ayrı yerde yazılı olan "vergi %20 ve yalnız TRY'de" kuralı profilden okunacak. Ürün DTO'sundaki `@IsIn([0,1,10,20])` ise **ambient profilin `taxRates`'ine** karşı doğrulayacak — Özbekistan'ın %12'si bugün sisteme hiç girilemiyor, bu tek başına blocker.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// create-product.dto.spec.ts (yeni dosya)
+import { validate } from "class-validator";
+import { plainToInstance } from "class-transformer";
+import { CreateProductDto } from "./create-product.dto";
+import { RequestContext } from "../../../common/context/request-context";
+
+const make = (taxRate: number) =>
+  plainToInstance(CreateProductDto, { name: "X", price: 10, categoryId: "c1", taxRate });
+
+describe("CreateProductDto taxRate", () => {
+  it("accepts a Turkish band under a TR tenant", async () => {
+    await RequestContext.run({ countryCode: "TR" }, async () => {
+      expect((await validate(make(20))).length).toBe(0);
+    });
+  });
+
+  it("rejects 12 under a TR tenant", async () => {
+    await RequestContext.run({ countryCode: "TR" }, async () => {
+      expect((await validate(make(12))).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("ACCEPTS 12 under a UZ tenant — the QQS rate that was impossible before", async () => {
+    await RequestContext.run({ countryCode: "UZ" }, async () => {
+      expect((await validate(make(12))).length).toBe(0);
+    });
+  });
+
+  it("rejects 20 under a UZ tenant", async () => {
+    await RequestContext.run({ countryCode: "UZ" }, async () => {
+      expect((await validate(make(20))).length).toBeGreaterThan(0);
+    });
+  });
+});
+```
+
+`quote.service.spec.ts`'e ekle:
+
+```ts
+  it("taxes a UZ quote at 12%, not 0% — the old code zero-rated every non-TRY currency", async () => {
+    // ... quote with currency UZS under a UZ tenant ...
+    expect(quote.taxCents).toBeGreaterThan(0);
+  });
+```
+
+`billing.service.spec.ts`'e ekle:
+
+```ts
+  it("records tax for a non-TRY invoice — isTurkish used to zero it", async () => {
+    // ... invoice for a UZ tenant ...
+    expect(invoice.tax.toNumber()).toBeGreaterThan(0);
+  });
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/modules/menu/dto src/modules/checkout src/modules/subscriptions/services/billing.service.spec.ts`
+Expected: FAIL — 12 reddediliyor, non-TRY vergi 0
+
+- [ ] **Step 3: Replace the four mirrors**
+
+1. `accounting.enum.ts` — `TaxRate` enum'u **kalır** (mevcut kod ona referans veriyor) ama `DEFAULT_TAX_RATE` artık türetilir; enum'un üstüne bir yorum: bu bantlar yalnız TR içindir ve doğruluk kaynağı `COUNTRY_PROFILES.TR.taxRates`'tir. Bir invariant testi ikisinin aynı kaldığını pinler.
+2. `kdv.helper.ts:3` — `DEFAULT_KDV_RATE` kalır ama **yalnız geriye-uyum varsayılanı** olarak; `splitGrossAmount` çağıranları oranı açıkça geçirecek şekilde güncellenir.
+3. `quote.service.ts:317` — `const taxRate = currency === "TRY" ? TR_KDV_RATE : 0;` yerine profilin `defaultTaxRate`'i yüzdeye çevrilerek kullanılır. `TR_KDV_RATE` sabiti silinir.
+4. `billing.service.ts:68-74` — `isTurkish` dalı kalkar; her para biriminde profilin oranıyla `splitGrossAmount` çağrılır.
+5. `create-product.dto.ts:223` — `@IsIn([0, 1, 10, 20])` yerine ambient profilin `taxRates`'ine karşı doğrulayan özel bir validator (`@IsCountryTaxRate()`). Varsayılan da profilin `defaultTaxRate`'i olur.
+
+- [ ] **Step 4: Run the full menu + checkout + subscriptions suites**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/modules/menu src/modules/checkout src/modules/subscriptions src/modules/accounting`
+Expected: PASS — TR davranışı bit-aynı, UZ yeni testleri yeşil
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/src
+git commit -m "feat(country): vergi kuralı tek kaynaktan
+
+Aynı kural dört yerde yazılıydı: quote.service (TR_KDV_RATE + currency===TRY
+? rate : 0), kdv.helper (DEFAULT_KDV_RATE), billing.service (isTurkish →
+non-TRY hiç vergi kaydetmiyordu) ve accounting.enum (TaxRate bandı). Hepsi
+profilden okuyor.
+
+Ürün girişindeki @IsIn([0,1,10,20]) ambient profilin bantlarına karşı
+doğruluyor — Özbekistan'ın %12 QQS'i bugüne dek sisteme HİÇ girilemiyordu.
+
+TR davranışı bit-aynı; bunu pinleyen testler eklendi."
+```
+
+---
+
+## Task 5: Telefon — 18 regex + 21 "TR" tek kurala
+
+**Files:**
+- Create: `backend/src/common/phone/e164.const.ts`
+- Modify: `backend/src/common/dto/normalize-phone.ts:39`
+- Modify: 18 regex tanımının bulunduğu DTO'lar (aşağıda sayılı)
+- Test: `backend/src/common/phone/e164.const.spec.ts`
+
+**Interfaces:**
+- Consumes: `RequestContext` (Task 3), `CountryService.ambient()`
+- Produces: `export const E164_PATTERN: RegExp`, `export const E164_MESSAGE: string`
+
+- [ ] **Step 1: Find every copy and pick the winning variant**
+
+```bash
+cd /home/tarik/Projects/kds/backend
+grep -rn '\[1-9\]' src --include=*.ts | grep -v '\.spec\.' | grep -v normalize-phone.ts \
+  | tee /tmp/e164-sites.txt | wc -l
+```
+Expected: **18** tanım, ve bunlar **iki ayrı varyant**:
+
+| Varyant | Nerede | Ne kabul eder |
+|---|---|---|
+| `/^\+[1-9]\d{6,14}$/` | 10 yer (reservations, customers, auth, users, checkout, supplier) | `+` **zorunlu**, 7-15 hane |
+| `/^\+?[1-9]\d{7,14}$/` | 8 yer (orders, customer-orders, partner, accounting, phone-verification) | `+` **opsiyonel**, 8-15 hane |
+
+Aynı alanın iki farklı kuralı var — biri `905551234567`'yi kabul eder, diğeri reddeder. Bu yüzden birleştirme saf bir refactor değil, bir **karar**.
+
+**Karar: kazanan `/^\+[1-9]\d{6,14}$/`.** Gerekçe: `@NormalizePhone` transform'u `@Matches` doğrulamasından **önce** çalışır (class-transformer sonra class-validator), yani regex'e ulaşan her değer libphonenumber'ın ürettiği E.164'tür ve `+` daima vardır. `\+?` varyantı ölü müsamaha. `{6,14}` ile `{7,14}` arasından daha geniş olanı almak bugün geçen hiçbir girdiyi reddetmez; daha darını almak `+9xxxxxxx` biçimli 7 haneli bir numarayı reddedebilirdi. **Önerdiğim `\d{1,14}` alt sınırı kullanılmıyor** — bugünkü en dar davranıştan daha gevşek olurdu ve bu bir genişletme demekti.
+
+- [ ] **Step 2: Write the failing test**
+
+```ts
+import { E164_PATTERN } from "./e164.const";
+import { normalizePhoneToE164 } from "../dto/normalize-phone";
+import { RequestContext } from "../context/request-context";
+
+describe("E164_PATTERN", () => {
+  it("accepts a Turkish and an Uzbek number", () => {
+    expect(E164_PATTERN.test("+905551234567")).toBe(true);
+    expect(E164_PATTERN.test("+998901234567")).toBe(true);
+  });
+  it("rejects a leading zero and a local-format number", () => {
+    expect(E164_PATTERN.test("+0555123")).toBe(false);
+    expect(E164_PATTERN.test("05551234567")).toBe(false);
+  });
+});
+
+describe("normalizePhoneToE164 ambient region", () => {
+  it("parses a locally-typed Uzbek number under a UZ tenant", () => {
+    RequestContext.run({ countryCode: "UZ" }, () => {
+      expect(normalizePhoneToE164("90 123 45 67")).toBe("+998901234567");
+    });
+  });
+  it("still parses a locally-typed Turkish number under a TR tenant", () => {
+    RequestContext.run({ countryCode: "TR" }, () => {
+      expect(normalizePhoneToE164("0555 123 45 67")).toBe("+905551234567");
+    });
+  });
+  it("falls back to TR outside a request — cron and bootstrap keep working", () => {
+    expect(normalizePhoneToE164("0555 123 45 67")).toBe("+905551234567");
+  });
+});
+```
+
+- [ ] **Step 3: Run and confirm failure**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/phone`
+Expected: FAIL — modül yok; ambient bölge okunmuyor
+
+- [ ] **Step 4: Implement**
+
+`e164.const.ts`:
+
+```ts
+/**
+ * The ONE E.164 rule. This was written out 18 separate times across the DTOs
+ * in TWO different variants — `/^\+[1-9]\d{6,14}$/` in ten places and
+ * `/^\+?[1-9]\d{7,14}$/` in eight — so the same field accepted a bare
+ * "905551234567" through some endpoints and rejected it through others.
+ *
+ * The strict variant wins. @NormalizePhone transforms before @Matches
+ * validates, so everything reaching this regex is already E.164 out of
+ * libphonenumber and always carries the '+'. The optional-'+' variant was
+ * dead permissiveness. Import this; do not retype it.
+ */
+export const E164_PATTERN = /^\+[1-9]\d{6,14}$/;
+export const E164_MESSAGE = "phone must be in E.164 format, e.g. +905551234567";
+```
+
+`normalize-phone.ts` — varsayılan bölge artık ambient ülkeden gelir:
+
+```ts
+export function normalizePhoneToE164(
+  value: string,
+  defaultRegion?: CountryCode,
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  // The region is what makes a locally-typed number parseable ("0555…" is
+  // Turkish, "90 123…" is Uzbek). It comes from the tenant in flight, read
+  // synchronously off the ambient request context — a decorator is fixed at
+  // definition time and cannot await a database read.
+  const region =
+    defaultRegion ??
+    ((RequestContext.get()?.countryCode as CountryCode | undefined) ?? "TR");
+  ...
+}
+```
+
+`NormalizePhone` decorator'ının imzası `(defaultRegion?: CountryCode)` olur; **21 çağrı yerindeki `@NormalizePhone("TR")` argümanı kaldırılır** ki ambient devreye girsin.
+
+- [ ] **Step 5: Sweep the 18 regex definitions**
+
+`/tmp/e164-sites.txt`'teki her satırda yerel `PHONE_REGEX` sabiti ve satır-içi regex `E164_PATTERN` ile, mesaj `E164_MESSAGE` ile değiştirilir. `@Matches(PHONE_REGEX, …)` çağrı yerleri (16 adet) sabitin adı korunarak import'a döner ya da doğrudan `E164_PATTERN` kullanır — hangisi daha az gürültü yaratıyorsa.
+
+Sekiz gevşek varyantın sıkıya dönmesi **davranış değişikliğidir**: bu uçlar artık `+` içermeyen bir numarayı reddeder. Transform önce çalıştığı için gerçek istemcilerde bu değer zaten oluşmuyor; yine de her birine bir test eklenir.
+
+- [ ] **Step 6: Run the full backend suite**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest && npx tsc --noEmit -p tsconfig.json`
+Expected: PASS
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/src
+git commit -m "feat(country): telefon kuralı tek yerde, bölge ülkeden
+
+Aynı E.164 kuralı 18 ayrı yerde, üstelik iki farklı varyantta yazılıydı:
+10 yerde `+` zorunlu, 8 yerde opsiyonel. Yani aynı alan bazı uçlardan
+\"905551234567\"ü kabul ederken bazılarından reddediyordu. Sıkı varyant
+kazandı — transform doğrulamadan önce çalıştığı için regex'e ulaşan her
+değer zaten libphonenumber'ın ürettiği E.164 ve '+' daima var; gevşek
+varyant ölü müsamahaydı.
+
+@NormalizePhone artık bölgeyi ambient istek bağlamından alıyor; 21 çağrı
+yerindeki sabit \"TR\" argümanı kaldırıldı. Yerel biçimde yazılmış bir
+numarayı ayrıştırabilmenin tek yolu bölgeyi bilmek: \"0555…\" Türk,
+\"90 123…\" Özbek. İstek dışında (cron, bootstrap) TR'ye düşer."
+```
+
+---
+
+## Task 6: Vergi kimlik numarası — GİRDİ doğrulaması profile
+
+**Files:**
+- Create: `backend/src/common/country/tax-id.validator.ts`
+- Modify: `backend/src/modules/tenants/dto/update-tenant-settings.dto.ts:263`
+- Modify: `backend/src/modules/accounting/dto/accounting-settings.dto.ts:25-36`
+- Modify: `backend/src/modules/accounting/dto/create-sales-invoice.dto.ts:22,39,44`
+- Modify: `frontend/src/pages/settings/AccountingSettingsPage.tsx:46,256`
+- Modify: `frontend/src/pages/admin/invoices/CreateInvoiceFromOrderModal.tsx:15`
+- Modify: `frontend/src/pages/settings/BrandingSettingsPage.tsx:34,164`
+- Test: `backend/src/common/country/tax-id.validator.spec.ts`
+
+**BU GÖREVDE DEĞİŞMEYECEK — bilerek TR'ye özel kalan yerler:**
+
+| Dosya | Neden kalıyor |
+|---|---|
+| `accounting/e-document-routing.ts:32,62` | e-Fatura mı e-Arşiv mi kararı **Türk regülasyonu**. VKN kontrolü burada iş kuralının kendisi, girdi doğrulaması değil. |
+| `accounting/providers/ubl-tr-builder.ts:133,162-178` | UBL-TR şeması. `PartyTaxScheme/CompanyID` tanım gereği VKN. |
+| `accounting/providers/mukellef-query.provider.ts:18-19` | GİB mükellef sorgusu. |
+| `accounting/adapters/nilvera.adapter.ts:26,34,201` | Nilvera'nın kendi API'si. |
+| `accounting/services/accounting-sync.service.ts:194,473` | Yukarıdakileri çağırıyor. |
+
+Bunlar genelleştirilmez çünkü **genelleştirilecek bir şey yok**: Özbekistan'ın e-fatura formatı UBL-TR değil, tamamen ayrı bir adapter. Task 9'un çözücüsü UZ için `eDocumentAdapterId: null` verdiğinden bu modüller UZ kiracıda **hiç çalışmaz** — doğru izolasyon budur. Spec bu genelleştirmeyi zaten P3+'a bırakmıştı.
+
+Değişen şey yalnızca **operatörün elle girdiği** vergi numarasının doğrulanması.
+
+**Interfaces:**
+- Consumes: `CountryProfile.taxIdRules`, `CountryService.ambient()`
+- Produces: `isValidTaxId(value: string, profile: CountryProfile): boolean`, `@IsCountryTaxId()` decorator
+
+Frontend'de `pattern="\d{10,11}"` HTML nitelikleri kaldırılır — doğrulama profile bağlı olduğu için istemcide sabit bir pattern yanlış olur; hata mesajı sunucudan gelir. Vergi-no etiketi profilin `labelKey`'inden i18n ile gelir (beş dil).
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+import { isValidTaxId } from "./tax-id.validator";
+import { COUNTRY_PROFILES } from "./country-profile.const";
+
+describe("isValidTaxId", () => {
+  const TR = COUNTRY_PROFILES.TR;
+  const UZ = COUNTRY_PROFILES.UZ;
+
+  it("TR accepts VKN(10) and TCKN(11)", () => {
+    expect(isValidTaxId("1234567890", TR)).toBe(true);
+    expect(isValidTaxId("12345678901", TR)).toBe(true);
+  });
+  it("TR rejects the Uzbek shapes", () => {
+    expect(isValidTaxId("123456789", TR)).toBe(false);
+    expect(isValidTaxId("12345678901234", TR)).toBe(false);
+  });
+  it("UZ accepts STIR(9) and PINFL(14) and rejects the Turkish shapes", () => {
+    expect(isValidTaxId("123456789", UZ)).toBe(true);
+    expect(isValidTaxId("12345678901234", UZ)).toBe(true);
+    expect(isValidTaxId("1234567890", UZ)).toBe(false);
+  });
+  it("rejects non-digits and empty regardless of country", () => {
+    expect(isValidTaxId("abc", TR)).toBe(false);
+    expect(isValidTaxId("", UZ)).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Run and confirm failure**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country/tax-id.validator.spec.ts`
+Expected: FAIL — modül yok
+
+- [ ] **Step 3: Implement and sweep**
+
+Doğrulayıcı profilin `taxIdRules`'unu dolaşır; `@IsCountryTaxId()` ambient profili kullanır. Yukarıdaki **3 backend girdi DTO'su + 3 frontend sitesi** ona döner — yukarıdaki tabloda sayılan e-fatura içleri değil. Hata mesajı profilin kural adlarından üretilir ("VKN (10) veya TCKN (11)" / "STIR (9) yoki PINFL (14)").
+
+- [ ] **Step 4: i18n**
+
+`country.taxId.vkn`, `.tckn`, `.stir`, `.pinfl` anahtarları beş dile **gerçek çeviriyle** eklenir (`tr`, `en`, `ru`, `uz`, `ar` — hepsi `settings.json`'da VKN metni taşıyor, önce onları say:
+`grep -rn 'VKN' frontend/src/i18n/locales/*/settings.json`). Sabit "10 hane / 11 hane" serbest metinleri profilin kural adlarından üretilen etikete döner.
+
+Türkçe `defaultValue` ile geçiştirme yok: parity testi geçer ama dört dil Türkçe görür — bu repoda daha önce yaşandı.
+
+- [ ] **Step 5: Verify**
+
+Run: `cd /home/tarik/Projects/kds/backend && npx jest && cd ../frontend && npx vitest run && npx tsc --noEmit -p tsconfig.json && cd .. && node scripts/check-i18n-parity.mjs`
+Expected: hepsi PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/src frontend/src
+git commit -m "feat(country): vergi kimlik numarası profilden doğrulanıyor
+
+Operatörün elle girdiği vergi numarası 3 backend DTO'su ve 3 frontend
+sitesinde sabit VKN/TCKN şekliyle doğrulanıyordu. Özbekistan'ın STIR'i 9,
+PINFL'i 14 hane — hepsi tarafından reddediliyordu. Artık profilin
+taxIdRules'u doğruluyor.
+
+e-Fatura içleri (e-document-routing, ubl-tr-builder, mükellef sorgusu,
+Nilvera) BİLEREK TR'ye özel kaldı: orada VKN kontrolü girdi doğrulaması
+değil, Türk regülasyonunun kendisi. Özbekistan'ın e-fatura formatı UBL-TR
+değil, ayrı bir adapter — ve UZ profili eDocumentAdapterId: null verdiği
+için o modüller UZ kiracıda hiç çalışmıyor.
+
+Frontend'deki sabit pattern nitelikleri kaldırıldı: doğrulama ülkeye bağlı
+olduğu için istemcide sabit bir pattern yanlış olur; mesaj sunucudan gelir."
+```
+
+---
+
+## Task 7: Para gösterimi — ondalık ülkeden, seçici kalkıyor
+
+**Files:**
+- Modify: `frontend/src/hooks/useCurrency.ts`
+- Modify: `frontend/src/hooks/useFormatCurrency.ts`
+- Create: `frontend/src/hooks/useCountryProfile.ts`
+- Modify: `backend/src/common/constants/currencies.const.ts`
+- Modify: para birimi seçicisini gösteren ayar sayfaları
+- Test: `frontend/src/hooks/useFormatCurrency.test.ts`
+
+**Interfaces:**
+- Consumes: `Tenant.countryCode` (ayarlar endpoint'inden)
+- Produces: `useCountryProfile()` → `{ currency, displayDecimals, intlLocale }`
+
+`useFormatCurrency` zaten doğru şekilde (`useLocale()` + `useCurrency()`); tek eksik `displayDecimals`'ı `minimumFractionDigits`/`maximumFractionDigits` olarak geçirmek. `SUPPORTED_CURRENCIES` backend'de **seçim listesi olmaktan çıkar**; `CURRENCY_INFO` sembol tablosu olarak kalır.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("formats TRY with two decimals", () => { /* ₺1.234,56 */ });
+it("formats UZS with NO decimals — so'm is quoted whole", () => {
+  // 123456789 minor units (tiyin) → "1 234 568 so'm", not "1.234.567,89"
+});
+it("round-trips: a UZS amount stored x100 displays whole and re-parses to the same integer", () => {});
+```
+
+- [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
+
+Commit mesajı, para biriminin artık seçilmediğini ve ülkenin sonucu olduğunu; `SUPPORTED_CURRENCIES`'in v3.2.9'da TRY'ye kısıldığını ve artık seçim listesi olmaktan tümden çıktığını anlatır.
+
+---
+
+## Task 8: `Decimal(10,2)` taşması
+
+**Files:**
+- Modify: `backend/prisma/schema.prisma` (toplam tutan kolonlar)
+- Create: migration + down
+- Test: `backend/src/common/country/decimal-overflow.spec.ts`
+
+**Interfaces:**
+- Consumes: yok
+- Produces: şema değişikliği
+
+`Decimal(10,2)` tavanı 99.999.999,99 ve UZS'de bu ~8.000 dolar. **Ürün fiyatı oraya varmaz ama günlük ciro, fatura toplamı ve sipariş tutarı varır.**
+
+- [ ] **Step 1: Enumerate the columns that hold aggregates**
+
+```bash
+cd /home/tarik/Projects/kds/backend
+grep -n "Decimal(10, 2)" prisma/schema.prisma | tee /tmp/decimal-sites.txt | wc -l
+```
+74 çıkacak. **Hepsi genişletilmeyecek** — yalnız toplam/tutar tutanlar. Her satırı sınıflandır ve listeyi rapora yaz: birim fiyat mı, toplam mı, oran mı. Oran ve yüzde kolonları olduğu gibi kalır.
+
+- [ ] **Step 2: Write the failing test**
+
+Atılabilir bir veritabanında 100.000.000 so'm'luk bir toplamın saklanabildiğini iddia eden bir test; genişletmeden önce numeric overflow ile düşer.
+
+- [ ] **Step 3-5:** genişlet (`Decimal(14, 2)`), up→down→up turunu atılabilir Postgres'te doğrula, commit.
+
+---
+
+## Task 9: Yetenek çözücü (P2 başlangıcı)
+
+**Files:**
+- Create: `backend/src/common/country/country-capability.resolver.ts`
+- Test: `backend/src/common/country/country-capability.resolver.spec.ts`
+
+**Interfaces:**
+- Consumes: `CountryService`, `PaymentProviderRegistry`, `FiscalProviderRegistry`, `EscPosBuilderRegistry`
+- Produces: `paymentProviderFor(tenantId): Promise<PaymentProvider>`, `fiscalProviderFor(tenantId)`, `escposBuilderFor(tenantId)`, `smsProviderIdFor(tenantId)`
+
+**Kritik davranış:** profil bir yetenek için `null` diyorsa çözücü **açık bir hata fırlatır**, sessizce Türk sağlayıcısına düşmez. UZ'de bugün `fiscalProviderId: null` — bu doğru ve dürüst; o kafe yasal fiş kesemez ve sistem bunu saklamamalı.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("resolves the Turkish payment provider for a TR tenant", async () => { /* "paytr" */ });
+it("REFUSES for a UZ tenant instead of silently falling back to PayTR", async () => {
+  await expect(resolver.paymentProviderFor("uz-tenant")).rejects.toThrow(
+    /no payment provider configured for UZ/i,
+  );
+});
+it("throws a clear error when a profile names a provider the registry does not have", async () => {
+  // A typo in the profile must fail loudly at call time, not 404 deep inside a payment.
+});
+```
+
+- [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
+
+---
+
+## Task 10: Ödeme — yedi sızıntı registry'ye
+
+**Files:**
+- Modify: `backend/src/modules/checkout/checkout-intent.service.ts:304`
+- Modify: `backend/src/modules/customer-orders/services/self-pay-intent.service.ts:52,216-222,546`
+- Modify: `backend/src/modules/customer-orders/services/self-pay-recovery.service.ts:68`
+- Modify: `backend/src/modules/payments-core/adapters/paytr-payment-provider.ts:89-93`
+- Test: ilgili spec'ler
+
+**Interfaces:**
+- Consumes: `CountryCapabilityResolver.paymentProviderFor` (Task 9)
+
+Yedi sızıntı:
+
+| # | Ne | Nasıl kapanıyor |
+|---|---|---|
+| 1 | `self-pay-intent.service.ts:52` somut `PaytrAdapter` enjeksiyonu | çözücü + registry |
+| 2 | `self-pay-recovery.service.ts:68` aynısı | çözücü + registry |
+| 3 | `checkout-intent.service.ts:304` `createIntent("paytr", …)` | çözücüden gelen id |
+| 4-5 | `paytr.adapter.ts:384,488` TRY kapısı | **kalır** — adapter kendi sınırını savunmalı |
+| 6 | `paytr-payment-provider.ts:89-93` ikinci TRY kapısı | **kalır**, aynı gerekçe |
+| 7 | `self-pay-intent.service.ts:216-222` kiracı para birimine göre red | kalkar — çözücü zaten doğru sağlayıcıyı verir; para birimi kontrolü sağlayıcının işi |
+
+**4, 5 ve 6 bilerek kalıyor:** adapter'ın kendi para birimi sınırını savunması doğru davranıştır. Kalkan şey, *çağıranın* PayTR olduğunu varsayması.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("a UZ tenant's self-pay never reaches the PayTR adapter", async () => {
+  // paytrAdapter.getIframeToken must not be called; a clear refusal instead.
+});
+it("a TR tenant's checkout still resolves to paytr — behaviour unchanged", async () => {});
+```
+
+- [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
+
+---
+
+## Task 11: SMS — süreç tekilinden kiracı başına
+
+**Files:**
+- Modify: `backend/src/modules/customers/sms.service.ts:14-84`
+- Test: `backend/src/modules/customers/sms.service.spec.ts`
+
+`initializeProvider()` constructor'da bir kez çalışıyor ve sağlayıcıyı süreç başına seçiyor; auto-detect yorumu açıkça "NetGSM önce (TR için ucuz)" diyor. Tek dağıtım TR kiracılarını NetGSM'e, UZ kiracılarını başka bir sağlayıcıya yönlendiremiyor.
+
+Sağlayıcılar bir registry'ye kaydolur; seçim `send()` anında kiracıdan çözülür. Süreç-başına `mockMode` prod-red mantığı **korunur** — o güvenlik davranışı doğru.
+
+- [ ] **Step 1-5:** test → düşsün → uygula → geçsin → commit.
+
+---
+
+## Task 12: Boot — PayTR zorunluluğu ülke koşullu
+
+**Files:**
+- Modify: `backend/src/common/helpers/env-validation.ts:62-66`
+- Test: `backend/src/common/helpers/env-validation.spec.ts`
+
+Bugün prod açılışı PayTR kimlik bilgileri yoksa `process.exit(1)` yapıyor, hiçbir ülke koşulu olmadan. **PayTR'siz bir dağıtım bugün ayağa kalkamaz** — UZ stack'i bu yüzden boot edemez.
+
+Kural, dağıtımın hizmet ettiği ülkelerin profillerinden türeyen sağlayıcı kümesine göre koşullu hale gelir: PayTR yalnız TR profilinin `paymentProviderIds`'i devredeyse zorunludur.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("boots without PayTR credentials when no active country profile names paytr", () => {});
+it("still refuses to boot without PayTR when a TR deployment needs it", () => {});
+```
+
+- [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
+
+---
+
+## Task 13: Yazıcı — kod sayfası ve zaman damgası profilden
+
+**Files:**
+- Modify: `backend/src/modules/device-mesh/printing/escpos-builder.service.ts:64-90,425-432,462-472`
+- Test: `backend/src/modules/device-mesh/printing/escpos-builder.service.spec.ts`
+
+İki kusur:
+1. CP857 tablosu 20 Türkçe girdi taşıyor ve `:467-468` tanımadığı her karakteri `0x3f` (`?`) yapıyor — Kiril ve Özbek Latin metni fişte okunmaz hâle geliyor.
+2. `:425-432` `trDateTime` zaman damgasını `tr-TR` + `Europe/Istanbul`'a çiviliyor ve **şubenin kendi saat dilimini hiç okumuyor** — bu bugün Türkiye için bile yanlış olabilir (şube `timezone` alanı var ve kullanılmıyor).
+
+Kod sayfası profilin `escposBuilderId`'sinden gelen builder'a, zaman damgası profilin `intlLocale`'ine ve **şubenin** `timezone`'una bağlanır.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("a Cyrillic product name does not become '?' on a UZ receipt", () => {});
+it("the receipt timestamp uses the BRANCH timezone, not Europe/Istanbul", () => {});
+it("a Turkish receipt is byte-identical to before — regression pin", () => {});
+```
+
+- [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
+
+---
+
+## Task 14: Türkiye regresyonu — kabul ölçütü
+
+**Files:**
+- Create: `backend/src/common/country/tr-unchanged.spec.ts`
+- Test: manuel, çalışan uygulamada
+
+**Bu planın kabul ölçütü:** P1+P2 sonunda Türk kiracı için görünen hiçbir şey değişmemiş olmalı.
+
+- [ ] **Step 1: Automated pin**
+
+TR kiracısı için vergi oranı, telefon normalizasyonu, vergi-no doğrulaması, para biçimi, sağlayıcı seçimi ve fiş çıktısının değişmediğini iddia eden bir spec.
+
+- [ ] **Step 2: Full suites**
+
+```bash
+cd /home/tarik/Projects/kds/backend && set -o pipefail && npx jest --silent && npx tsc --noEmit -p tsconfig.json && npm run lint:ci
+cd /home/tarik/Projects/kds/frontend && npx vitest run && npx tsc --noEmit -p tsconfig.json
+cd /home/tarik/Projects/kds && node scripts/check-i18n-parity.mjs
+```
+
+- [ ] **Step 3: Manual — a TR tenant**
+
+Menü, POS, sipariş, fiş, fatura: her yerde ₺, %20/%10 KDV, `+90` telefon, VKN/TCKN. Hiçbiri değişmemiş olmalı.
+
+- [ ] **Step 4: Manual — a UZ tenant**
+
+`countryCode='UZ'` yapılmış bir test kiracısında: so'm ondalıksız görünür, %12 ürün vergisi girilebilir, `+998` telefon ayrıştırılır, STIR/PINFL kabul edilir, self-pay PayTR'ye **hiç** ulaşmaz ve açık bir hata verir.
+
+---
+
+## Self-Review
+
+**Spec coverage**
+
+| Spec bölümü | Görev |
+|---|---|
+| Ülke profili kod sabiti | T1 |
+| `Tenant.countryCode`, TR varsayılanı, türetilen currency | T2 |
+| Ambient ülke (senkron okuma) | T3 |
+| Dört vergi aynası + ürün bandı | T4 |
+| Telefon (23 regex, 21 "TR") | T5 |
+| Vergi-no (7 kod + 2 pattern + 20 metin) | T6 |
+| `displayDecimals`, seçicinin kalkması | T7 |
+| `Decimal(10,2)` taşması | T8 |
+| Yetenek çözücü, `null` = açık red | T9 |
+| Ödeme: yedi sızıntı | T10 |
+| SMS kiracı başına | T11 |
+| Ülke koşullu boot | T12 |
+| Kod sayfası + şube saat dilimi | T13 |
+| TR değişmedi kabul ölçütü | T14 |
+
+Kapsam dışı olduğu spec'te yazılı ve burada da görev yok: UBL-TR'nin genelleştirilmesi, IKPU/MXIK alanı, UZ fiskal/ödeme/e-fatura adapter'ları, e-posta şablonlarının yerelleştirilmesi, dağıtım. Bunlar P3-P7.
+
+**Placeholder scan:** "TBD"/"TODO" yok. T7, T8, T10-T13'te adım gövdeleri özet — bu bilinçli: o görevler bir süpürme ve dokunulacak yerler dosya:satır olarak sayılmış durumda; uygulayan ajan listeyi grep ile üretip rapora yazacak. T1-T6 ve T9 tam kod taşıyor çünkü orada tasarım kararı var.
+
+**Type consistency:** `CountryProfile` T1'de üretilir, T2-T13'te tüketilir. `CountryService.ambient()` T2'de tanımlanır, T3'te anlamlı hale gelir, T4-T6'da kullanılır. `CountryCapabilityResolver` T9'da üretilir, T10-T13'te tüketilir. `E164_PATTERN` T5'te üretilir ve yalnız orada süpürülür.
+
+**Doğal sevkiyat sınırı:** T1-T8 (P1) tek başına tutarlı ve gönderilebilir — ülke profili, parametreler, TR değişmemiş. T9-T13 (P2) onun üstüne biner. İstenirse iki ayrı sevkiyat yapılabilir.
