@@ -132,9 +132,11 @@ export class CreateProductDto {
   @MaxLength(5000)
   ingredients?: string;
 
-  // Schema is Decimal(10, 2) — anything above 99,999,999.99 surfaces as a 500
-  // from Postgres. 10,000,000 mirrors the payment-amount cap (iter-42); any
-  // realistic menu item is several orders below.
+  // Schema is Decimal(14, 2) since the Task 8 widening (was Decimal(10, 2);
+  // that old ceiling is exactly what money-column-bounds.const.ts guards
+  // against elsewhere). 10,000,000 is a business-realism cap independent of
+  // that precision — it mirrors the payment-amount cap (iter-42); any
+  // realistic menu item is several orders below, at either precision.
   @ApiProperty({ example: 12.99 })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
