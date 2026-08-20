@@ -1532,6 +1532,38 @@ it("refuses to boot on an unknown country code rather than silently serving noth
 
 Kod sayfası profilin `escposBuilderId`'sinden gelen builder'a, zaman damgası profilin `intlLocale`'ine ve **şubenin** `timezone`'una bağlanır.
 
+- [ ] **Step 0: Sunucu tarafı para biçimlendirme — T7'nin envanteri**
+
+T7 backend'de sabit `.toFixed(2)` ve sabit `tr-TR` biçimlendirme taraması yaptı. Bunlar **sunucunun ürettiği belgeler**, yani frontend'in `useFormatCurrency`'si oraya hiç ulaşmıyor. UZS kiracıda tam sayı olarak yazılan bir para birimi her fişte ve her raporda iki ondalıkla çıkar.
+
+**Bu görevde düzeltilecek üçü** (aynı kök nedeni paylaşıyorlar, birlikte düzeltilmeli):
+
+| # | Yer | Ne render ediyor | Kusur |
+|---|---|---|---|
+| 1 | `device-mesh/printing/escpos-builder.service.ts:411-417` | ESC/POS **fiş** | sabit `tr-TR` + 2 ondalık `Intl.NumberFormat`; UZ için de erişilebilir (`escpos-tr` builder'ı paylaşıyor) |
+| 2 | `orders/services/receipt-snapshot.builder.ts:14,139-190` | #1'i besliyor | aynı |
+| 3 | `z-reports/services/z-report-pdf.service.ts` (12 satır) | Z-Report **PDF** | sabit ondalık **+ `CURRENCY_SYMBOLS` UZS için `"$"`e düşüyor** |
+| 4 | `z-reports/z-reports.service.ts:534,562-603` | Z-Report **e-posta** | aynı sembol hatası |
+
+**`"$"` düşüşü ayrı bir kusur ve daha kötüsü:** Özbek bir restoranın gün sonu raporu dolar işaretiyle çıkar. Ondalıkla birlikte düzeltilmeli — kök neden aynı.
+
+Çözüm: profilin `currency` + `displayDecimals` + `intlLocale`'inden besleneni **tek bir sunucu-tarafı biçimlendirici**. Frontend'in `useFormatCurrency`'siyle aynı kuralı uygulamalı, yoksa ekranla fiş birbirini tutmaz.
+
+**Bu görevde düzeltilmeyecekler** (T7 envanterinden, gerekçeleriyle):
+
+- `subscriptions/services/invoice-pdf.service.ts:95` — platformun kendi abonelik faturası, eski non-TRY havale yolu (dar)
+- `checkout/checkout-notifications.service.ts:124` — donanım siparişi e-postası, pratikte TR-only
+- `cash-drawer/cash-drawer.service.ts:180` ve `orders/services/payment-validator.service.ts:125` — API **hata mesajları** (POS toast'ı), belge değil
+- `delivery-platforms/services/delivery-order.service.ts:565,914` — sipariş notu metni, platformlar TR-only
+- `payments.service.ts`, `self-pay-*.service.ts` — kablo hassasiyetinde API alanları, frontend zaten doğru biçimlendiriyor
+- PayTR / UBL-TR — tasarımı gereği kalıcı olarak TRY-only
+
+```ts
+it("renders a UZS receipt with no decimals and the so'm symbol, not '$'", () => {});
+it("renders a Turkish receipt byte-identically to before — regression pin", () => {});
+it("the Z-report PDF and the ESC/POS receipt agree on the same amount", () => {});
+```
+
 - [ ] **Step 1: Write the failing test**
 
 ```ts
