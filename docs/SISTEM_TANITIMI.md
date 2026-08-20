@@ -87,7 +87,8 @@ Kullanıcı, masa, ürün, kategori ve **aylık sipariş sayısı sınırsızdı
 | AI Menü Stüdyosu | modül / yıllık | ₺1.990 |
 | API & Webhook Erişimi | modül / yıllık | ₺2.490 |
 | Partner Ekran API | modül / yıllık | ₺1.990 |
-| Yemeksepeti / Getir / Trendyol Yemek | entegrasyon / yıllık | her biri ₺2.490 |
+| Paket Servis Entegrasyonları (Yemeksepeti, Getir, Trendyol Yemek, Migros Yemek) | entegrasyon / yıllık | ₺2.499 |
+| Semt | entegrasyon / — | yakında, ücretsiz |
 | ÖKC / Yazarkasa (Hugin) | entegrasyon / yıllık | ₺2.990 |
 | Çağrı-ID | entegrasyon / yıllık | ₺1.490 |
 | SMS Bildirimleri | entegrasyon / yıllık | ₺990 |

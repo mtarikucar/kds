@@ -572,9 +572,7 @@ Tüm fiyatlar **TL ve KDV dahildir**. "/yıl" işaretli kalemler yıllıktır.
 
 | Entegrasyon | Fiyat | Ne yapar? |
 |---|---:|---|
-| Yemeksepeti | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
-| Getir | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
-| Trendyol Yemek | 2.490₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
+| Paket Servis (Yemeksepeti, Getir, Trendyol Yemek, Migros Yemek) | 2.499₺/yıl | Siparişler otomatik POS ve mutfağa düşer |
 | ÖKC / Yazarkasa (Hugin) | 2.990₺/yıl | Yazarkasa ile entegre fiş kesimi ve mali rapor senkronizasyonu |
 | Çağrı-ID | 1.490₺/yıl | Gelen çağrıda müşteriyi tanıma, tek tıkla sipariş açma |
 | SMS | 990₺/yıl | Sipariş, rezervasyon ve kampanya SMS'i (gönderim kontörle) |
@@ -640,11 +638,10 @@ Aşağıdakiler öneridir, zorunluluk değil. İstediğiniz kalemi istediğiniz 
 | Kalem | Fiyat |
 |---|---:|
 | Bakım, Destek ve Güncelleme | 4.900₺/yıl |
-| Yemeksepeti | 2.490₺/yıl |
-| Getir | 2.490₺/yıl |
+| Paket Servis (dört platform) | 2.499₺/yıl |
 | Çağrı-ID | 1.490₺/yıl |
 | SMS | 990₺/yıl |
-| **Toplam** | **12.360₺/yıl** |
+| **Toplam** | **9.879₺/yıl** |
 
 Not: SMS gönderimleri kontörle harcanır (500 SMS = 490₺, süresiz).
 

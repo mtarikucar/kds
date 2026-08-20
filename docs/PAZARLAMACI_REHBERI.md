@@ -81,14 +81,12 @@ Yukarıdaki 1. bölümdeki listenin tamamı. Ücreti yok, süresi yok, lisans ge
 
 | Entegrasyon | Yıllık | Ne açar |
 |---|---:|---|
-| Yemeksepeti | **₺2.490** | Yemeksepeti siparişleri otomatik POS ve mutfağa düşer |
-| Getir | **₺2.490** | Getir siparişleri otomatik POS ve mutfağa düşer |
-| Trendyol Yemek | **₺2.490** | Trendyol Yemek siparişleri otomatik POS ve mutfağa düşer |
+| Paket Servis Entegrasyonları | **₺2.499** | Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek siparişleri otomatik POS ve mutfağa düşer |
 | ÖKC / Yazarkasa (Hugin) | **₺2.990** | Hugin yazarkasa ile fiş kesimi ve mali rapor senkronizasyonu |
 | Çağrı-ID | **₺1.490** | Gelen çağrıda müşteriyi otomatik tanıma, tek tıkla sipariş |
 | SMS Bildirimleri | **₺990** | Sipariş/rezervasyon/kampanya SMS'i (gönderimler kontörle harcanır) |
 
-Teslimat entegrasyonları birikir: müşteri üç platformu da alabilir, hepsi tek mutfak akışına düşer.
+Teslimat artık tek kalem: dört platform (Yemeksepeti, Getir, Trendyol Yemek, Migros Yemek) tek ₺2.499'luk pakette gelir, platform başına ayrı ücret yoktur. Semt entegrasyonu yakında ve pakete **ücretsiz** dahil edilecek.
 
 ### Kapasite
 

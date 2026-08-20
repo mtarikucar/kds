@@ -706,6 +706,10 @@
         {
           "name": "Migros Yemek",
           "description": "Migros Yemek orders join the same pool and are forwarded to the kitchen automatically."
+        },
+        {
+          "name": "Semt",
+          "description": "The Semt integration is coming soon — it will be enabled free of charge when ready."
         }
       ],
       "note": "Platform integrations are optional paid modules; the core system (POS, kitchen display, menu, QR menu) is free."
