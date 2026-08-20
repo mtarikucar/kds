@@ -295,4 +295,52 @@ describe("the shipped à-la-carte catalog", () => {
       expect(p.priceCents).toBeGreaterThanOrEqual(100);
     }
   });
+
+  it("binds card shift to the personnel module", () => {
+    const card = ALACARTE_CATALOG_BY_CODE.get("module_personnel_card_shift")!;
+    expect(card).toBeDefined();
+    expect(card.deps).toEqual(["module_personnel"]);
+    expect(card.billing).toBe("oneTime");
+    expect(card.priceCents).toBe(400_000);
+    expect(card.requiresLicense).toBe(true);
+    expect(card.sortOrder).toBe(18);
+    expect(card.grants).toEqual({ "feature.cardShift": true });
+    // maxQuantity is read ONLY for kind:'capacity'
+    // (addon-purchasability.rules.ts:124-133); a module's second purchase is
+    // blocked by isOwned instead. Setting it here would be inert noise.
+    expect(card.maxQuantity).toBeUndefined();
+  });
+
+  it("accepts a oneTime cadence for kind:'module'", () => {
+    // K5. catalog-validation.ts only pins a cadence for license (→annual),
+    // credit and service (→oneTime); `case "module"` asks for at least one
+    // feature.* grant and nothing else. This locks that in, because a
+    // well-meaning "modules are annual" rule would make this product illegal.
+    expect(
+      validateCatalogRow(
+        base({
+          kind: "module",
+          billing: "oneTime",
+          grants: { "feature.cardShift": true },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps every description's licence sentence — a one-time price is not forever", () => {
+    // K21/§8 Risk 3: paying ₺4.000 once and then letting the licence lapse
+    // DARKENS the module (plan-projector.service.ts:282). The five locale
+    // descriptions are the only place the customer is told before they pay.
+    const card = ALACARTE_CATALOG_BY_CODE.get("module_personnel_card_shift")!;
+    const promises: Record<string, RegExp> = {
+      tr: /lisansınız aktif olduğu sürece geçerlidir/i,
+      en: /as long as your licence is active/i,
+      ru: /пока действует ваша лицензия/i,
+      ar: /ما دام ترخيصك ساريًا/,
+      uz: /litsenziyangiz faol bo'lgunicha amal qiladi/i,
+    };
+    for (const [locale, pattern] of Object.entries(promises)) {
+      expect(card.i18n[locale].description).toMatch(pattern);
+    }
+  });
 });
