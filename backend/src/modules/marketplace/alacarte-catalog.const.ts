@@ -61,36 +61,49 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
   // ---------------------------------------------------------------- LICENSE
   {
     code: LICENSE_ADDON_CODE,
-    name: "HummyTummy Lisansı",
+    name: "Bakım, Destek ve Güncelleme",
     description:
-      "Ücretli modülleri satın alabilmek ve kullanabilmek için gereken yıllık lisans. Satın alma tarihi hesabınızın yıl dönümü olur; sonradan aldığınız her modül bu tarihe orantılı fiyatlanır.",
+      "Ücretli modülleri satın alabilmek ve kullanabilmek için gereken yıllık paket. Öncelikli destek, e-Fatura gönderimi, tüm sürüm güncellemeleri ve günlük yedekleme dahildir. Satın alma tarihi hesabınızın yıl dönümü olur; sonradan aldığınız her modül bu tarihe orantılı fiyatlanır.",
     kind: "license",
     billing: "annual",
-    priceCents: 299_000,
-    grants: { "feature.license": true },
+    // v3.6.7 repricing: was ₺2.990 and granted nothing but the right to buy.
+    // A mandatory fee that unlocks no capability is the single highest-friction
+    // line in a quote — the field guide needed a dedicated objection script for
+    // it. Folding the two products customers most often bought alongside it
+    // (priority_support ₺1.990, fiscal_efatura ₺1.990) turns it into something
+    // with contents: ₺6.970 of separate SKUs for ₺4.900.
+    priceCents: 490_000,
+    grants: {
+      "feature.license": true,
+      "feature.prioritySupport": true,
+      // Folds with UNION against fiscal_hugin's ["hugin"], so a tenant holding
+      // both ends up with ["efatura","hugin"] rather than one clobbering the
+      // other.
+      "integration.fiscal": ["efatura"],
+    },
     deps: [],
     requiresLicense: false,
     sortOrder: 0,
     i18n: t(
       [
-        "HummyTummy Lisansı",
-        "Ücretli modülleri satın alabilmek ve kullanabilmek için gereken yıllık lisans. Satın alma tarihi hesabınızın yıl dönümü olur.",
+        "Bakım, Destek ve Güncelleme",
+        "Ücretli modülleri açan yıllık paket. Öncelikli destek, e-Fatura gönderimi, tüm güncellemeler ve günlük yedekleme dahil. Satın alma tarihi hesabınızın yıl dönümü olur.",
       ],
       [
-        "HummyTummy Licence",
-        "The annual licence required to buy and use any paid module. Its purchase date becomes your account anniversary.",
+        "Maintenance, Support & Updates",
+        "The annual package that unlocks every paid module. Includes priority support, e-invoice filing, all version updates and daily backups. Its purchase date becomes your account anniversary.",
       ],
       [
-        "Лицензия HummyTummy",
-        "Годовая лицензия, необходимая для покупки и использования любого платного модуля. Дата покупки становится годовщиной вашего аккаунта.",
+        "Обслуживание, поддержка и обновления",
+        "Годовой пакет, открывающий все платные модули. Включает приоритетную поддержку, отправку электронных счетов, все обновления и ежедневное резервное копирование. Дата покупки становится годовщиной аккаунта.",
       ],
       [
-        "ترخيص HummyTummy",
-        "الترخيص السنوي المطلوب لشراء واستخدام أي وحدة مدفوعة. يصبح تاريخ الشراء ذكرى حسابك السنوية.",
+        "الصيانة والدعم والتحديثات",
+        "الباقة السنوية التي تفتح كل وحدة مدفوعة. تشمل الدعم ذا الأولوية وإرسال الفاتورة الإلكترونية وجميع التحديثات والنسخ الاحتياطي اليومي. يصبح تاريخ الشراء ذكرى حسابك السنوية.",
       ],
       [
-        "HummyTummy litsenziyasi",
-        "Har qanday pullik modulni sotib olish va ishlatish uchun zarur yillik litsenziya. Sotib olingan sana hisobingiz yillik sanasi bo'ladi.",
+        "Texnik xizmat, qo'llab-quvvatlash va yangilanishlar",
+        "Barcha pullik modullarni ochadigan yillik paket. Ustuvor qo'llab-quvvatlash, e-Faktura yuborish, barcha yangilanishlar va kunlik zaxira nusxa kiradi. Sotib olingan sana hisobingiz yillik sanasi bo'ladi.",
       ],
     ),
   },
@@ -138,7 +151,11 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
       "Reçete, stok sayımı, satın alma siparişi, fire takibi, tedarikçi yönetimi ve şubeler arası transfer.",
     kind: "module",
     billing: "annual",
-    priceCents: 149_000,
+    // v3.6.7 repricing: was ₺1.490. This module makes waste measurable, which
+    // is the highest-ROI thing in the catalog for a kitchen — pricing it below
+    // the reservation module told buyers it was a minor add-on. Competing
+    // suites bundle the same capability into packages several times this.
+    priceCents: 390_000,
     grants: { "feature.inventoryTracking": true },
     deps: [],
     requiresLicense: true,
@@ -341,38 +358,8 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
       ],
     ),
   },
-  {
-    code: "priority_support",
-    name: "Öncelikli Destek",
-    description:
-      "Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi.",
-    kind: "module",
-    billing: "annual",
-    priceCents: 199_000,
-    grants: { "feature.prioritySupport": true },
-    deps: [],
-    requiresLicense: true,
-    sortOrder: 17,
-    i18n: t(
-      [
-        "Öncelikli Destek",
-        "Destek taleplerinizde öncelikli sıra ve garantili yanıt süresi.",
-      ],
-      [
-        "Priority Support",
-        "Front-of-queue support with a guaranteed response time.",
-      ],
-      [
-        "Приоритетная поддержка",
-        "Приоритетная очередь обращений и гарантированное время ответа.",
-      ],
-      ["الدعم ذو الأولوية", "أولوية في طابور الدعم مع زمن استجابة مضمون."],
-      [
-        "Ustuvor qo'llab-quvvatlash",
-        "Murojaatlarda ustuvor navbat va kafolatlangan javob vaqti.",
-      ],
-    ),
-  },
+  // `priority_support` (₺1.990) lived here until v3.6.7. It is now part of the
+  // licence, which grants `feature.prioritySupport` directly.
 
   // ----------------------------------------------------------- INTEGRATIONS
   ...(
@@ -423,41 +410,10 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
       ),
     }),
   ),
-  {
-    code: "fiscal_efatura",
-    name: "e-Fatura (Nilvera)",
-    description:
-      "Satış faturalarınızın Nilvera üzerinden e-Fatura / e-Arşiv olarak GİB'e gönderilmesi.",
-    kind: "integration",
-    billing: "annual",
-    priceCents: 199_000,
-    grants: { "integration.fiscal": ["efatura"] },
-    deps: [],
-    requiresLicense: true,
-    sortOrder: 23,
-    i18n: t(
-      [
-        "e-Fatura (Nilvera)",
-        "Satış faturalarınız Nilvera üzerinden e-Fatura / e-Arşiv olarak gönderilir.",
-      ],
-      [
-        "e-Invoice (Nilvera)",
-        "Your sales invoices are filed as e-Fatura / e-Arşiv through Nilvera.",
-      ],
-      [
-        "Электронный счёт (Nilvera)",
-        "Ваши счета отправляются как e-Fatura / e-Arşiv через Nilvera.",
-      ],
-      [
-        "الفاتورة الإلكترونية (Nilvera)",
-        "تُرسل فواتير مبيعاتك كفاتورة إلكترونية عبر Nilvera.",
-      ],
-      [
-        "e-Faktura (Nilvera)",
-        "Savdo hisob-fakturalaringiz Nilvera orqali e-Faktura sifatida yuboriladi.",
-      ],
-    ),
-  },
+  // `fiscal_efatura` (₺1.990) lived here until v3.6.7. It is now part of the
+  // licence, which grants `integration.fiscal: ["efatura"]` directly. That
+  // grant folds with UNION, so `fiscal_hugin` below still adds "hugin"
+  // alongside it rather than replacing it.
   {
     code: "fiscal_hugin",
     name: "ÖKC / Yazarkasa (Hugin)",
@@ -789,14 +745,23 @@ export const ALACARTE_CATALOG: AlaCarteProduct[] = [
  * `MarketplaceAddOn.code` may not be reused and `TenantAddOn.addOnId` is
  * onDelete: Restrict, so a delete would either orphan or fail.
  *
- * All three granted `limit.kdsScreens` / `limit.kdsStations` / `limit.tablets`
- * — keys no enforcement code has ever read. They were sold and enforced
- * nothing; à-la-carte drops device capacity pricing entirely.
+ * The first three granted `limit.kdsScreens` / `limit.kdsStations` /
+ * `limit.tablets` — keys no enforcement code has ever read. They were sold and
+ * enforced nothing; à-la-carte drops device capacity pricing entirely.
+ *
+ * `priority_support` and `fiscal_efatura` were retired by the v3.6.7
+ * repricing: their grants moved INTO the licence rather than disappearing, so
+ * a tenant who already owns either keeps the capability twice over (their own
+ * archived row still grants it, and the licence now grants it too — both fold
+ * idempotently). Nobody loses access; they simply stop being separately
+ * purchasable.
  */
 export const RETIRED_ADDON_CODES = [
   "kds_extra_screen",
   "kds_extra_station",
   "extra_tablet",
+  "priority_support",
+  "fiscal_efatura",
 ] as const;
 
 export const ALACARTE_CATALOG_BY_CODE: ReadonlyMap<string, AlaCarteProduct> =

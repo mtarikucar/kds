@@ -111,7 +111,7 @@ Traditional POS systems:
 ✓ **Movement History** - Detailed records of all stock movements
 ✓ **Waste Tracking** - Loss and waste analysis
 
-**Paid module** - Inventory & Cost Management is ₺1.490/year, and requires the ₺2.990/year licence. Recipes, stock counts, purchase orders, suppliers and inter-branch transfers are included in that module.
+**Paid module** - Inventory & Cost Management is ₺3.900/year, and requires the ₺4.900/year Maintenance, Support & Updates package. Recipes, stock counts, purchase orders, suppliers and inter-branch transfers are included in that module.
 
 ## 6. Reporting and Decision Support
 
@@ -234,7 +234,7 @@ Traditional POS systems:
 
 ## 5. Inventory and Stock Management
 
-> Paid module: Inventory & Cost Management, ₺1.490/year, requires the ₺2.990/year licence.
+> Paid module: Inventory & Cost Management, ₺3.900/year, requires the ₺4.900/year Maintenance, Support & Updates package.
 
 ### Stock Tracking
 - **Product-Based Inventory**: Stock level for each product
@@ -296,7 +296,7 @@ Traditional POS systems:
 ### There Are No Plans
 The free core is granted to every account unconditionally and does not expire. On top of it you buy individual products from a catalogue. Nothing is bundled, nothing is tiered, and buying one module never changes the price of another.
 
-- **Licence** (₺2.990/year): the prerequisite for buying and using any paid module
+- **Maintenance, Support & Updates** (₺4.900/year): the prerequisite for buying and using any paid module; includes priority support, e-invoice filing, all version updates and daily backups
 - **Modules, integrations, capacity**: annual, bought one at a time
 - **Credits**: one-time purchases with no expiry, valid until consumed
 - **Services**: one-time (on-site installation and training)
@@ -555,20 +555,19 @@ Every paid item is annual unless marked otherwise, and every module requires the
 
 | Item | Price |
 |---|---:|
-| **HummyTummy Licence** — prerequisite for buying and using any paid module | **₺2.990/year** |
+| **Maintenance, Support & Updates** — prerequisite for buying and using any paid module; includes priority support, e-invoice filing, all version updates and daily backups | **₺4.900/year** |
 
 ### Modules
 
 | Module | Price |
 |---|---:|
 | Advanced Reports & Analytics | ₺1.290/year |
-| Inventory & Cost Management | ₺1.490/year |
+| Inventory & Cost Management | ₺3.900/year |
 | Reservations | ₺990/year |
 | Staff Management | ₺990/year |
 | AI Menu Studio | ₺1.990/year |
 | API & Webhooks | ₺2.490/year |
 | Partner Display API | ₺1.990/year |
-| Priority Support | ₺1.990/year |
 
 ### Integrations
 
@@ -577,7 +576,6 @@ Every paid item is annual unless marked otherwise, and every module requires the
 | Yemeksepeti | ₺2.490/year |
 | Getir | ₺2.490/year |
 | Trendyol Yemek | ₺2.490/year |
-| e-Invoice (Nilvera) | ₺1.990/year |
 | Fiscal printer / ÖKC (Hugin) | ₺2.990/year |
 | Caller-ID | ₺1.490/year |
 | SMS | ₺990/year |
@@ -626,10 +624,10 @@ Nothing to buy. POS, kitchen display, QR menu, tables, cash, basic reports, cust
 
 | Item | Price |
 |---|---:|
-| Licence | ₺2.990 |
-| Inventory & Cost Management | ₺1.490 |
+| Maintenance, Support & Updates | ₺4.900 |
+| Inventory & Cost Management | ₺3.900 |
 | Reservations | ₺990 |
-| **Total, first full year** | **₺5.470** |
+| **Total, first full year** | **₺9.790** |
 
 Bought mid-year, each module is prorated to the anniversary, so the first invoice is lower than this.
 
@@ -637,23 +635,23 @@ Bought mid-year, each module is prorated to the anniversary, so the first invoic
 
 | Item | Price |
 |---|---:|
-| Licence | ₺2.990 |
-| Inventory & Cost Management | ₺1.490 |
+| Maintenance, Support & Updates | ₺4.900 |
+| Inventory & Cost Management | ₺3.900 |
 | Yemeksepeti | ₺2.490 |
 | Getir | ₺2.490 |
 | Advanced Reports & Analytics | ₺1.290 |
-| **Total, first full year** | **₺10.750** |
+| **Total, first full year** | **₺15.070** |
 
 ### A three-branch operation
 
 | Item | Price |
 |---|---:|
-| Licence | ₺2.990 |
+| Maintenance, Support & Updates | ₺4.900 |
 | 2 extra branches (first is free) | ₺7.980 |
-| Inventory & Cost Management | ₺1.490 |
+| Inventory & Cost Management | ₺3.900 |
 | Advanced Reports & Analytics | ₺1.290 |
 | Staff Management | ₺990 |
-| **Total, first full year** | **₺14.740** |
+| **Total, first full year** | **₺19.060** |
 
 Everything not listed above — POS, KDS, QR menu, orders, cash, loyalty, unlimited users and orders — is still ₺0 in each of these cases.
 
@@ -684,7 +682,7 @@ The configurations below describe what different kinds of venue actually switch 
 - Deep sales/product/staff/customer analytics and the accounting back-office
 - Daily sales exported as CSV for the accountant (part of the Advanced Reports module); Z-Report PDF is free
 
-**Annual cost:** ₺2.990 licence + ₺1.490 inventory + ₺1.290 advanced reports = **₺5.770/year**, on one invoice, one renewal date.
+**Annual cost:** ₺4.900 maintenance & support + ₺3.900 inventory + ₺1.290 advanced reports = **₺10.090/year**, on one invoice, one renewal date.
 
 ## Setup 3: Multi-Branch Operation — 4 branches
 
@@ -696,7 +694,7 @@ The configurations below describe what different kinds of venue actually switch 
 - Attendance, shift planning and shift swaps in the Staff module
 - Optional: API & Webhooks (₺2.490/year) to push data into an existing accounting system
 
-**Annual cost:** ₺2.990 + ₺11.970 (3 × ₺3.990) + ₺1.490 + ₺1.290 + ₺990 = **₺18.730/year**.
+**Annual cost:** ₺4.900 + ₺11.970 (3 × ₺3.990) + ₺3.900 + ₺1.290 + ₺990 = **₺23.050/year**.
 
 ## Setup 4: Delivery-Heavy Kitchen
 
@@ -706,7 +704,7 @@ The configurations below describe what different kinds of venue actually switch 
 - Each platform is a separate ₺2.490/year integration — buy only the ones you sell on
 - Caller-ID (₺1.490/year) recognises a phone customer and opens the order in one click
 
-**Annual cost:** ₺2.990 licence + ₺2.490 per platform.
+**Annual cost:** ₺4.900 maintenance & support + ₺2.490 per platform.
 
 ---
 
@@ -826,7 +824,7 @@ Yes, and it is not a trial. POS, kitchen display, menu, tables and floor plan, Q
 There is no trial period, because there is nothing to trial into. The core does not expire. If you want to look before registering, there is a shared demo restaurant you can open without an account.
 
 ### How much do the paid parts cost?
-The licence is ₺2.990/year and is the prerequisite for any paid module. Modules run from ₺990 to ₺2.490/year, delivery-platform integrations are ₺2.490/year each, an extra branch is ₺3.990/year, credit packs are one-time from ₺490, and on-site installation and training is a one-time ₺7.500. Every price includes VAT. The full catalogue is in the Pricing section above.
+Maintenance, Support & Updates is ₺4.900/year and is the prerequisite for any paid module; priority support and e-invoice filing are inside it. Modules run from ₺990 to ₺2.490/year, delivery-platform integrations are ₺2.490/year each, an extra branch is ₺3.990/year, credit packs are one-time from ₺490, and on-site installation and training is a one-time ₺7.500. Every price includes VAT. The full catalogue is in the Pricing section above.
 
 ### What are the payment methods?
 Card payment through PayTR. No card is stored and nothing is charged automatically.
@@ -886,7 +884,7 @@ No. Card details are handled by PayTR, our payment provider. HummyTummy does not
 ### How do I get support?
 - **Email**: support@hummytummy.com
 - **Documentation**: User manual and video tutorials
-- **Priority Support module** (₺1.990/year + licence): front-of-queue handling with a guaranteed response time
+- **Priority support** (inside Maintenance, Support & Updates): front-of-queue handling with a guaranteed response time
 
 ### Is training provided?
 - Online documentation and video tutorials for everyone, free

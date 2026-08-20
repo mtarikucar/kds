@@ -1,4 +1,5 @@
-// GuidanceTab.test.tsx
+// ProcurementGuidance.test.tsx — the two sections that used to be the
+// "Tedarik Rehberi" tab, now rendered at either end of the suppliers hub.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -11,12 +12,12 @@ vi.mock('../../../features/stock-management/stockManagementApi', () => ({
 vi.mock('../../../hooks/useFormatCurrency', () => ({ useFormatCurrency: () => (n: number) => `₺${n}` }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string, d?: any) => (typeof d === 'string' ? d : k) }) }));
 
-import GuidanceTab from './GuidanceTab';
+import { BuyListSection, ChannelGuideSection } from './ProcurementGuidance';
 
 declare global { /* eslint-disable no-var */ var __guidance: any; /* eslint-enable no-var */ }
 
 const q = (data: unknown) => ({ data, isLoading: false, isError: false });
-const renderTab = () => render(<MemoryRouter><GuidanceTab /></MemoryRouter>);
+const renderTab = () => render(<MemoryRouter><><BuyListSection /><ChannelGuideSection /></></MemoryRouter>);
 
 beforeEach(() => {
   createPO.mockReset();
@@ -34,7 +35,7 @@ beforeEach(() => {
   });
 });
 
-describe('GuidanceTab', () => {
+describe('ProcurementGuidance', () => {
   it('renders a buy-list row with supplier and price', () => {
     renderTab();
     expect(screen.getByText('Dana Kıyma')).toBeInTheDocument();

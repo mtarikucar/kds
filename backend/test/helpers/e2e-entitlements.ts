@@ -80,7 +80,7 @@ export async function grantLicence(
 ) {
   const licence = await upsertProduct(prisma, {
     code: LICENCE_CODE,
-    name: "HummyTummy Lisansı",
+    name: "Bakım, Destek ve Güncelleme",
     kind: "license",
     priceCents: 299_000,
     grants: { "feature.license": true },

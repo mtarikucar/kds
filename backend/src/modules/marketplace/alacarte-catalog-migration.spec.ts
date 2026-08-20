@@ -29,6 +29,20 @@ const DOWN_SQL = join(
   "../../../prisma/migrations/20260811100000_alacarte_catalog/down.sql",
 );
 
+/**
+ * Follow-up migrations that change what the base catalog migration wrote.
+ *
+ * The tripwire compares the constant against the COMPOSED state — base
+ * migration plus every follow-up listed here — rather than against the base
+ * alone. Comparing against the base alone would make any legitimate reprice
+ * impossible without rewriting an already-applied migration, which is the one
+ * thing a migration may never do. Add a file here whenever a new migration
+ * changes a catalog price or retires a product.
+ */
+const FOLLOW_UP_SQL = [
+  "20260820120000_reprice_licence_and_stock/migration.sql",
+].map((rel) => join(__dirname, "../../../prisma/migrations", rel));
+
 interface ParsedRow {
   code: string;
   kind: string;
@@ -70,6 +84,43 @@ function parseUpserts(sql: string): ParsedRow[] {
   return rows;
 }
 
+/**
+ * Split into per-statement chunks on the UPDATE keyword rather than on `;`.
+ * Semicolons appear INSIDE the copy this migration writes (the licence
+ * description reads "…yıl dönümü olur; sonradan aldığınız her modül…"), so a
+ * naive `split(";")` tears one statement into pieces and silently reads no
+ * price at all.
+ */
+function updateStatements(sql: string): string[] {
+  return executableSql(sql)
+    .split(/(?=UPDATE\s+"marketplace_addons")/)
+    .filter((s) => /UPDATE\s+"marketplace_addons"/.test(s));
+}
+
+/** code -> new priceCents, from a follow-up migration's `UPDATE ... SET`. */
+function parseRepricing(sql: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const stmt of updateStatements(sql)) {
+    // First price after SET is the new one; the WHERE guard deliberately
+    // carries the OLD value and must not be mistaken for it.
+    const price = /SET[\s\S]*?"priceCents"\s*=\s*(\d+)/.exec(stmt);
+    const code = /WHERE[\s\S]*?"code"\s*=\s*'([a-z0-9_]+)'/.exec(stmt);
+    if (price && code) out.set(code[1], Number(price[1]));
+  }
+  return out;
+}
+
+/** Codes a follow-up migration archives — retired, but never deleted. */
+function parseArchived(sql: string): string[] {
+  const codes: string[] = [];
+  for (const stmt of updateStatements(sql)) {
+    if (!/SET\s+"status"\s*=\s*'archived'/.test(stmt)) continue;
+    const list = /"code"\s+IN\s*\(([^)]*)\)/.exec(stmt);
+    if (list) codes.push(...[...list[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]));
+  }
+  return codes;
+}
+
 describe("à-la-carte catalog migration", () => {
   const sql = readFileSync(MIGRATION_SQL, "utf8");
   const down = readFileSync(DOWN_SQL, "utf8");
@@ -77,14 +128,33 @@ describe("à-la-carte catalog migration", () => {
   const downOnly = executableSql(down);
   const parsed = parseUpserts(sql);
 
+  const followUps = FOLLOW_UP_SQL.map((p) => readFileSync(p, "utf8"));
+  const reprices = new Map(
+    followUps.flatMap((f) => [...parseRepricing(f).entries()]),
+  );
+  const archivedLater = new Set(followUps.flatMap(parseArchived));
+
+  /** What a fully migrated database actually holds, as sellable rows. */
+  const effective = parsed
+    .filter((r) => !archivedLater.has(r.code))
+    .map((r) => ({ ...r, priceCents: reprices.get(r.code) ?? r.priceCents }));
+
+  it("retires products only through RETIRED_ADDON_CODES", () => {
+    // A follow-up that archives a row without listing it in the constant would
+    // leave the seed re-publishing it on every fresh database.
+    for (const code of archivedLater) {
+      expect([...RETIRED_ADDON_CODES]).toContain(code);
+    }
+  });
+
   it("upserts exactly the products in the catalog constant", () => {
-    expect(parsed.map((r) => r.code).sort()).toEqual(
+    expect(effective.map((r) => r.code).sort()).toEqual(
       ALACARTE_CATALOG.map((p) => p.code).sort(),
     );
   });
 
   it("carries the same kind, billing and PRICE as the constant", () => {
-    for (const row of parsed) {
+    for (const row of effective) {
       const product = ALACARTE_CATALOG_BY_CODE.get(row.code)!;
       expect({
         code: row.code,

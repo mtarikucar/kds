@@ -1,9 +1,8 @@
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Compass, Package, ClipboardList, Truck, ChefHat, Wrench, LucideIcon } from 'lucide-react';
+import { Package, ClipboardList, Truck, ChefHat, Wrench, LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { STOCK_TABS, parseStockTab, type StockTab } from './stockTabs';
-import GuidanceTab from './stock/GuidanceTab';
 import ItemsTab from './stock/ItemsTab';
 import OrdersTab from './stock/OrdersTab';
 import SuppliersHub from './stock/SuppliersHub';
@@ -11,7 +10,6 @@ import CostingTab from './stock/CostingTab';
 import OperationsTab from './stock/OperationsTab';
 
 const ICONS: Record<StockTab, LucideIcon> = {
-  guide: Compass,
   items: Package,
   orders: ClipboardList,
   suppliers: Truck,
@@ -20,7 +18,8 @@ const ICONS: Record<StockTab, LucideIcon> = {
 };
 
 // Tab lives in the URL (?tab=…) so refresh/deep-link/back all work — same
-// convention as Tables (?view). Unknown tab → guide.
+// convention as Tables (?view). Unknown tab → items; the retired 'guide' tab
+// redirects to suppliers, where its content moved.
 const StockPage = () => {
   const { t } = useTranslation('stock');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,7 +29,7 @@ const StockPage = () => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (tab === 'guide') next.delete('tab');
+        if (tab === 'items') next.delete('tab');
         else next.set('tab', tab);
         return next;
       },
@@ -72,7 +71,6 @@ const StockPage = () => {
         </nav>
       </div>
 
-      {active === 'guide' && <GuidanceTab />}
       {active === 'items' && <ItemsTab />}
       {active === 'orders' && <OrdersTab />}
       {active === 'suppliers' && <SuppliersHub />}

@@ -79,7 +79,7 @@ route**; a route without the decorator denies nobody.
 ## Catalog products and what they grant
 
 Prices are **TRY**, **VAT-inclusive**, and stored in the catalog as cents
-(`priceCents`): `299000` = ₺2,990.00. `annual` lines are day-prorated to the
+(`priceCents`): `490000` = ₺4,900.00. `annual` lines are day-prorated to the
 account anniversary — see the
 [Licensing & Billing API](/en/developer/billing-api).
 
@@ -87,20 +87,20 @@ account anniversary — see the
 
 | Code | Price | Grants | Requires licence |
 | --- | --- | --- | --- |
-| `license_annual` | ₺2,990/yr | `feature.license` | — |
+| `license_annual` | ₺4,900/yr | `feature.license`, `feature.prioritySupport`, `integration.fiscal` += `efatura` | — |
 
 ### Modules
 
 | Code | Price | Grants | Requires licence |
 | --- | --- | --- | --- |
 | `advanced_reports` | ₺1,290/yr | `feature.advancedReports` | ✅ |
-| `module_inventory` | ₺1,490/yr | `feature.inventoryTracking` | ✅ |
+| `module_inventory` | ₺3,900/yr | `feature.inventoryTracking` | ✅ |
 | `module_reservations` | ₺990/yr | `feature.reservationSystem` | ✅ |
 | `module_personnel` | ₺990/yr | `feature.personnelManagement` | ✅ |
 | `module_ai_studio` | ₺1,990/yr | `feature.aiContentGeneration` | ✅ |
 | `api_access` | ₺2,490/yr | `feature.apiAccess` | ✅ |
 | `module_external_display` | ₺1,990/yr | `feature.externalDisplay` | ✅ |
-| `priority_support` | ₺1,990/yr | `feature.prioritySupport` | ✅ |
+| `priority_support` | — | `feature.prioritySupport` | **archived v3.6.7** — folded into `license_annual` |
 
 ### Integrations
 
@@ -109,7 +109,7 @@ account anniversary — see the
 | `delivery_yemeksepeti` | ₺2,490/yr | `integration.delivery` += `yemeksepeti`, `feature.deliveryIntegration` | ✅ |
 | `delivery_getir` | ₺2,490/yr | `integration.delivery` += `getir`, `feature.deliveryIntegration` | ✅ |
 | `delivery_trendyol_yemek` | ₺2,490/yr | `integration.delivery` += `trendyol_yemek`, `feature.deliveryIntegration` | ✅ |
-| `fiscal_efatura` | ₺1,990/yr | `integration.fiscal` += `efatura` | ✅ |
+| `fiscal_efatura` | — | `integration.fiscal` += `efatura` | **archived v3.6.7** — folded into `license_annual` |
 | `fiscal_hugin` | ₺2,990/yr | `integration.fiscal` += `hugin` | ✅ |
 | `caller_id_integration` | ₺1,490/yr | `integration.caller` += `generic` | ✅ |
 | `sms_integration` | ₺990/yr | `integration.sms` += `*` | ✅ |

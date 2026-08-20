@@ -21,7 +21,7 @@ import PricingPage from './PricingPage';
 describe('PricingPage', () => {
   const product = (over: Record<string, unknown> = {}) => ({
     code: 'license_annual',
-    name: 'HummyTummy Lisansı',
+    name: 'Bakım, Destek ve Güncelleme',
     description: null,
     kind: 'license',
     billing: 'annual',

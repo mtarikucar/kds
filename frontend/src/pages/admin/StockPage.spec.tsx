@@ -4,8 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StockPage from './StockPage';
 
-// Stub the six tab bodies so the shell test is about routing, not tab internals.
-vi.mock('./stock/GuidanceTab', () => ({ default: () => <div>GUIDE_BODY</div> }));
+// Stub the five tab bodies so the shell test is about routing, not tab internals.
 vi.mock('./stock/ItemsTab', () => ({ default: () => <div>ITEMS_BODY</div> }));
 vi.mock('./stock/OrdersTab', () => ({ default: () => <div>ORDERS_BODY</div> }));
 vi.mock('./stock/SuppliersHub', () => ({ default: () => <div>SUPPLIERS_BODY</div> }));
@@ -27,21 +26,25 @@ const renderAt = (initial: string) => {
 };
 
 describe('StockPage shell', () => {
-  it('defaults to the guide tab with no ?tab', () => {
+  it('defaults to the items tab with no ?tab', () => {
     renderAt('/admin/stock');
-    expect(screen.getByText('GUIDE_BODY')).toBeInTheDocument();
+    expect(screen.getByText('ITEMS_BODY')).toBeInTheDocument();
   });
   it('restores the tab from ?tab on load (deep link)', () => {
     renderAt('/admin/stock?tab=orders');
     expect(screen.getByText('ORDERS_BODY')).toBeInTheDocument();
   });
-  it('falls back to guide for an unknown ?tab', () => {
+  it('falls back to items for an unknown ?tab', () => {
     renderAt('/admin/stock?tab=bogus');
-    expect(screen.getByText('GUIDE_BODY')).toBeInTheDocument();
+    expect(screen.getByText('ITEMS_BODY')).toBeInTheDocument();
   });
-  it('renders all six tab buttons', () => {
+  it('sends the retired ?tab=guide link to suppliers, where its content moved', () => {
+    renderAt('/admin/stock?tab=guide');
+    expect(screen.getByText('SUPPLIERS_BODY')).toBeInTheDocument();
+  });
+  it('renders all five tab buttons', () => {
     renderAt('/admin/stock');
-    ['nav.guide', 'nav.items', 'nav.orders', 'nav.suppliers', 'nav.costing', 'nav.operations'].forEach((k) => {
+    ['nav.items', 'nav.orders', 'nav.suppliers', 'nav.costing', 'nav.operations'].forEach((k) => {
       expect(screen.getByRole('tab', { name: k })).toBeInTheDocument();
     });
   });

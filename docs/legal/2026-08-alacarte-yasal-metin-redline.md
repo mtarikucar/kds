@@ -34,9 +34,9 @@ olan metin geri alınabilir kalmalı. Doğru yol yeni bir **v3.0** yayımlamakt�
 | Çekirdek | POS, adisyon, KDS, menü, masa/kat planı, QR menü, sipariş, kasa, temel raporlar, ekip/rol, müşteriler, cihaz/şube paneli, özel marka+alan adı — **süresiz ücretsiz**, kullanıcı/masa/ürün/kategori/aylık sipariş **sınırsız**, ilk şube ücretsiz | `entitlements/free-baseline.const.ts` |
 | Deneme süresi | **Yok.** Ücretsizlik kalıcı olduğu için deneme kavramı ortadan kalktı | — |
 | Plan/kademe | **Yok.** Ürünler tek tek satın alınır | `marketplace/alacarte-catalog.const.ts` |
-| Lisans | 2.990₺/yıl; ücretli modülleri hem **satın almanın** hem **kullanmanın** ön koşulu | `checkout/addon-purchasability.rules.ts`, `entitlements/plan-projector.service.ts` |
+| Bakım, Destek ve Güncelleme (eski adı "Lisans") | 4.900₺/yıl; ücretli modülleri hem **satın almanın** hem **kullanmanın** ön koşulu. Öncelikli destek, e-Fatura gönderimi, tüm sürüm güncellemeleri ve günlük yedekleme bu kalemin içindedir (v3.6.7) | `checkout/addon-purchasability.rules.ts`, `entitlements/plan-projector.service.ts` |
 | Faturalama dönemi | **Yalnızca yıllık** ve tek seferlik. Aylık dönem yok | katalogdaki `billing: "annual" \| "oneTime"` |
-| Orantılama | Lisans alım günü değişmez yıl dönümü; yıl içi alımlar kalan güne orantılı; yıl dönümüne <14 gün kalmışsa sonraki döngüye taşınır; satır alt sınırı 1₺ | `licensing/anniversary.ts` |
+| Orantılama | Bakım, Destek ve Güncelleme alım günü değişmez yıl dönümü; yıl içi alımlar kalan güne orantılı; yıl dönümüne <14 gün kalmışsa sonraki döngüye taşınır; satır alt sınırı 1₺ | `licensing/anniversary.ts` |
 | Yenileme | **Manuel.** Otomatik tahsilat yok, kayıtlı kart yok. Hatırlatma 30/7/1 gün kala | `licensing/renewal-cycle.service.ts`, `renewal-scheduler.service.ts` |
 | Ödenmezse | 7 gün ek süre; sonra yalnızca **erişim** kararır, **veri silinmez**; ödenince aynen geri açılır | `marketplace/tenant-addon-sweeper.service.ts` |
 | Ödeme | PayTR, yalnız TRY | `payments/adapters/paytr.adapter.ts` |
@@ -76,7 +76,7 @@ olan metin geri alınabilir kalmalı. Doğru yol yeni bir **v3.0** yayımlamakt�
 | §4.4 | "yenileme, **plan yükseltme**" | Plan yükseltme yok | "yenileme veya ek modül alımı" |
 | **§5 (tamamı)** | "**Aylık Abonelik** İadeleri" + §5.2 "Otomatik yenileme… iptal edilirse" | **Aylık abonelik ve otomatik yenileme yok** | Bölümü kaldır. Yerine: "Yenileme manuel olduğu için, yenilemek istemeyen Üye'nin herhangi bir işlem yapmasına gerek yoktur; tahsilat gerçekleşmez." |
 | §6.1 | Yıllık: ilk 30 gün tam iade | **Korunabilir ve modele uygun** | Koru |
-| **§6.2** | Orantısal iade örneği "**aylık plan fiyatı** üzerinden" (12.000₺ yıllık / 1.200₺ aylık) | Aylık fiyat diye bir şey yok; örnek hesaplanamaz | Orantıyı **gün bazlı** yeniden kur ve örneği gerçek katalog kalemiyle ver (ör. Stok & Maliyet 1.490₺/yıl) |
+| **§6.2** | Orantısal iade örneği "**aylık plan fiyatı** üzerinden" (12.000₺ yıllık / 1.200₺ aylık) | Aylık fiyat diye bir şey yok; örnek hesaplanamaz | Orantıyı **gün bazlı** yeniden kur ve örneği gerçek katalog kalemiyle ver (ör. Stok & Maliyet 3.900₺/yıl) |
 | §6.3 | 6 ay sonrası iade yok | Korunabilir | Koru |
 | **§7 (tamamı)** | "Plan Değişiklikleri — yükseltme/düşürme" | Plan yok | Bölümü kaldır. Yerine: "Modül ekleme — yıl dönümüne orantılı ücretlendirilir. Kapasite azaltma — yalnızca yenilemede geçerli olur, dönem içi iade yapılmaz." |
 | §8 | "Madde 6.3'te belirtilen süreler" | §6.3 atfı iade **yapılmayan** hali gösteriyor, döngüsel | Atfı düzelt |

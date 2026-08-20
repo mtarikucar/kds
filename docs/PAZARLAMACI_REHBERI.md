@@ -34,7 +34,7 @@ KDS, Türkiye'deki kafe ve restoranlar için tek bir hesapta çalışan bir SaaS
 
 Bunların hepsi **kredi kartı istenmeden**, **lisans gerekmeden** ve **süre sınırı olmadan** açıktır. Üstelik **kullanıcı, masa, ürün, kategori ve aylık sipariş sayısı sınırsızdır** ve **ilk şube ücretsizdir**.
 
-Ücretli tarafta ise tek tek satın alınan yıllık kalemler var: stok ve maliyet, gelişmiş raporlar, rezervasyon, personel, AI menü stüdyosu, API, teslimat platformu entegrasyonları (Yemeksepeti / Getir / Trendyol Yemek), e-Fatura, ÖKC, çağrı-ID, SMS, ek şube.
+Ücretli tarafta ise tek tek satın alınan yıllık kalemler var: stok ve maliyet, gelişmiş raporlar, rezervasyon, personel, AI menü stüdyosu, API, teslimat platformu entegrasyonları (Yemeksepeti / Getir / Trendyol Yemek), ÖKC, çağrı-ID, SMS, ek şube. Öncelikli destek ve e-Fatura ayrı kalem değil — Bakım, Destek ve Güncelleme paketinin içinde.
 
 **Neden satması kolay?**
 
@@ -55,26 +55,27 @@ Tüm fiyatlar **Türk Lirası**, **KDV dahil** ve **yıllıktır** (aksi belirti
 
 Yukarıdaki 1. bölümdeki listenin tamamı. Ücreti yok, süresi yok, lisans gerekmiyor, kart istenmiyor.
 
-### Lisans (ücretli tarafın ön koşulu)
+### Bakım, Destek ve Güncelleme (ücretli tarafın ön koşulu)
 
-| Ürün | Yıllık |
-|---|---:|
-| **Lisans** (mağazada *HummyTummy Lisansı*) | **₺2.990** |
+| Ürün | Yıllık | İçindekiler |
+|---|---:|---|
+| **Bakım, Destek ve Güncelleme** | **₺4.900** | Öncelikli destek • e-Fatura (Nilvera) gönderimi • tüm sürüm güncellemeleri • günlük yedekleme |
 
-Lisans, ücretli modülleri **hem satın almanın hem de kullanmanın** ön koşuludur. Müşteri sepete bir modül attığında mağaza lisansı otomatik ekler. Lisans yenilenmezse ücretli modüllerin erişimi de kapanır — **ücretsiz çekirdek etkilenmez**.
+Ücretli modülleri **hem satın almanın hem de kullanmanın** ön koşuludur. Müşteri sepete bir modül attığında mağaza bu kalemi otomatik ekler. Yenilenmezse ücretli modüllerin erişimi de kapanır — **ücretsiz çekirdek etkilenmez**.
+
+> **Satarken bunu söyle:** bu kalem eskiden "Lisans" adıyla ₺2.990'dı ve tek başına hiçbir şey açmıyordu. Artık içinde öncelikli destek (ayrı satılırken ₺1.990) ve e-Fatura (ayrı satılırken ₺1.990) var. Ayrı ayrı ₺6.970 tutan üç kalem, tek kalemde **₺4.900**. Müşteri ₺2.070 kazanıyor.
 
 ### Modüller (yıllık, lisans ön koşuluyla)
 
 | Modül | Yıllık | Ne açar |
 |---|---:|---|
 | Gelişmiş Rapor & Analitik | **₺1.290** | Detaylı satış/ürün/personel/müşteri analitiği, muhasebe back-office, e-belge ayarları |
-| Stok & Maliyet Yönetimi | **₺1.490** | Reçete, sayım, satın alma siparişi, fire takibi, tedarikçi, şubeler arası transfer |
+| Stok & Maliyet Yönetimi | **₺3.900** | Reçete, sayım, satın alma siparişi, fire takibi, tedarikçi, şubeler arası transfer |
 | Rezervasyon Sistemi | **₺990** | Rezervasyon takvimi, müsaitlik hesabı, halka açık online rezervasyon sayfası |
 | Personel Yönetimi | **₺990** | Puantaj, vardiya planlama, vardiya değişimi, performans takibi |
 | AI Menü Stüdyosu | **₺1.990** | AI ile ürün görseli/video/3D model üretimi, menü OCR içe aktarma (üretimler kontörle harcanır) |
 | API & Webhook Erişimi | **₺2.490** | REST API anahtarları, giden webhook'lar |
 | Partner Ekran API | **₺1.990** | Üçüncü taraf ekranların menüyü göstermesi için ekran bazlı API |
-| Öncelikli Destek | **₺1.990** | Destek taleplerinde öncelikli sıra, garantili yanıt süresi |
 
 ### Entegrasyonlar (yıllık, lisans ön koşuluyla)
 
@@ -83,7 +84,6 @@ Lisans, ücretli modülleri **hem satın almanın hem de kullanmanın** ön koş
 | Yemeksepeti | **₺2.490** | Yemeksepeti siparişleri otomatik POS ve mutfağa düşer |
 | Getir | **₺2.490** | Getir siparişleri otomatik POS ve mutfağa düşer |
 | Trendyol Yemek | **₺2.490** | Trendyol Yemek siparişleri otomatik POS ve mutfağa düşer |
-| e-Fatura (Nilvera) | **₺1.990** | Satış faturalarının Nilvera üzerinden e-Fatura / e-Arşiv gönderimi |
 | ÖKC / Yazarkasa (Hugin) | **₺2.990** | Hugin yazarkasa ile fiş kesimi ve mali rapor senkronizasyonu |
 | Çağrı-ID | **₺1.490** | Gelen çağrıda müşteriyi otomatik tanıma, tek tıkla sipariş |
 | SMS Bildirimleri | **₺990** | Sipariş/rezervasyon/kampanya SMS'i (gönderimler kontörle harcanır) |
@@ -118,10 +118,12 @@ Kontörler yıllık yenilemeye girmez. Bittiğinde müşteri yenisini alır.
 | Profil | Sepet | Yıllık toplam |
 |---|---|---:|
 | Küçük kafe, sadece kasa istiyor | Hiçbir şey — ücretsiz çekirdek | **₺0** |
-| Stok maliyetini kontrol etmek isteyen restoran | Lisans + Stok & Maliyet | **₺4.480** |
-| Rezervasyon alan şehir merkezi restoranı | Lisans + Rezervasyon + Gelişmiş Rapor | **₺5.270** |
-| Paket servis yapan işletme | Lisans + Yemeksepeti + Getir + Trendyol Yemek | **₺10.460** |
-| 3 şubeli zincir | Lisans + 2 × Ek Şube + Gelişmiş Rapor | **₺12.260** |
+| Stok maliyetini kontrol etmek isteyen restoran | Bakım&Destek + Stok & Maliyet | **₺8.800** |
+| Rezervasyon alan şehir merkezi restoranı | Bakım&Destek + Rezervasyon + Gelişmiş Rapor | **₺7.180** |
+| Paket servis yapan işletme | Bakım&Destek + Yemeksepeti + Getir + Trendyol Yemek | **₺12.370** |
+| 3 şubeli zincir | Bakım&Destek + 2 × Ek Şube + Gelişmiş Rapor | **₺14.170** |
+
+Her sepette öncelikli destek ve e-Fatura zaten dahil — ayrıca satmıyorsun, ayrıca ücretlendirmiyorsun.
 
 ---
 
@@ -129,8 +131,8 @@ Kontörler yıllık yenilemeye girmez. Bittiğinde müşteri yenisini alır.
 
 Bu bölüm satışın en kritik parçası. Yanlış anlatılan tek cümle iptal sebebidir.
 
-- **Yıl dönümü sabittir.** Müşteri lisansı hangi gün aldıysa o gün hesabın **değişmez yıl dönümüdür**.
-- **Yıl içinde alınan kalem orantılı fiyatlanır.** Yıl dönümüne 90 gün kalmışken alınan ₺1.490'lık modül, o 90 gün için fiyatlanır — sonraki yıl dönümünde tam fiyattan yenilenir. Amaç: hesabın tek tarihte toplanması.
+- **Yıl dönümü sabittir.** Müşteri Bakım, Destek ve Güncelleme kalemini hangi gün aldıysa o gün hesabın **değişmez yıl dönümüdür**.
+- **Yıl içinde alınan kalem orantılı fiyatlanır.** Yıl dönümüne 90 gün kalmışken alınan ₺3.900'lık modül, o 90 gün için fiyatlanır — sonraki yıl dönümünde tam fiyattan yenilenir. Amaç: hesabın tek tarihte toplanması.
 - **Yıl dönümüne 14 günden az kalmışsa** kalem sonraki tam döngüye taşınır (kalan gün + bir tam yıl). Kimse 5 günlük bir kalem satın almaz.
 - **Hiçbir fatura satırı ₺1'in altına inmez.**
 - **Tek fatura, tek yenileme tarihi.** Müşteri yılda bir kez, kalemlerinin tamamını gösteren tek bir faturayla öder.
@@ -153,10 +155,10 @@ Komisyon = Ödenen sepet toplamı × En yüksek tutarlı kalemin oranı
 
 | Sepet | Toplam | Oran | Komisyonun |
 |---|---:|:---:|---:|
-| Lisans + Stok & Maliyet | ₺4.480 | %10 | **₺448** |
-| Lisans + Rezervasyon + Gelişmiş Rapor | ₺5.270 | %10 | **₺527** |
-| Lisans + 3 teslimat entegrasyonu | ₺10.460 | %10 | **₺1.046** |
-| Lisans + 2 Ek Şube + Gelişmiş Rapor | ₺12.260 | %10 | **₺1.226** |
+| Bakım&Destek + Stok & Maliyet | ₺8.800 | %10 | **₺880** |
+| Bakım&Destek + Rezervasyon + Gelişmiş Rapor | ₺7.180 | %10 | **₺718** |
+| Bakım&Destek + 3 teslimat entegrasyonu | ₺12.370 | %10 | **₺1.237** |
+| Bakım&Destek + 2 Ek Şube + Gelişmiş Rapor | ₺14.170 | %10 | **₺1.417** |
 
 **Orantılı fiyat komisyonu da düşürür.** Yıl ortasında eklenen bir modülün faturası orantılı kesilir; komisyon o orantılı tutar üzerinden yazılır. Büyük sepeti yıl dönümüne yakın değil, **yıl dönümünde** kurdur.
 
@@ -261,7 +263,7 @@ Eski modelde "hangi paket?" diye başlıyordun. Artık akış şu:
 
 1. **Ücretsiz hesabı aç ve kurdur.** Menüyü gir, masaları çiz, QR'ı bas. Bu adımda müşteriden tek kuruş istemiyorsun — itiraz yüzeyi sıfır.
 2. **İşletmeyi çalışırken izle.** Hangi eksik canını yakıyor? Fire mi veriyor, telefonla rezervasyon mu alıyor, Yemeksepeti tabletiyle mi boğuşuyor?
-3. **O eksiğin modülünü sat.** Tek kalem, net fayda, net fiyat. "Fireyi görmek için Stok & Maliyet: yılda ₺1.490 + lisans."
+3. **O eksiğin modülünü sat.** Tek kalem, net fayda, net fiyat. "Fireyi görmek için Stok & Maliyet: yılda ₺3.900 + Bakım&Destek."
 4. **Yıl dönümünde genişlet.** Yıl dönümü, orantı kaybı olmadan yeni kalem eklemenin en doğru anıdır.
 
 ### Hedef müşteri profili önceliği
@@ -296,8 +298,8 @@ Eski modelde "hangi paket?" diye başlıyordun. Artık akış şu:
 - **"Aylık ödeyebilir miyim?"**
   → Ücretli kalemler yıllıktır. Bunun karşılığında yıl içinde eklediğiniz her kalem, hesabınızın yıl dönümüne kalan gün kadar orantılı fiyatlanır — yani yılın ortasında alırsanız tam yıl ödemezsiniz, tek faturada tek tarihte toplanırsınız.
 
-- **"Bu 'lisans' da ne? Modülün fiyatı yetmiyor mu?"**
-  → Lisans, ücretli tarafı açan yıllık anahtardır: hem satın almanın hem de kullanmanın ön koşuludur ve hesabınızın yıl dönümünü belirler. Bir kez alınır, kaç modül eklerseniz ekleyin bir tanedir.
+- **"Bu 'Bakım, Destek ve Güncelleme' de ne? Modülün fiyatı yetmiyor mu?"**
+  → İçinde üç şey var: destek taleplerinizde öncelikli sıra ve garantili yanıt süresi, e-Fatura/e-Arşiv gönderimi ve tüm sürüm güncellemeleri + günlük yedekleme. Bunları ayrı ayrı satsak ₺6.970 tutuyor; tek kalemde ₺4.900. Bir kez alınır, kaç modül eklerseniz ekleyin bir tanedir ve hesabınızın yıl dönümünü belirler.
 
 - **"KDV üstüne binecek mi?"**
   → Hayır. İlan edilen tutarlar KDV dahildir; faturada KDV ayrı gösterilir ama toplam değişmez.

@@ -61,7 +61,7 @@ const TermsOfServicePage: React.FC = () => {
                   The core of the Service — POS/order management, kitchen display, menu, tables and floor plan, QR menu, orders, cash, basic reports, team and roles, customers, device and branch management, and custom branding — is free and unlimited for every account and requires no credit card. You pay only for the items you choose to add.
                 </p>
                 <ul>
-                  <li>Paid items are the annual HummyTummy Licence together with individually purchased annual modules, integrations and capacity items, plus one-time credit packs and services. The licence is a prerequisite for buying and using any paid module.</li>
+                  <li>Paid items are the annual Maintenance, Support & Updates together with individually purchased annual modules, integrations and capacity items, plus one-time credit packs and services. The licence is a prerequisite for buying and using any paid module.</li>
                   <li>All listed prices are in Turkish Lira and include VAT (KDV).</li>
                   <li>Annual items are billed in advance and prorated by day to the days remaining until your account's anniversary, so everything lands on a single invoice that renews on a single date.</li>
                   <li>Renewal is manual. We do not store your card and never charge it automatically; we remind you 30, 7 and 1 day before your anniversary.</li>
@@ -144,7 +144,7 @@ const TermsOfServicePage: React.FC = () => {
                   Hizmetin çekirdeği — POS/adisyon, mutfak ekranı (KDS), menü, masa ve kat planı, QR menü, sipariş, kasa, temel raporlar, ekip ve roller, müşteriler, cihaz ve şube yönetimi ile özel marka — her hesap için ücretsiz ve sınırsızdır; kredi kartı gerektirmez. Yalnızca eklemeyi seçtiğiniz kalemler için ödeme yaparsınız.
                 </p>
                 <ul>
-                  <li>Ücretli kalemler: yıllık HummyTummy Lisansı ile tek tek satın alınan yıllık modüller, entegrasyonlar ve kapasite kalemleri; ayrıca tek seferlik kontör paketleri ve hizmetler. Lisans, ücretli modülleri satın almanın ve kullanmanın ön koşuludur.</li>
+                  <li>Ücretli kalemler: yıllık Bakım, Destek ve Güncelleme kalemi ile tek tek satın alınan yıllık modüller, entegrasyonlar ve kapasite kalemleri; ayrıca tek seferlik kontör paketleri ve hizmetler. Bakım, Destek ve Güncelleme kalemi, ücretli modülleri satın almanın ve kullanmanın ön koşuludur; öncelikli destek ve e-Fatura gönderimi bu kalemin içindedir.</li>
                   <li>Yayınlanan tüm fiyatlar Türk Lirası cinsindendir ve KDV dahildir.</li>
                   <li>Yıllık kalemler peşin faturalandırılır ve hesabınızın yıl dönümüne kalan gün sayısına göre gün bazlı orantılanır; böylece tüm kalemleriniz tek faturada toplanır ve tek tarihte yenilenir.</li>
                   <li>Yenileme manueldir. Kartınızı saklamayız ve otomatik tahsilat yapmayız; yıl dönümünüze 30, 7 ve 1 gün kala hatırlatırız.</li>
