@@ -18,20 +18,27 @@
 --    önce zaten bir cancelledAt'i olabilir ve onu silmek down'ı sadık bir ters
 --    işlem olmaktan çıkarır. to_jsonb(NULL) 'null' ürettiği için NULLIF ile
 --    tekrar NULL'a çevrilir.
+--    pricingMeta'nın kendisi de aynı ilkeye tabi: up COALESCE(pricingMeta,
+--    '{}') ile başladığı için stamp anahtarları çıkarılınca dıştaki NULLIF
+--    boş '{}' kalırsa gerçek NULL'a çevirir — up'tan önce hiç pricingMeta'sı
+--    olmayan (satırların büyük çoğunluğu) bir satır down sonrası '{}' değil
+--    NULL'a döner; round-trip'te gözlemlenen NULL->'{}' sürüklenmesini kapatır.
 UPDATE "tenant_addons" t
    SET "status" = t."pricingMeta" ->> 'migratedPriorStatus',
        "cancelledAt" = NULLIF(t."pricingMeta" ->> 'migratedPriorCancelledAt', 'null')::timestamp,
        "endedAt"     = NULLIF(t."pricingMeta" ->> 'migratedPriorEndedAt', 'null')::timestamp,
-       "pricingMeta" = ((((t."pricingMeta" - 'migratedPriorStatus')
+       "pricingMeta" = NULLIF(((((t."pricingMeta" - 'migratedPriorStatus')
                           - 'migratedPriorCancelledAt')
                           - 'migratedPriorEndedAt')
-                          - 'migratedFrom')
+                          - 'migratedFrom'), '{}'::jsonb)
  WHERE t."pricingMeta" ? 'migratedPriorStatus';
 
--- 2. Taşınan satırları özgün SKU'larına geri yaz.
+-- 2. Taşınan satırları özgün SKU'larına geri yaz. pricingMeta burada da aynı
+--    NULLIF ile: taşınan satırın up'tan önce başka bir meta alanı yoksa (tek
+--    anahtarı migratedFrom idiyse) down onu gerçek NULL'a döndürür.
 UPDATE "tenant_addons" t
    SET "addOnId" = m."id",
-       "pricingMeta" = t."pricingMeta" - 'migratedFrom'
+       "pricingMeta" = NULLIF(t."pricingMeta" - 'migratedFrom', '{}'::jsonb)
   FROM "marketplace_addons" m
  WHERE m."code" = t."pricingMeta" ->> 'migratedFrom'
    AND t."pricingMeta" ? 'migratedFrom'
