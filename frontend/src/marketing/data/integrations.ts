@@ -43,26 +43,35 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
       {
         name: "Yemeksepeti",
         status: "entegre",
+        note: "Tek pakette dört platform",
         logo: "/brand/logos/yemeksepeti.png",
       },
-      { name: "Getir", status: "entegre", logo: "/brand/logos/getir.png" },
+      {
+        name: "Getir",
+        status: "entegre",
+        note: "Tek pakette dört platform",
+        logo: "/brand/logos/getir.png",
+      },
       {
         name: "Trendyol Yemek",
         status: "entegre",
+        note: "Tek pakette dört platform",
         logo: "/brand/logos/trendyol.png",
       },
-      // Migros Yemek ships and works, but it is not a separate purchase: the
-      // catalogue sells only yemeksepeti/getir/trendyol_yemek, while the route
-      // gate is domain-wide (`@RequiresIntegration("delivery")` with no
-      // provider, delivery-platforms.controller.ts) and DeliveryConfigService
-      // .create() does no per-vendor check. So owning ANY delivery integration
-      // enables the Migros adapter too. `entegre` is the honest status; the
-      // note keeps us from implying a Migros SKU exists.
+      // v3.6.8: Migros is no longer the odd one out. The three per-platform
+      // SKUs folded into `delivery_platforms` (₺2.499/yr) and Migros is one of
+      // the four vendors it grants — which matches what the domain-wide route
+      // gate (`@RequiresIntegration("delivery")`, no provider) always did.
       {
         name: "Migros Yemek",
         status: "entegre",
-        note: "Delivery entegrasyonuna dahil, ayrı ürün olarak satılmıyor",
+        note: "Tek pakette dört platform",
         logo: "/brand/logos/migros.png",
+      },
+      {
+        name: "Semt",
+        status: "yakinda",
+        note: "Entegrasyon yakında — ücretsiz",
       },
     ],
     noIntegration:

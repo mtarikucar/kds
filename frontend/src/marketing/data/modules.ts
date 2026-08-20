@@ -250,7 +250,7 @@ export const MODULES: Module[] = [
     imageKey: "deliveryScooter",
     category: "Entegrasyon & Donanım",
     bullets: [
-      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek tek panelde",
+      "Yemeksepeti, Getir, Trendyol Yemek ve Migros Yemek tek panelde (Semt yakında)",
       "Menü ve fiyatları tek panelden tüm platformlara gönderin",
       "Kurye aldı / teslim edildi bildirimi otomatik işlenir",
       "e-Fatura / e-Arşiv (Paraşüt, Foriba, Logo)",
