@@ -40,6 +40,12 @@ export interface CartItemService {
   // Free-form note from the buyer (delivery instructions, contact
   // person at the venue, etc.). Forwarded to InstallationRequest.notes.
   notes?: string;
+  /**
+   * v3.7.0 — 3D baskı: alıcının kendi menüsünden seçtiği ürün id'leri.
+   * SADECE `print3d_item` satırında anlamlıdır. Satırın adedi SUNUCUDA bu
+   * diziden türetilir; istemcinin `qty`'si yok sayılır.
+   */
+  productIds?: string[];
 }
 
 export type CartItem = CartItemAddOn | CartItemHardware | CartItemService;
@@ -60,6 +66,23 @@ export interface Cart {
    * mark that cycle paid in the same transaction as the provisioning.
    */
   renewalCycleId?: string;
+}
+
+/**
+ * v3.7.0 — bir print3d kaleminin satın alma anındaki anlık görüntüsü.
+ *
+ * Menü ürünleri GERÇEKTEN siliniyor ve menü düzenlemesi ödenmiş bir siparişi
+ * yeniden yazamaz, bu yüzden ad/foto/model quote anında dondurulur ve
+ * provizyon bunları Print3dJobItem'a birebir kopyalar.
+ */
+export interface Print3dLineSnapshot {
+  /** Ürün hâlâ varsa id'si; quote anında bulunamadıysa null. */
+  productId: string | null;
+  name: string;
+  imageUrl: string | null;
+  model3dUrl: string | null;
+  /** 0-tabanlı sıra — manifestoda kalemler bu sırayla basılır. */
+  position: number;
 }
 
 // Per-line metadata the QuoteService producer attaches and the
@@ -108,6 +131,11 @@ export interface PricedLineMeta {
   saleMode?: string;
   preferredDates?: string[];
   notes?: string;
+  // --- 3D baskı figür (v3.7.0) ---
+  /** Seçilen menü ürünlerinin id'leri — `print3d_item` adedi buradan türer. */
+  print3dProductIds?: string[];
+  /** Provizyon anında Print3dJobItem'a dondurulacak anlık görüntüler. */
+  print3dSnapshots?: Print3dLineSnapshot[];
 }
 
 export interface PricedLine {

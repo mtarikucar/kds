@@ -112,6 +112,26 @@ export class CartItemDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  // v3.7.0 — 3D baskı figür hizmeti: alıcının KENDİ menüsünden seçtiği ürünler.
+  // print3d_item satırının ADEDİ bu diziden TÜRETİLİR; istemcinin qty'si
+  // yok sayılır (QuoteService.resolvePrint3dSelection).
+  //
+  // Alan burada BEYAN EDİLMEK ZORUNDA: main.ts'in ValidationPipe'ı
+  // whitelist:true ile çalışır ve beyan edilmemiş alanı SESSİZCE siler —
+  // dizi kaybolur, adet 1'e düşer, 50 figür 50 kuruşa satılır.
+  @ApiPropertyOptional({
+    type: [String],
+    format: "uuid",
+    minItems: 1,
+    maxItems: 50,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsUUID("all", { each: true })
+  productIds?: string[];
 }
 
 export class CartDto {
