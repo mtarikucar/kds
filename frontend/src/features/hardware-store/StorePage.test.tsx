@@ -42,6 +42,24 @@ vi.mock('../../store/authStore', () => ({
     sel({ user: { email: 'op@x.com', firstName: 'Op', lastName: 'Erator' } }),
 }));
 
+// Onamın kendi spec'i var; burada üç yasal-belge sorgusunu her senaryoya
+// sürüklerdi. CatalogStore.test.tsx'teki yerleşik desen: `useConsentComplete`
+// bir bayrakla değiştirilir. Fark: buradaki stub GERÇEKTEN onChange çağırır,
+// çünkü testin iddiası "hangi id'ler gönderildi" — `default: () => null`
+// olsaydı acceptedDocs sonsuza dek [] kalır ve iddia hiç yeşile dönmezdi.
+let consentComplete = true;
+vi.mock('../legal/CheckoutConsent', () => ({
+  default: ({ onChange }: { onChange: (ids: string[]) => void }) => (
+    <button
+      data-testid="tick-consents"
+      onClick={() => onChange(['doc-kvkk', 'doc-sales', 'doc-refund'])}
+    >
+      consents
+    </button>
+  ),
+  useConsentComplete: () => consentComplete,
+}));
+
 // ShippingAddressForm has its own spec; stub it to a button that calls
 // onSubmit so we can assert the checkout intent wiring without re-testing the
 // form internals.
@@ -111,6 +129,7 @@ describe('StorePage', () => {
     intent.isPending = false;
     hardwareOrders.data = [];
     hardwareOrders.refetch.mockReset();
+    consentComplete = true;
     // Reset the shared in-memory cart between tests.
     useCartStore.getState().clear();
     window.sessionStorage.clear();
@@ -364,5 +383,63 @@ describe('StorePage', () => {
       );
       expect(screen.getByText('Confirming your payment')).toBeInTheDocument();
     });
+  });
+
+  it('sends acceptedDocumentIds with the checkout intent', async () => {
+    products.data = [makeProduct()];
+    intent.mutateAsync.mockResolvedValue({ paymentRef: 'CK-1', paymentLink: '' });
+    const { rerender } = renderStore();
+    fireEvent.click(screen.getAllByText(enHardware.store.card.addToCart)[0]);
+    // Checkout stays locked until a quote exists (quote-before-pay lock) —
+    // mirror the existing "opens the checkout modal…" test's pattern.
+    quote.data = {
+      lines: [],
+      currency: 'TRY',
+      subtotalCents: 50000,
+      taxCents: 9000,
+      shippingCents: 2500,
+      totalCents: 61500,
+      warnings: [],
+      isPureRecurring: false,
+    };
+    rerender(
+      <MemoryRouter>
+        <StorePage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(enHardware.store.checkout));
+    fireEvent.click(await screen.findByTestId('tick-consents'));
+    fireEvent.click(screen.getByTestId('ship-submit'));
+    await waitFor(() => expect(intent.mutateAsync).toHaveBeenCalled());
+    expect(intent.mutateAsync.mock.calls[0][0].acceptedDocumentIds).toEqual([
+      'doc-kvkk',
+      'doc-sales',
+      'doc-refund',
+    ]);
+  });
+
+  it('does not start a checkout while the three consents are unticked', async () => {
+    consentComplete = false;
+    products.data = [makeProduct()];
+    const { rerender } = renderStore();
+    fireEvent.click(screen.getAllByText(enHardware.store.card.addToCart)[0]);
+    quote.data = {
+      lines: [],
+      currency: 'TRY',
+      subtotalCents: 50000,
+      taxCents: 9000,
+      shippingCents: 2500,
+      totalCents: 61500,
+      warnings: [],
+      isPureRecurring: false,
+    };
+    rerender(
+      <MemoryRouter>
+        <StorePage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(enHardware.store.checkout));
+    fireEvent.click(await screen.findByTestId('ship-submit'));
+    expect(intent.mutateAsync).not.toHaveBeenCalled();
   });
 });

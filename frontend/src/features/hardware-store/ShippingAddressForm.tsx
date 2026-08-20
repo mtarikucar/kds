@@ -99,6 +99,12 @@ interface Props {
   branches?: Branch[];
   onSubmit: (result: { address: ShippingAddress; branchId?: string }) => void;
   submitting?: boolean;
+  /**
+   * v3.7.0 — DIŞ kapı. `submitting`'den farkı: bu, "işlem sürüyor" değil
+   * "henüz gönderilemez" demektir (ör. mesafeli satış onamı işaretlenmedi),
+   * bu yüzden düğme etiketi "İşleniyor…"a dönmez.
+   */
+  disabled?: boolean;
   submitLabel?: string;
 }
 
@@ -129,6 +135,7 @@ export default function ShippingAddressForm({
   branches,
   onSubmit,
   submitting,
+  disabled,
   submitLabel,
 }: Props) {
   const { t } = useTranslation('hardware');
@@ -421,7 +428,7 @@ export default function ShippingAddressForm({
 
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || disabled}
         className="w-full rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {submitting ? t('shippingForm.processing') : effectiveSubmitLabel}

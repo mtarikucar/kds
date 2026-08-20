@@ -213,16 +213,22 @@ describe('storeApi mutations', () => {
     expect(h.toastError).toHaveBeenCalledWith('Checkout failed');
   });
 
-  it('useCreateCheckoutIntent POSTs the intent endpoint', async () => {
+  it('useCreateCheckoutIntent POSTs the intent endpoint WITH the three consent ids', async () => {
+    // Bu alan backend'de ZORUNLU (create-intent.dto.ts). Kanca göndermediği
+    // sürece donanım/hizmet mağazasından PayTR ödemesi 400 ile ölür.
     h.post.mockResolvedValue({ data: { paymentRef: 'p' } });
     const { result } = renderHook(() => useCreateCheckoutIntent(), { wrapper });
     await result.current.mutateAsync({
       cart: { items: [] },
       buyer: { email: 'a@b.c', name: 'A', phone: '1' },
+      acceptedDocumentIds: ['doc-kvkk', 'doc-sales', 'doc-refund'],
     });
     expect(h.post).toHaveBeenCalledWith(
       '/v1/checkout/intent',
-      expect.objectContaining({ cart: { items: [] } }),
+      expect.objectContaining({
+        cart: { items: [] },
+        acceptedDocumentIds: ['doc-kvkk', 'doc-sales', 'doc-refund'],
+      }),
     );
   });
 

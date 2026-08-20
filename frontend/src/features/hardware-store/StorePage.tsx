@@ -24,6 +24,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useListBranches } from '../branches/branchesApi';
 import HardwareCheckoutResult from './HardwareCheckoutResult';
 import { stashPendingCheckoutRef, resolvePendingCheckoutRef, clearPendingCheckoutRef } from './checkoutRef';
+import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -135,6 +136,11 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
   // tweaking the cart after entering the address doesn't lose their typing.
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  // v3.7.0 — mesafeli satış onamı. Backend CreateCheckoutIntentDto bu üç
+  // id'yi zorunlu kılıyor; alan gönderilmediği için donanım mağazasından
+  // PayTR ödemesi bugüne kadar 400 alıyordu.
+  const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
+  const consentGiven = useConsentComplete(acceptedDocs);
 
   // Auto-add the ?sku=<sku> product on mount. Guarded with `processed` so
   // re-renders + state changes don't keep adding. Once it's processed we
@@ -193,7 +199,10 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
   }
 
   async function startCheckout(result: { address: ShippingAddress; branchId?: string }) {
-    if (lines.length === 0 || !user) return;
+    // Onam kapısı BURADA da duruyor: ShippingAddressForm'un disabled prop'u
+    // görsel kapı, bu ise para kapısı. İkisi ayrı olmalı — form ileride başka
+    // bir çağırandan da submit edilebilir.
+    if (lines.length === 0 || !user || !consentGiven) return;
     const { address, branchId } = result;
     setShippingAddress(address);
     const intentResult = await intent.mutateAsync({
@@ -216,6 +225,8 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
       // HardwareOrder.branchId. Address still in cart.shippingAddress
       // as the snapshot; branchId is the reference.
       branchId,
+      // v3.7.0 — yasal onam, PayTR jetonundan ÖNCE doğrulanıp kaydediliyor.
+      acceptedDocumentIds: acceptedDocs,
     });
     stashPendingCheckoutRef(intentResult.paymentRef);
     if (intentResult.paymentLink) {
@@ -505,11 +516,18 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
         <p className="mb-4 text-xs text-gray-500">
           {t('store.deliveryNote')}
         </p>
+        <div className="mb-4 border-b pb-4">
+          <h3 className="mb-2 text-xs font-semibold text-gray-900">
+            {t('store.consentTitle')}
+          </h3>
+          <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+        </div>
         <ShippingAddressForm
           initial={shippingAddress ?? undefined}
           branches={branches}
           onSubmit={startCheckout}
           submitting={intent.isPending}
+          disabled={!consentGiven}
           submitLabel={t('store.payWithPaytr')}
         />
         <p className="mt-3 text-[11px] text-gray-500">

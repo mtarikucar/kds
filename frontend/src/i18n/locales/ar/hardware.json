@@ -120,6 +120,7 @@
     "close": "Close",
     "deliveryNote": "Your hardware will be shipped to this address. The information will be transferred to the secure PayTR payment page.",
     "payWithPaytr": "Pay with PayTR",
+    "consentTitle": "الموافقات القانونية",
     "paytrNote": "Payment is processed securely by PayTR. Your card details are not shared with HummyTummy.",
     "card": {
       "gibCertified": "GİB certified",
