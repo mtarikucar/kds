@@ -23,6 +23,7 @@ import {
   EmptyStringToNumber,
   EmptyStringToUndefined,
 } from "../../../common/dto/transforms";
+import { NormalizePhone } from "../../../common/dto/normalize-phone";
 import { E164_PATTERN } from "../../../common/phone/e164.const";
 
 // Iter-85: customer-session token shape — 32 random bytes encoded as
@@ -134,6 +135,7 @@ export class CreateCustomerOrderDto {
 
   @ApiProperty({ required: false })
   @EmptyStringToUndefined()
+  @NormalizePhone()
   @IsString()
   @IsOptional()
   @MaxLength(20)

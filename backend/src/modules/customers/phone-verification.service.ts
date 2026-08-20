@@ -13,7 +13,7 @@ import {
   normalizePhone,
 } from "./customers.helpers";
 import { maskPhone } from "../../common/helpers/pii-mask.helper";
-import { E164_PATTERN } from "../../common/phone/e164.const";
+import { E164_PATTERN, E164_MESSAGE } from "../../common/phone/e164.const";
 
 // Per-tenant and per-phone daily send caps to bound SMS cost and blunt
 // pumping-fraud (attacker cycles target phones to evade the 60s per-phone
@@ -51,7 +51,10 @@ export class PhoneVerificationService {
   ): Promise<{ verificationId: string; expiresAt: Date; message: string }> {
     const phone = normalizePhone(phoneRaw);
     if (!E164_PATTERN.test(phone)) {
-      throw new BadRequestException("Invalid phone number format");
+      // Generic, no-field-name-needed context (a raw phone param, not a
+      // multi-field DTO) — the shared E164_MESSAGE is the genuinely right
+      // message here rather than a bespoke duplicate string.
+      throw new BadRequestException(E164_MESSAGE);
     }
 
     const now = new Date();

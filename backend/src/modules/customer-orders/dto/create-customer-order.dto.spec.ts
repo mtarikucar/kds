@@ -177,5 +177,18 @@ describe('CreateCustomerOrderDto (iter-84)', () => {
       const msgs = await errors(dto);
       expect(msgs.some((m) => /customerPhone/i.test(m))).toBe(true);
     });
+
+    // Fix round 1: this field is a public QR-menu surface with zero live
+    // frontend callers today, but a customer typing a bare local number
+    // ("0555 123 45 67") should be normalized like every other phone field
+    // on the API, not rejected outright — @NormalizePhone added here.
+    it('normalizes a locally-typed Turkish number via @NormalizePhone', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        customerPhone: '0555 123 45 67',
+      });
+      expect(dto.customerPhone).toBe('+905551234567');
+      expect(await errors(dto)).toEqual([]);
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { Transform, TransformFnParams } from "class-transformer";
 import { parsePhoneNumberFromString, CountryCode } from "libphonenumber-js";
 import { RequestContext } from "../context/request-context";
+import { resolveCountryProfile } from "../country/country.service";
 
 /**
  * Normalize a free-typed phone number to E.164 (e.g. "+905551234567").
@@ -19,8 +20,13 @@ import { RequestContext } from "../context/request-context";
  * The region is what makes a locally-typed number parseable ("0555…" is
  * Turkish, "90 123…" is Uzbek). When the caller doesn't pin one explicitly,
  * it comes from the tenant in flight — read synchronously off the ambient
- * request context — falling back to TR outside a request (cron, bootstrap,
- * seeds), where there is no tenant to ask.
+ * request context, resolved through the ONE door to a country profile,
+ * `resolveCountryProfile()` (the pure, non-DI function `IsCountryTaxRate`
+ * already uses for the identical reason: this runs from a plain function,
+ * not through Nest's injector, so `CountryService` can't be injected here).
+ * That function already owns the "unknown/absent code falls back to
+ * DEFAULT_COUNTRY (TR)" decision — this file does not re-decide it or
+ * duplicate the "TR" literal.
  *
  * NOTE — this `CountryCode` is libphonenumber-js's own type (the parsing
  * region), not Task 1's `CountryProfileCode`. Do not conflate the two.
@@ -33,8 +39,11 @@ export function normalizePhoneToE164(
   if (!trimmed) return "";
   const region =
     defaultRegion ??
-    (RequestContext.get()?.countryCode as CountryCode | undefined) ??
-    "TR";
+    // phoneRegion is authored in COUNTRY_PROFILES (code-reviewed config, not
+    // request input), so this is the one legitimate place to widen it to
+    // libphonenumber's CountryCode union.
+    (resolveCountryProfile(RequestContext.get()?.countryCode)
+      .phoneRegion as CountryCode);
   try {
     const parsed = parsePhoneNumberFromString(trimmed, region);
     if (parsed && parsed.isValid()) return parsed.number;

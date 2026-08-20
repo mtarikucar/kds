@@ -172,4 +172,109 @@ describe("RequestContextInterceptor country resolution", () => {
     expect(country.cachedCodeFor("t-1")).toBe("UZ");
     expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(2); // retried, not stuck
   });
+
+  /**
+   * Fix round 1 (Task 5 review, Task 3 wiring gap): TenantGuard steps aside
+   * entirely for @Public() routes via shouldBypassGlobalAuth, so req.user
+   * and req.tenantId are BOTH absent on every public route — the QR menu,
+   * public reservations, customer self-pay, OTP, Partner Display. Ambient
+   * country resolution was therefore completely inert on exactly the
+   * surfaces where a CUSTOMER types their own phone number.
+   *
+   * Some of these routes (qr-menu ":tenantId", public-reservations
+   * ":tenantId/settings" etc.) already carry the tenant as a route param.
+   * That's enough to pick a COUNTRY PROFILE. It is NOT enough to trust as
+   * an identity — a public route's params are attacker-controlled — so the
+   * fallback below must feed ONLY the country lookup, never
+   * RequestContext.tenantId (which flows into logs, Sentry, and branch/
+   * tenant scoping decisions elsewhere).
+   */
+  describe("public route param fallback (country lookup only)", () => {
+    it("resolves country from req.params.tenantId when there is no authenticated tenant", async () => {
+      let seenCountryCode: string | undefined;
+      let seenTenantId: string | undefined;
+      await RequestContext.run({ requestId: "r-pub" }, async () => {
+        await lastValueFrom(
+          interceptor.intercept(httpCtx({ params: { tenantId: "t-1" } }), {
+            handle: () => of("handled"),
+          } as any),
+        );
+        seenCountryCode = RequestContext.get()?.countryCode;
+        seenTenantId = RequestContext.get()?.tenantId;
+      });
+      expect(seenCountryCode).toBe("UZ");
+      expect(seenTenantId).toBeUndefined();
+    });
+
+    // The load-bearing security test. A route param is attacker-controlled
+    // on a public route — using it to pick a country profile is harmless
+    // (worst case: your own phone number parses under the wrong region),
+    // but writing it to RequestContext.tenantId would be a tenant-escape
+    // vector via logs/Sentry/scoping.
+    it("NEVER populates RequestContext.tenantId from a route param", async () => {
+      let store: ReturnType<typeof RequestContext.get>;
+      await RequestContext.run({ requestId: "r-pub" }, async () => {
+        await lastValueFrom(
+          interceptor.intercept(
+            httpCtx({ params: { tenantId: "victim-tenant" } }),
+            { handle: () => of("handled") } as any,
+          ),
+        );
+        store = RequestContext.get();
+      });
+      expect(store?.tenantId).toBeUndefined();
+      expect(store?.countryCode).toBe("UZ"); // country WAS resolved from the param
+    });
+
+    it("still uses the process-lifetime cache on the route-param path — no query-per-request regression", async () => {
+      const run = () =>
+        RequestContext.run({ requestId: "r-pub" }, async () => {
+          await lastValueFrom(
+            interceptor.intercept(httpCtx({ params: { tenantId: "t-1" } }), {
+              handle: () => of("handled"),
+            } as any),
+          );
+        });
+      await run();
+      expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(1);
+      await run();
+      expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores an unrelated route param (e.g. :subdomain on by-subdomain) — falls back to no countryCode, same as today", async () => {
+      // by-subdomain/:subdomain is explicitly out of scope: resolving a
+      // subdomain to a country needs a separate lookup this fix doesn't add.
+      let store: ReturnType<typeof RequestContext.get>;
+      await RequestContext.run({ requestId: "r-pub" }, async () => {
+        await lastValueFrom(
+          interceptor.intercept(httpCtx({ params: { subdomain: "acme" } }), {
+            handle: () => of("handled"),
+          } as any),
+        );
+        store = RequestContext.get();
+      });
+      expect(store?.tenantId).toBeUndefined();
+      expect(store?.countryCode).toBeUndefined();
+      expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("degrades gracefully when country resolution fails on the route-param path — a DB blip must not 500 a public route", async () => {
+      (prisma.tenant.findUnique as any).mockRejectedValueOnce(
+        new Error("connection reset"),
+      );
+      let result: unknown;
+      let store: ReturnType<typeof RequestContext.get>;
+      await RequestContext.run({ requestId: "r-pub" }, async () => {
+        result = await lastValueFrom(
+          interceptor.intercept(httpCtx({ params: { tenantId: "t-1" } }), {
+            handle: () => of("handled"),
+          } as any),
+        );
+        store = RequestContext.get();
+      });
+      expect(result).toBe("handled");
+      expect(store?.tenantId).toBeUndefined();
+      expect(store?.countryCode).toBeUndefined();
+    });
+  });
 });

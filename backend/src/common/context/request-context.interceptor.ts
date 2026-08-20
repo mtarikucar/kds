@@ -27,6 +27,25 @@ import { CountryService } from "../country/country.service";
  * shape), and only the first request for a given tenant per process takes
  * the async path.
  *
+ * PUBLIC ROUTES (Task 5 review fix): TenantGuard steps aside entirely for
+ * @Public() routes via shouldBypassGlobalAuth, so `req.user`/`req.tenantId`
+ * are BOTH absent — the QR menu, public reservations, customer self-pay,
+ * OTP, Partner Display. Ambient country resolution was completely inert on
+ * exactly the surfaces where a CUSTOMER types their own phone number (an
+ * Uzbek café's QR-menu customer typing "90 123 45 67" was always parsed as
+ * Turkish). Several of these routes still carry the tenant as a route param
+ * (`@Get(":tenantId")`, `@Get(":tenantId/settings")`) — enough to pick a
+ * country profile. `by-subdomain/:subdomain` is explicitly out of scope
+ * (resolving a subdomain needs a separate lookup this fix doesn't add) and
+ * keeps falling back to TR, same as today.
+ *
+ * SECURITY: on a public route that param is attacker-controlled. It is used
+ * ONLY for `countryLookupTenantId` below — NEVER written to
+ * `RequestContext.tenantId`, which flows into logs, Sentry, and branch/
+ * tenant scoping decisions elsewhere. Worst case under this design is that
+ * an attacker makes their own phone number parse under a different
+ * country's rules, which is harmless.
+ *
  * Registered as a global APP_INTERCEPTOR — runs on EVERY HTTP request. The
  * whole Nest pipeline runs inside the AsyncLocalStorage context that
  * RequestContextMiddleware opened, so `set()` mutates the live store the
@@ -49,18 +68,25 @@ export class RequestContextInterceptor implements NestInterceptor {
       userId: req?.user?.id ?? req?.user?.sub,
     });
 
-    if (!tenantId) return next.handle(); // anonymous — ambient() falls back
+    // Authenticated tenantId if we have one; otherwise fall back to a route
+    // param IN NAME ONLY for the purpose of picking a country profile. See
+    // the SECURITY note above — this value must never reach
+    // RequestContext.tenantId or anything derived from it.
+    const countryLookupTenantId: string | undefined =
+      tenantId ?? req?.params?.tenantId;
+
+    if (!countryLookupTenantId) return next.handle(); // fully anonymous — ambient() falls back
 
     // Fast path: a tenant's country never changes in practice, so this
     // misses exactly once per tenant per process. Keeping it synchronous is
     // the whole point — this interceptor runs on EVERY request.
-    const cached = this.country.cachedCodeFor(tenantId);
+    const cached = this.country.cachedCodeFor(countryLookupTenantId);
     if (cached) {
       RequestContext.set({ countryCode: cached });
       return next.handle();
     }
 
-    return from(this.country.forTenant(tenantId)).pipe(
+    return from(this.country.forTenant(countryLookupTenantId)).pipe(
       switchMap((profile) => {
         RequestContext.set({ countryCode: profile.code });
         return next.handle();
@@ -72,10 +98,10 @@ export class RequestContextInterceptor implements NestInterceptor {
       // hiccup during warm-up would 500 the first request of any tenant
       // (Turkish ones included) if left uncaught. Degrade to no countryCode
       // (ambient() falls back to the default profile) rather than fail the
-      // request the same way the anonymous branch above already does.
+      // request the same way the fully-anonymous branch above already does.
       catchError((err) => {
         this.logger.warn(
-          `Country resolution failed for tenant ${tenantId}, continuing without it: ${err?.message ?? err}`,
+          `Country resolution failed for tenant ${countryLookupTenantId}, continuing without it: ${err?.message ?? err}`,
         );
         return next.handle();
       }),

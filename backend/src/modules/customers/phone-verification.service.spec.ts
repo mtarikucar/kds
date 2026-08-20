@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PhoneVerificationService } from './phone-verification.service';
+import { E164_MESSAGE } from '../../common/phone/e164.const';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
 /**
@@ -92,6 +93,20 @@ describe('PhoneVerificationService.sendOTP phone format gate (T5)', () => {
     // regex accepted that shape; the shared E164_PATTERN rejects it.
     await expect(svc.sendOTP('12345678', 'sess-1', 'tenant-1')).rejects.toThrow(
       BadRequestException,
+    );
+  });
+
+  // Fix round 1: this is a generic, no-field-name-needed context (a raw
+  // phone string param, not a multi-field DTO), so E164_MESSAGE — the
+  // shared constant otherwise exported with zero call sites — is the
+  // genuinely right message here rather than a bespoke duplicate.
+  it('throws the shared E164_MESSAGE (not a bespoke duplicate string)', async () => {
+    const prisma = mockPrismaClient();
+    const sms: any = { sendVerificationCode: jest.fn(), isServiceEnabled: () => true };
+    const svc = new PhoneVerificationService(prisma as any, sms);
+
+    await expect(svc.sendOTP('12345678', 'sess-1', 'tenant-1')).rejects.toThrow(
+      E164_MESSAGE,
     );
   });
 
