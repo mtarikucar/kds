@@ -29,6 +29,8 @@ describe("CheckoutIntentService.createIntent — hardware stock guard (Task 4)",
   let quoteSvc: any;
   let addonGuard: any;
   let catalog: { getAvailableStock: jest.Mock };
+  let referralDirectory: any;
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CheckoutIntentService;
 
   const buyer = {
@@ -56,12 +58,18 @@ describe("CheckoutIntentService.createIntent — hardware stock guard (Task 4)",
     quoteSvc = { quote: jest.fn() };
     addonGuard = { assertPurchasable: jest.fn().mockResolvedValue(undefined) };
     catalog = { getAvailableStock: jest.fn() };
+    referralDirectory = { resolveReferralCode: jest.fn().mockResolvedValue(null) };
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
     svc = new CheckoutIntentService(
       prisma,
       quoteSvc,
       payments,
       addonGuard,
       catalog as any,
+      referralDirectory as any,
+      countryCapability as any,
     );
   });
 

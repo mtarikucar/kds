@@ -19,9 +19,13 @@ import { EscPosBuilder } from "../../modules/printing-core/escpos.types";
  * "paytr" / "fiscal_hugin" / "escpos-tr" literals and instead ask "give me
  * the provider for this tenant."
  *
- * Nothing calls this yet (Task 9 only builds the seam) — Tasks 10-13 rewire
- * the existing call sites onto it. Until then this is dead code reachable
- * only from tests, and a Turkish tenant's behaviour is unchanged.
+ * Task 9 only built the seam — nothing called it yet. Task 10 rewired the
+ * payment path (checkout-intent.service.ts, self-pay-intent.service.ts,
+ * self-pay-recovery.service.ts) onto `paymentProviderFor`; fiscal and
+ * ESC/POS callers are still Tasks 11-13's work. A Turkish tenant's
+ * behaviour is unchanged throughout — `paymentProviderFor("TR tenant")`
+ * still resolves to the same PaytrPaymentProvider instance those callers
+ * used before the rewire.
  *
  * TWO RULES THIS CLASS EXISTS TO ENFORCE:
  *

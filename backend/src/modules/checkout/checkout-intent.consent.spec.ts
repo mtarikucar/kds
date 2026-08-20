@@ -35,6 +35,7 @@ describe("CheckoutIntentService.createIntent legal consent", () => {
   let catalog: any;
   let demoGuard: { assertNotDemo: jest.Mock };
   let consent: { verifyAndRecord: jest.Mock };
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CheckoutIntentService;
 
   beforeEach(() => {
@@ -71,6 +72,9 @@ describe("CheckoutIntentService.createIntent legal consent", () => {
     catalog = { getAvailableStock: jest.fn() };
     demoGuard = { assertNotDemo: jest.fn().mockResolvedValue(undefined) };
     consent = { verifyAndRecord: jest.fn().mockResolvedValue(undefined) };
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
     svc = new CheckoutIntentService(
       prisma,
       quoteSvc,
@@ -78,6 +82,7 @@ describe("CheckoutIntentService.createIntent legal consent", () => {
       addonGuard,
       catalog,
       referralDirectory as any,
+      countryCapability as any,
       demoGuard as any,
       consent as any,
     );

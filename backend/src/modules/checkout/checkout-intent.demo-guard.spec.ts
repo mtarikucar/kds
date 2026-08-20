@@ -21,6 +21,11 @@ describe("CheckoutIntentService.createIntent demo-tenant block", () => {
   let addonGuard: any;
   let catalog: any;
   let demoGuard: { assertNotDemo: jest.Mock };
+  // Task 10 — never reached in this spec (demoGuard rejects first, before
+  // the country-capability gate runs), but wired so the constructor shape
+  // matches production DI and the positional demoGuard arg below stays
+  // correctly aligned.
+  let countryCapability: { paymentProviderFor: jest.Mock };
   let svc: CheckoutIntentService;
 
   beforeEach(() => {
@@ -39,6 +44,9 @@ describe("CheckoutIntentService.createIntent demo-tenant block", () => {
         }),
       ),
     };
+    countryCapability = {
+      paymentProviderFor: jest.fn().mockResolvedValue({ id: "paytr" }),
+    };
     svc = new CheckoutIntentService(
       prisma,
       quoteSvc,
@@ -46,6 +54,7 @@ describe("CheckoutIntentService.createIntent demo-tenant block", () => {
       addonGuard,
       catalog,
       referralDirectory as any,
+      countryCapability as any,
       demoGuard as any,
     );
   });
