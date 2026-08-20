@@ -455,15 +455,21 @@ export class CountryService {
 }
 ```
 
-- [ ] **Step 7: Run tests + typecheck**
+- [ ] **Step 7: Expose countryCode to the frontend**
+
+`backend/src/modules/tenants/tenants.service.ts:22` civarındaki `TENANT_SETTINGS_SELECT` bugün `currency: true` veriyor ama ülkeyi vermiyor — Task 7'nin frontend biçimlendiricisi profili bu select olmadan hiç göremez. `countryCode: true` eklenir ve `frontend/src/hooks/useCurrency.ts`'teki `TenantSettings` arayüzüne `countryCode: string` eklenir.
+
+`currency` alanı select'te **kalır** (türetilmiş ayna; frontend hâlâ okuyor), ama Task 7 onu yazılabilir olmaktan çıkaracak.
+
+- [ ] **Step 8: Run tests + typecheck**
 
 Run: `cd /home/tarik/Projects/kds/backend && npx jest src/common/country && npx tsc --noEmit -p tsconfig.json`
 Expected: PASS, tsc 0
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add backend/prisma/schema.prisma backend/prisma/migrations backend/src/common/country/
+git add backend/prisma/schema.prisma backend/prisma/migrations backend/src/common/country/ backend/src/modules/tenants/ frontend/src/hooks/useCurrency.ts
 git commit -m "feat(country): Tenant.countryCode + profil çözüm servisi
 
 Ülkenin tek VERİ hâli countryCode; para birimi, vergi, telefon, yerel ayar
@@ -932,6 +938,8 @@ olduğu için istemcide sabit bir pattern yanlış olur; mesaj sunucudan gelir."
 - Modify: `frontend/src/hooks/useFormatCurrency.ts`
 - Create: `frontend/src/hooks/useCountryProfile.ts`
 - Modify: `backend/src/common/constants/currencies.const.ts`
+- Modify: `backend/src/modules/tenants/dto/update-tenant-settings.dto.ts` — `currency` alanı **kaldırılır**
+- Modify: `frontend/src/hooks/useCurrency.ts` — `UpdateTenantSettingsDto.currency` kaldırılır
 - Modify: para birimi seçicisini gösteren ayar sayfaları
 - Test: `frontend/src/hooks/useFormatCurrency.test.ts`
 
@@ -940,6 +948,8 @@ olduğu için istemcide sabit bir pattern yanlış olur; mesaj sunucudan gelir."
 - Produces: `useCountryProfile()` → `{ currency, displayDecimals, intlLocale }`
 
 `useFormatCurrency` zaten doğru şekilde (`useLocale()` + `useCurrency()`); tek eksik `displayDecimals`'ı `minimumFractionDigits`/`maximumFractionDigits` olarak geçirmek. `SUPPORTED_CURRENCIES` backend'de **seçim listesi olmaktan çıkar**; `CURRENCY_INFO` sembol tablosu olarak kalır.
+
+Para birimi **yazılabilir olmaktan da çıkar**: `UpdateTenantSettingsDto.currency` kaldırılır. Bir kiracının para birimini ülkesinden bağımsız değiştirebilmesi, Task 2'nin kurduğu "currency türetilir" değişmezini deler. Okuma tarafı (`TENANT_SETTINGS_SELECT.currency`) kalır.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1076,13 +1086,22 @@ Sağlayıcılar bir registry'ye kaydolur; seçim `send()` anında kiracıdan ç�
 
 Bugün prod açılışı PayTR kimlik bilgileri yoksa `process.exit(1)` yapıyor, hiçbir ülke koşulu olmadan. **PayTR'siz bir dağıtım bugün ayağa kalkamaz** — UZ stack'i bu yüzden boot edemez.
 
-Kural, dağıtımın hizmet ettiği ülkelerin profillerinden türeyen sağlayıcı kümesine göre koşullu hale gelir: PayTR yalnız TR profilinin `paymentProviderIds`'i devredeyse zorunludur.
+**Bu görevin tanımsız girdisi vardı ve ön-uçuş taramasında yakalandı:** doğrulama boot'ta, herhangi bir kiracı bilinmeden çalışır — "bu dağıtım hangi ülkelere hizmet ediyor" sorusunun kodda bir cevabı yok.
+
+**Karar: yeni bir `DEPLOYMENT_COUNTRIES` ortam değişkeni, varsayılanı `"TR"`.** Virgülle ayrılmış ISO kodları. Doğrulama, o ülkelerin profillerinin `capabilities`'inde adı geçen sağlayıcıların kimlik bilgilerini zorunlu tutar.
+
+Neden ortam değişkeni: boot zamanı bir dağıtım gerçeğidir, kiracı gerçeği değil. Veritabanından "hangi ülkelerin kiracısı var" diye sormak, doğrulamayı DB'ye bağımlı kılar ve ilk UZ kiracısı yaratıldığı an prod boot'unu kırar.
+
+Varsayılan `"TR"` olduğu için **bugünkü davranış bit-aynı**: PayTR kimlik bilgileri hâlâ zorunlu. `DEPLOYMENT_COUNTRIES=UZ` olan bir stack ise PayTR'siz açılır.
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-it("boots without PayTR credentials when no active country profile names paytr", () => {});
-it("still refuses to boot without PayTR when a TR deployment needs it", () => {});
+it("still refuses to boot without PayTR when DEPLOYMENT_COUNTRIES is unset — today's behaviour", () => {});
+it("still refuses to boot without PayTR when DEPLOYMENT_COUNTRIES=TR", () => {});
+it("boots without PayTR credentials when DEPLOYMENT_COUNTRIES=UZ", () => {});
+it("requires BOTH countries' providers when DEPLOYMENT_COUNTRIES=TR,UZ", () => {});
+it("refuses to boot on an unknown country code rather than silently serving nothing", () => {});
 ```
 
 - [ ] **Step 2-5:** çalıştır-düşsün → uygula → çalıştır-geçsin → commit.
