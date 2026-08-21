@@ -122,4 +122,29 @@ describe('HardwareCheckoutResult', () => {
     });
     expect(screen.getByText(enHardware.store.checkoutResult.failTitle)).toBeInTheDocument();
   });
+
+  it('shows the print3d production note and partner badge when the matched order carries a print3dJob', () => {
+    ordersQuery.data = [
+      makeOrder({
+        paymentRef: 'CK-1',
+        print3dJob: {
+          id: 'job-1',
+          status: 'queued',
+          itemCount: 2,
+          totalCents: 160000,
+          partner: 'figurunica',
+          items: [],
+        },
+      } as any),
+    ];
+    renderResult('CK-1');
+    expect(screen.getByText(enHardware.print3d.result.note)).toBeInTheDocument();
+    expect(screen.getByText(enHardware.print3d.partnerLabel)).toBeInTheDocument();
+  });
+
+  it('does not show the print3d note for a regular hardware order', () => {
+    ordersQuery.data = [makeOrder({ paymentRef: 'CK-1' })];
+    renderResult('CK-1');
+    expect(screen.queryByText(enHardware.print3d.result.note)).not.toBeInTheDocument();
+  });
 });

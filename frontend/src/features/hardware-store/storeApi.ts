@@ -348,6 +348,26 @@ export interface HardwareOrderInstallation {
   notes: string | null;
 }
 
+/**
+ * v3.7.0 — a service-only print3d order carries EMPTY `items` (service
+ * lines never produce a HardwareOrderItem row). The job record is the only
+ * place the item names, photos and count actually live; the tenant order
+ * screens branch on this instead of rendering a blank item table.
+ */
+export interface HardwareOrderPrint3dJob {
+  id: string;
+  status: string;
+  itemCount: number;
+  totalCents: number;
+  partner: string;
+  items: {
+    productName: string;
+    productImageUrl: string | null;
+    position: number;
+    status: string;
+  }[];
+}
+
 export interface HardwareOrderSummary {
   id: string;
   status: string;
@@ -361,6 +381,7 @@ export interface HardwareOrderSummary {
   createdAt: string;
   updatedAt: string;
   itemCount: number;
+  print3dJob?: HardwareOrderPrint3dJob | null;
 }
 
 export interface HardwareOrderDetail extends HardwareOrderSummary {

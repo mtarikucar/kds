@@ -84,4 +84,32 @@ describe('HardwareOrdersListPage', () => {
     fireEvent.change(select, { target: { value: '' } });
     expect(lastStatus).toBeUndefined();
   });
+
+  // v3.7.0 — backend never returns an itemCount field for a service-only
+  // print3d order (HardwareOrder has no HardwareOrderItem rows), so the
+  // column read from the wrong field and rendered blank.
+  it('shows the print3d item count for a service-only order', () => {
+    state.data = [
+      {
+        id: 'order-p3d',
+        status: 'paid',
+        totalCents: 185000,
+        currency: 'TRY',
+        installation: null,
+        itemCount: undefined,
+        createdAt: '2026-08-20T00:00:00Z',
+        print3dJob: {
+          id: 'job-1',
+          status: 'queued',
+          itemCount: 7,
+          totalCents: 185000,
+          partner: 'figurunica',
+          items: [],
+        },
+      },
+    ];
+    renderPage();
+    const row = screen.getByText('#order-p3').closest('tr')!;
+    expect(within(row).getByText('7')).toBeInTheDocument();
+  });
 });
