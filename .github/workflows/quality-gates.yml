@@ -151,6 +151,16 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
+      - name: Build
+        # `tsc --noEmit` type-checks but does not bundle: a default export
+        # that's missing, misnamed, or unresolvable at Rollup time (bad
+        # import path, case-sensitivity mismatch that only bites on a
+        # case-insensitive filesystem, circular-export edge case, etc.)
+        # passes typecheck and unit tests but fails `vite build`. Without
+        # this step that class of bug reaches production tags unnoticed —
+        # see the v3.10.0/v3.11.0 desktop build breakage.
+        run: npm run build
+
   contract-drift:
     name: Backend/frontend contract drift
     runs-on: ubuntu-latest
