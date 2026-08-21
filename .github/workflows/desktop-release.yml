@@ -603,35 +603,59 @@ jobs:
           echo "Response code: $HTTP_CODE"
           echo "Response body: $BODY"
 
+          # A JSON API response starts with `{` or `[`. Anything else — most
+          # often a Cloudflare/WAF managed-challenge page — starts with `<`
+          # (an HTML document). Flag that explicitly so the next person
+          # doesn't have to reverse-engineer an HTML dump to find the cause.
+          explain_non_json_body() {
+            local body="$1" first_char
+            first_char=$(echo "$body" | sed -e 's/^[[:space:]]*//' | cut -c1)
+            if [ "$first_char" != "{" ] && [ "$first_char" != "[" ]; then
+              echo "::error::Response body is not JSON (starts with '$first_char') — this is the signature of a WAF/bot-challenge (e.g. Cloudflare managed challenge) intercepting the request and returning an HTML page instead of reaching the API, not an application-level error."
+            fi
+          }
+
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
             echo "✅ Release created in backend"
 
-            # Get release ID from response
-            RELEASE_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+            # Get release ID from response. `|| true` keeps a non-match from
+            # tripping this step's errexit — an empty RELEASE_ID is handled
+            # explicitly below instead of aborting mid-pipeline.
+            RELEASE_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 
-            if [ -n "$RELEASE_ID" ]; then
-              echo "Release ID: $RELEASE_ID"
-              echo "Publishing release..."
+            if [ -z "$RELEASE_ID" ]; then
+              echo "::error::Backend returned HTTP $HTTP_CODE but no release id could be parsed from the response body."
+              explain_non_json_body "$BODY"
+              exit 1
+            fi
 
-              # Publish the release
-              PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/ci/releases/$RELEASE_ID/publish" \
-                -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
-                -w "\n%{http_code}" \
-                -s)
+            echo "Release ID: $RELEASE_ID"
+            echo "Publishing release..."
 
-              PUBLISH_CODE=$(echo "$PUBLISH_RESPONSE" | tail -n1)
+            # Publish the release
+            PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/ci/releases/$RELEASE_ID/publish" \
+              -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
+              -w "\n%{http_code}" \
+              -s)
 
-              if [ "$PUBLISH_CODE" -ge 200 ] && [ "$PUBLISH_CODE" -lt 300 ]; then
-                echo "✅ Release published successfully"
-              else
-                echo "⚠️ Failed to publish release (code: $PUBLISH_CODE)"
-                echo "You can manually publish it from the admin panel"
-              fi
+            PUBLISH_CODE=$(echo "$PUBLISH_RESPONSE" | tail -n1)
+            PUBLISH_BODY=$(echo "$PUBLISH_RESPONSE" | sed '$d')
+
+            echo "Publish response code: $PUBLISH_CODE"
+            echo "Publish response body: $PUBLISH_BODY"
+
+            if [ "$PUBLISH_CODE" -ge 200 ] && [ "$PUBLISH_CODE" -lt 300 ]; then
+              echo "✅ Release published successfully"
+            else
+              echo "::error::Failed to publish release $RELEASE_ID (HTTP $PUBLISH_CODE)."
+              explain_non_json_body "$PUBLISH_BODY"
+              exit 1
             fi
           else
-            echo "❌ Failed to create release in backend"
-            echo "Please manually add the release via the admin panel"
-            echo "⚠️ This is not critical - GitHub release was created successfully"
+            echo "::error::Failed to create release in backend (HTTP $HTTP_CODE)."
+            explain_non_json_body "$BODY"
+            echo "The GitHub release itself was still created; add it to the backend manually via the admin panel once the sync issue above is resolved."
+            exit 1
           fi
 
   # Final verification
