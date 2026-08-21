@@ -544,23 +544,54 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Push release info to backend API
+  #
+  # This runs the create-release and publish POSTs *from the production
+  # box itself, against its own loopback* — the same mechanism
+  # release-deploy.yml's pre-check job uses for its /api/health probe
+  # (see that file, "Production API liveness (HARD, probed via SSH)").
+  # A runner-side request to https://hummytummy.com gets a 403 managed
+  # challenge from Cloudflare's WAF (GitHub Actions egress IPs carry a
+  # poor reputation score there; a WAF custom-rule Skip does not reach
+  # Bot Fight Mode, which is a separate layer). The endpoint and the API
+  # key both work fine — curl from an arbitrary non-runner host gets a
+  # real 401 from ApiKeyGuard — so routing this call through localhost on
+  # the box, exactly like the health probe does, sidesteps Cloudflare
+  # entirely without loosening the zone's bot protection or the guard.
   sync-backend:
     name: Sync with Backend API
     needs: [prepare, get-asset-urls]
     runs-on: ubuntu-latest
     continue-on-error: false  # Fail the workflow if backend sync fails so we catch issues
+    env:
+      SERVER_HOST: '38.242.233.166'
 
     steps:
-      - name: Push release to backend
-        run: |
-          VERSION="${{ needs.prepare.outputs.version_number }}"
-          TAG="${{ needs.prepare.outputs.version }}"
-          WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
-          LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
-          WINDOWS_SIG="${{ needs.get-asset-urls.outputs.windows_signature }}"
-          LINUX_SIG="${{ needs.get-asset-urls.outputs.linux_signature }}"
+      # composite action under .github/actions/ requires the repo to be
+      # checked out before `uses: ./...` can resolve.
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
 
-          # Debug: Check if URLs and signatures are populated
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Push release to backend (via SSH, loopback — bypasses Cloudflare)
+        env:
+          VERSION: ${{ needs.prepare.outputs.version_number }}
+          TAG: ${{ needs.prepare.outputs.version }}
+          WINDOWS_URL: ${{ needs.get-asset-urls.outputs.windows_url }}
+          LINUX_URL: ${{ needs.get-asset-urls.outputs.linux_url }}
+          WINDOWS_SIG: ${{ needs.get-asset-urls.outputs.windows_signature }}
+          LINUX_SIG: ${{ needs.get-asset-urls.outputs.linux_signature }}
+          API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Debug: Check if URLs and signatures are populated. Fail fast,
+          # before even touching SSH, on obviously-bad input.
           echo "🔍 Debug - Release information:"
           echo "VERSION: $VERSION"
           echo "TAG: $TAG"
@@ -569,21 +600,73 @@ jobs:
           echo "WINDOWS_SIG: ${WINDOWS_SIG:0:50}..."
           echo "LINUX_SIG: ${LINUX_SIG:0:50}..."
 
-          # Validate URLs before sending
           if [ -z "$WINDOWS_URL" ] || [ -z "$LINUX_URL" ]; then
             echo "❌ Error: One or both download URLs are empty!"
             echo "Cannot sync to backend without valid URLs"
             exit 1
           fi
 
-          # Create release notes (simplified for API)
-          RELEASE_NOTES="Release $TAG of HummyTummy Desktop App"
+          echo "📤 Pushing release to backend API over SSH (production loopback)..."
 
-          echo "📤 Pushing release to backend API..."
+          # The whole exchange (both POSTs) runs INSIDE this one SSH exec, on
+          # the box, against its own localhost — never through hummytummy.com.
+          #
+          # Dynamic values are passed as positional parameters to `bash -s --`
+          # rather than interpolated into the script text: the heredoc below
+          # is a *quoted* delimiter ('REMOTE_SCRIPT'), so nothing — least of
+          # all API_KEY — is substituted by the local shell into the script
+          # body. That means the key is never written into a command string
+          # that a `set -x` or an `::error::` message could echo; it only
+          # ever exists as $7 inside the remote script's own memory, and the
+          # remote script never prints it.
+          #
+          # No `-n`: the heredoc is this ssh invocation's stdin, and that's
+          # exactly the channel `bash -s` reads its script from.
+          ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            root@"${SERVER_HOST}" bash -s -- \
+            "$VERSION" "$TAG" "$WINDOWS_URL" "$LINUX_URL" "$WINDOWS_SIG" "$LINUX_SIG" "$API_KEY" \
+            <<'REMOTE_SCRIPT'
+          set -euo pipefail
 
-          RESPONSE=$(curl -X POST https://hummytummy.com/api/desktop/ci/releases \
+          VERSION="$1"
+          TAG="$2"
+          WINDOWS_URL="$3"
+          LINUX_URL="$4"
+          WINDOWS_SIG="$5"
+          LINUX_SIG="$6"
+          API_KEY="$7"
+
+          # Blue/green aware port resolution — same state file, same
+          # default-to-blue, same port mapping as release-deploy.yml's
+          # pre-flight health probe ("Production API liveness (HARD,
+          # probed via SSH)"). Do not hardcode 3000: under blue-green the
+          # active backend may be on green's loopback port (3010).
+          active=blue
+          if [ -f /var/lib/kds-deploy/active-color-prod ]; then
+            active="$(. /var/lib/kds-deploy/active-color-prod 2>/dev/null; echo "${ACTIVE_COLOR:-blue}")"
+          fi
+          if [ "$active" = green ]; then port=3010; else port=3000; fi
+          BASE_URL="http://localhost:${port}"
+          echo "Resolved active color: ${active} (port ${port})"
+
+          RELEASE_NOTES="Release ${TAG} of HummyTummy Desktop App"
+
+          # A JSON API response starts with `{` or `[`. Anything else here
+          # would mean something is wrong with the loopback request itself
+          # (backend down, wrong port, proxy misconfig) — there is no WAF
+          # on this path, so treat it as a real backend problem, not a
+          # bot-challenge signature.
+          explain_non_json_body() {
+            local body="$1" first_char
+            first_char=$(echo "$body" | sed -e 's/^[[:space:]]*//' | cut -c1)
+            if [ "$first_char" != "{" ] && [ "$first_char" != "[" ]; then
+              echo "::error::Response body is not JSON (starts with '$first_char') from a loopback request on the production box itself — this is not a WAF/bot-challenge (there is no Cloudflare on this path); check that the ${active} backend container is actually listening on port ${port} and inspect its logs."
+            fi
+          }
+
+          RESPONSE=$(curl -X POST "${BASE_URL}/api/desktop/ci/releases" \
             -H "Content-Type: application/json" \
-            -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
+            -H "X-API-Key: ${API_KEY}" \
             -d "{
               \"version\": \"$VERSION\",
               \"releaseTag\": \"$TAG\",
@@ -603,18 +686,6 @@ jobs:
           echo "Response code: $HTTP_CODE"
           echo "Response body: $BODY"
 
-          # A JSON API response starts with `{` or `[`. Anything else — most
-          # often a Cloudflare/WAF managed-challenge page — starts with `<`
-          # (an HTML document). Flag that explicitly so the next person
-          # doesn't have to reverse-engineer an HTML dump to find the cause.
-          explain_non_json_body() {
-            local body="$1" first_char
-            first_char=$(echo "$body" | sed -e 's/^[[:space:]]*//' | cut -c1)
-            if [ "$first_char" != "{" ] && [ "$first_char" != "[" ]; then
-              echo "::error::Response body is not JSON (starts with '$first_char') — this is the signature of a WAF/bot-challenge (e.g. Cloudflare managed challenge) intercepting the request and returning an HTML page instead of reaching the API, not an application-level error."
-            fi
-          }
-
           if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
             echo "✅ Release created in backend"
 
@@ -633,8 +704,8 @@ jobs:
             echo "Publishing release..."
 
             # Publish the release
-            PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/ci/releases/$RELEASE_ID/publish" \
-              -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
+            PUBLISH_RESPONSE=$(curl -X POST "${BASE_URL}/api/desktop/ci/releases/$RELEASE_ID/publish" \
+              -H "X-API-Key: ${API_KEY}" \
               -w "\n%{http_code}" \
               -s)
 
@@ -657,6 +728,7 @@ jobs:
             echo "The GitHub release itself was still created; add it to the backend manually via the admin panel once the sync issue above is resolved."
             exit 1
           fi
+          REMOTE_SCRIPT
 
   # Final verification
   verify:
