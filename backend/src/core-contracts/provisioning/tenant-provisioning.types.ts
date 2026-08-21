@@ -34,6 +34,17 @@ export interface ProvisionTenantForLeadCommand {
     amountOverride: number | null;
     trialDaysOverride: number | null;
   } | null;
+  /**
+   * ISO-3166-1 alpha-2 country the converted tenant operates in — same
+   * vocabulary as RegisterDto#countryCode (COUNTRY_PROFILES). OPTIONAL:
+   * the marketing side of this contract does not collect one from a lead
+   * yet, and widening this field additively (rather than requiring it)
+   * avoids a synchronized cross-repo deploy with kds-marketing. CORE
+   * still writes an EXPLICIT value on every tenant it creates — absent or
+   * unrecognized resolves to DEFAULT_COUNTRY through resolveCountryProfile(),
+   * never a bare schema default.
+   */
+  countryCode?: string;
 }
 
 /** Plan facts returned so marketing can compute the SIGNUP commission without reading SubscriptionPlan. */

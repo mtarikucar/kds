@@ -31,3 +31,29 @@ describe("normalizePhoneToE164 (default region TR)", () => {
     expect(normalizePhoneToE164("(202) 555-0182", "US")).toBe("+12025550182");
   });
 });
+
+describe("normalizePhoneToE164 — the registration blind spot", () => {
+  // Registration is @Public() with no tenant, so RequestContext.countryCode
+  // is never set there — resolveCountryProfile(undefined) falls back to
+  // DEFAULT_COUNTRY (TR), which is what the default-region branch in
+  // normalizePhoneToE164 reads. This is fine IN PRACTICE only because
+  // PhoneInput always emits E.164 (a leading "+"), which libphonenumber-js
+  // parses correctly regardless of the region argument.
+  it("MISPARSES a bare, locally-typed Uzbek number under the ambient TR fallback (no leading +)", () => {
+    // A bare national UZ number, exactly as a user might type it without a
+    // country selector or a "+" prefix, run through the SAME no-ambient-
+    // country path registration hits. This is deliberately NOT a "PhoneInput
+    // saves us" test — it proves the DTO-level gap the frontend is relied
+    // upon to avoid.
+    const result = normalizePhoneToE164("901234567"); // no defaultRegion → TR fallback
+    expect(result).not.toBe("+998901234567");
+  });
+
+  it("parses an E.164 Uzbek number correctly with NO ambient region at all — the actual registration path", () => {
+    // PhoneInput's onChange contract always emits E.164 ("+998…"), which
+    // libphonenumber-js parses from the leading "+" regardless of the
+    // region argument — this is why the misparse above never reaches
+    // production despite the ambient-country gap.
+    expect(normalizePhoneToE164("+998901234567")).toBe("+998901234567");
+  });
+});

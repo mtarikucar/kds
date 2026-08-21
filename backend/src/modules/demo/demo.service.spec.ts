@@ -161,6 +161,11 @@ describe('DemoService', () => {
     // a pre-existing/partial demo never collides on the subdomain.
     const tenantArgs = (prisma.tenant.upsert as jest.Mock).mock.calls[0][0];
     expect(tenantArgs.where.subdomain).toBe('demo-explore');
+    // The demo tenant is Turkish — written EXPLICITLY on the create block
+    // (not left to the schema default) so the intent is visible, matching
+    // every other tenant-creating path in the codebase.
+    expect(tenantArgs.create.countryCode).toBe('TR');
+    expect(tenantArgs.create.currency).toBe('TRY');
     expect(prisma.tenant.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.branch.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.user.upsert).toHaveBeenCalledTimes(1);

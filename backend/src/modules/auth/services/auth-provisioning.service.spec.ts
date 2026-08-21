@@ -99,6 +99,128 @@ describe("AuthProvisioningService — signup no longer touches the plan rail", (
   });
 });
 
+describe("AuthProvisioningService.provisionNewTenantWithAdmin — countryCode/currency", () => {
+  // The decisive wiring proof for the new-restaurant path: the operator's
+  // chosen countryCode must land on the tenant row, and currency must be
+  // DERIVED from the country profile — never a hardcoded "TRY", never left
+  // to the schema default. Before this, provisionNewTenantWithAdmin never
+  // wrote countryCode at all, so every tenant landed on the schema
+  // default ("TR") with no way to leave it.
+  function makeTx() {
+    return {
+      tenant: { create: jest.fn().mockResolvedValue({ id: "t-1" }) },
+      subscription: { create: jest.fn() },
+      subscriptionPlan: { findUnique: jest.fn() },
+      branch: { create: jest.fn().mockResolvedValue({ id: "b-1" }) },
+      user: { create: jest.fn().mockResolvedValue({ id: "u-1" }) },
+      userBranchAssignment: { create: jest.fn() },
+    };
+  }
+
+  it("writes countryCode=UZ and derives currency=UZS from the profile — not the TR default", async () => {
+    const svc = new AuthProvisioningService(makePrisma() as any);
+    const tx = makeTx();
+
+    await svc.provisionNewTenantWithAdmin(tx as any, {
+      restaurantName: "Toshkent Oshxonasi",
+      finalSubdomain: "toshkent-oshxonasi",
+      countryCode: "UZ",
+      userParams: {
+        email: "owner@uz.example",
+        hashedPassword: "x",
+        firstName: "A",
+        lastName: "B",
+        userRole: "ADMIN",
+        userStatus: "ACTIVE",
+        phone: "+998901234567",
+      } as any,
+    });
+
+    const data = tx.tenant.create.mock.calls[0][0].data;
+    expect(data.countryCode).toBe("UZ");
+    expect(data.currency).toBe("UZS");
+  });
+
+  it("writes countryCode=TR and currency=TRY for a Turkish operator", async () => {
+    const svc = new AuthProvisioningService(makePrisma() as any);
+    const tx = makeTx();
+
+    await svc.provisionNewTenantWithAdmin(tx as any, {
+      restaurantName: "Acme",
+      finalSubdomain: "acme",
+      countryCode: "TR",
+      userParams: {
+        email: "a@b.com",
+        hashedPassword: "x",
+        firstName: "A",
+        lastName: "B",
+        userRole: "ADMIN",
+        userStatus: "ACTIVE",
+        phone: "+905551234567",
+      } as any,
+    });
+
+    const data = tx.tenant.create.mock.calls[0][0].data;
+    expect(data.countryCode).toBe("TR");
+    expect(data.currency).toBe("TRY");
+  });
+
+  it("never silently derives currency from user input — it always comes from the profile", async () => {
+    // Task 7 rule (v3.7.0): Tenant.currency is a derived, write-only mirror.
+    // Passing a countryCode of "UZ" must always yield "UZS", regardless of
+    // what a caller might otherwise have wanted to pass as currency — there
+    // is no currency parameter on this method at all, which is the point.
+    const svc = new AuthProvisioningService(makePrisma() as any);
+    const tx = makeTx();
+    await svc.provisionNewTenantWithAdmin(tx as any, {
+      restaurantName: "X",
+      finalSubdomain: "x",
+      countryCode: "UZ",
+      userParams: {
+        email: "c@d.com",
+        hashedPassword: "x",
+        firstName: "C",
+        lastName: "D",
+        userRole: "ADMIN",
+        userStatus: "ACTIVE",
+        phone: "+998901234567",
+      } as any,
+    });
+    const data = tx.tenant.create.mock.calls[0][0].data;
+    expect(Object.keys(data)).not.toContain("currencyOverride");
+    expect(data.currency).toBe("UZS");
+  });
+});
+
+describe("AuthProvisioningService.createSocialAuthUser — explicit country", () => {
+  // Social sign-up (Google/Apple) carries no explicit country signal from
+  // the OAuth callback, so it explicitly defaults to DEFAULT_COUNTRY (TR) —
+  // written on purpose, not left to the Prisma column default, so the
+  // intent is visible in the write itself.
+  it("writes countryCode=TR and currency=TRY explicitly on the tenant it creates", async () => {
+    const prisma = makePrisma();
+    const tx = {
+      tenant: { create: jest.fn().mockResolvedValue({ id: "t-social" }) },
+      branch: { create: jest.fn().mockResolvedValue({ id: "b-social" }) },
+      user: { create: jest.fn().mockResolvedValue({ id: "u-social" }) },
+    };
+    (prisma as any).$transaction = jest.fn((cb: any) => cb(tx));
+    const svc = new AuthProvisioningService(prisma as any);
+
+    await svc.createSocialAuthUser({
+      email: "social@example.com",
+      firstName: "Social",
+      lastName: "User",
+      googleId: "g-1",
+      authProvider: "google",
+    });
+
+    const data = tx.tenant.create.mock.calls[0][0].data;
+    expect(data.countryCode).toBe("TR");
+    expect(data.currency).toBe("TRY");
+  });
+});
+
 describe("AuthProvisioningService.buildPlanFeatureOverrides", () => {
   it("seeds NOTHING — the free core is projected, not overridden", () => {
     // This used to mirror the plan's TRUE feature flags onto the tenant so

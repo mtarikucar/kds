@@ -20,6 +20,7 @@ import {
   CoreProvisioningPlanInvalidError,
   CoreProvisioningSubdomainError,
 } from "../../core-contracts/provisioning/tenant-provisioning.types";
+import { resolveCountryProfile } from "../../common/country/country.service";
 
 type PlanRow = NonNullable<
   Awaited<ReturnType<PrismaService["subscriptionPlan"]["findUnique"]>>
@@ -146,6 +147,12 @@ export class TenantProvisioningService implements CoreProvisioningPort {
       .replace(/^-|-$/g, "");
     const subdomain = await this.allocateSubdomain(baseSubdomain);
 
+    // Written EXPLICITLY on every tenant this creates — command.countryCode
+    // is optional (marketing doesn't send one yet), but resolveCountryProfile
+    // always returns a real profile (falling back to DEFAULT_COUNTRY), so the
+    // write itself is never left to the Prisma column default.
+    const countryProfile = resolveCountryProfile(command.countryCode);
+
     // Random admin password the rep never sees — delivered to the new owner by
     // marketing's welcome email and rotated on first login.
     const rawPassword = randomBytes(12).toString("base64url");
@@ -157,6 +164,8 @@ export class TenantProvisioningService implements CoreProvisioningPort {
           data: {
             name: command.tenantName,
             subdomain,
+            countryCode: countryProfile.code,
+            currency: countryProfile.currency,
             // v3.3.0 — provisioning no longer seeds featureOverrides.
             //
             // It used to mirror the plan's TRUE flags so PlanFeatureGuard's
