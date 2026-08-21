@@ -199,6 +199,13 @@ const DeliveryPlatformsSettingsPage = lazyWithReload(
 const SmsSettingsPage = lazyWithReload(
   () => import("./pages/settings/SmsSettingsPage"),
 );
+// v3.7.0 — 3D baskı figür hizmeti sihirbazı. lazyWithReload (React.lazy
+// DEĞİL) kullanılıyor ki bir deploy hashed chunk'ları değiştirdiğinde eski
+// bundle'da açık kalan bir sekme beyaz ekran yerine tek seferlik reload ile
+// kurtulsun — bkz. utils/lazyWithReload.ts.
+const Print3dWizardPage = lazyWithReload(
+  () => import("./features/print3d/Print3dWizardPage"),
+);
 import Layout from "./components/layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 // HummyTummy Phase 3–12 admin screens.
@@ -830,6 +837,9 @@ function App() {
               path="/admin/marketplace"
               element={<Navigate to="/admin/store?tab=catalog" replace />}
             />
+            {/* v3.7.0 — statik segment, dinamik :sku'dan önce sıralanır
+                (React Router v6 sıralaması), ama okunurluk için de üstte. */}
+            <Route path="/admin/store/print3d" element={<Print3dWizardPage />} />
             {/* v2.8.87: rich product/service detail page (real route, not modal). */}
             <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
             {/* v2.8.84: tenant order history + detail. List lives in the hub's
