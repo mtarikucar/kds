@@ -7,6 +7,7 @@ import {
   TenantStatus,
 } from "../dto/tenant-filter.dto";
 import { UpdateTenantOverridesDto } from "../dto/update-tenant-overrides.dto";
+import { UpdateTenantCountryDto } from "../dto/update-tenant-country.dto";
 import { SuperAdminAuditService } from "./superadmin-audit.service";
 import { AuditAction, EntityType } from "../dto/audit-filter.dto";
 import { NotificationsService } from "../../notifications/notifications.service";
@@ -17,6 +18,10 @@ import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
 import { FEATURE_KEYS as CANONICAL_FEATURE_KEYS } from "../../entitlements/entitlement-keys.const";
 import { EntitlementService } from "../../entitlements/entitlement.service";
+import {
+  CountryService,
+  resolveCountryProfile,
+} from "../../../common/country/country.service";
 
 /**
  * Override whitelist — deliberately the canonical entitlement vocabulary and
@@ -62,6 +67,10 @@ export class SuperAdminTenantsService {
     // EntitlementsModule is @Global. The override editor reads the engine's
     // own projection rather than plan columns, which no longer carry anything.
     private readonly entitlements: EntitlementService,
+    // CommonModule is @Global. Injected so updateCountry() can invalidate
+    // the process-lifetime tenant→country cache the moment it writes a new
+    // countryCode — see the method for why that call is load-bearing.
+    private readonly country: CountryService,
   ) {}
 
   async findAll(filters: TenantFilterDto) {
@@ -376,6 +385,83 @@ export class SuperAdminTenantsService {
           ),
       ]),
     );
+  }
+
+  /**
+   * Correct a mis-registered tenant's country. Existing tenants are all
+   * Turkish today, which is right — this exists for the case where an
+   * operator picked the wrong country at signup and there is otherwise no
+   * way to fix it (UpdateTenantSettingsDto deliberately has no countryCode
+   * field — the operator's own tenant-settings surface is not where a
+   * cross-cutting change like this belongs).
+   *
+   * currency is re-derived from the profile alongside countryCode — never
+   * copied from the request — so the two columns can never disagree.
+   *
+   * CRITICAL: CountryService caches tenant→country for the process
+   * lifetime (RequestContextInterceptor's synchronous fast path on every
+   * request). Writing countryCode without calling invalidate() leaves the
+   * correction inert until the process restarts — the tenant would keep
+   * behaving as its OLD country for every request in between.
+   */
+  async updateCountry(
+    tenantId: string,
+    dto: UpdateTenantCountryDto,
+    actorId: string,
+    actorEmail: string,
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException("Tenant not found");
+    }
+
+    // DTO-level @IsIn already rejected anything outside COUNTRY_PROFILES,
+    // so this resolves to the operator's actual choice — never a silent
+    // DEFAULT_COUNTRY fallback masking a typo that should have 400'd.
+    const profile = resolveCountryProfile(dto.countryCode);
+
+    // No-op — skip the write, the audit row and the cache invalidation so
+    // a no-op PATCH stays cheap and silent, mirroring updateStatus's rule.
+    if (tenant.countryCode === profile.code) {
+      return { countryCode: tenant.countryCode, currency: tenant.currency };
+    }
+
+    const previousCountryCode = tenant.countryCode;
+    const previousCurrency = tenant.currency;
+
+    const updated = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { countryCode: profile.code, currency: profile.currency },
+      select: { id: true, countryCode: true, currency: true },
+    });
+
+    // Load-bearing: without this the correction never takes effect until
+    // the process restarts. See CountryService.invalidate()'s own doc
+    // comment — it was built for exactly this caller.
+    this.country.invalidate(tenantId);
+
+    await this.auditService.log({
+      action: AuditAction.UPDATE,
+      entityType: EntityType.TENANT,
+      entityId: tenantId,
+      actorId,
+      actorEmail,
+      previousData: {
+        countryCode: previousCountryCode,
+        currency: previousCurrency,
+      },
+      newData: {
+        countryCode: updated.countryCode,
+        currency: updated.currency,
+      },
+      targetTenantId: tenantId,
+      targetTenantName: tenant.name,
+    });
+
+    return { countryCode: updated.countryCode, currency: updated.currency };
   }
 
   async getTenantUsers(tenantId: string, page: number = 1, limit: number = 20) {

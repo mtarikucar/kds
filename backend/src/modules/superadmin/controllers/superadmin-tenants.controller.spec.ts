@@ -16,6 +16,7 @@ describe("SuperAdminTenantsController", () => {
       findAll: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue({}),
       updateStatus: jest.fn().mockResolvedValue({}),
+      updateCountry: jest.fn().mockResolvedValue({}),
       getTenantUsers: jest.fn().mockResolvedValue([]),
       getTenantOrders: jest.fn().mockResolvedValue([]),
       getTenantStats: jest.fn().mockResolvedValue({}),
@@ -32,6 +33,12 @@ describe("SuperAdminTenantsController", () => {
     const dto = { status: "SUSPENDED" } as any;
     await ctrl.updateStatus("t1", dto, "sa-1", "root@x.com");
     expect(svc.updateStatus).toHaveBeenCalledWith("t1", dto, "sa-1", "root@x.com");
+  });
+
+  it("updateCountry threads the dto + acting super-admin identity", async () => {
+    const dto = { countryCode: "UZ" } as any;
+    await ctrl.updateCountry("t1", dto, "sa-1", "root@x.com");
+    expect(svc.updateCountry).toHaveBeenCalledWith("t1", dto, "sa-1", "root@x.com");
   });
 
   it("getTenantUsers defaults page/limit", async () => {
