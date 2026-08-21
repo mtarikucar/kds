@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { safePartnerUrl } from './partnerBadge';
+import { safePartnerUrl } from './partnerUrl';
 
 /**
  * "Üretim ortağı: Figurunica".
