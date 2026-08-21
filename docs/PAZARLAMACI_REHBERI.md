@@ -111,6 +111,7 @@ Kontörler yıllık yenilemeye girmez. Bittiğinde müşteri yenisini alır.
 | Hizmet | Tutar | İçerik |
 |---|---:|---|
 | Yerinde Kurulum & Eğitim | **₺7.500** | Tam gün yerinde kurulum, cihaz devreye alma, personel eğitimi |
+| 3D Baskı Figür | **₺1.500 + ₺50/ürün** | Menüden seçilen her ürün için bir figür; KDV ve kargo dahil, üretim ortağı Figurunica |
 
 ### Donanım (tek seferlik, kargolu)
 
