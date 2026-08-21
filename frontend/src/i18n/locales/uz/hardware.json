@@ -164,6 +164,7 @@
       "title": "3D bosma figurka",
       "desc": "Menyudan tanlagan har bir taom uchun bitta 3D bosma figurka. QQS va yetkazib berish narxga kiritilgan.",
       "price": "₺1 500 + har bir taom uchun ₺50",
+      "priceLine": "{{base}} + har bir taom uchun {{perItem}}",
       "cta": "Buyurtma berish"
     },
     "wizard": {

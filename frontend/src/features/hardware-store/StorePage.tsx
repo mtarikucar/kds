@@ -25,6 +25,8 @@ import { useListBranches } from '../branches/branchesApi';
 import HardwareCheckoutResult from './HardwareCheckoutResult';
 import { stashPendingCheckoutRef, resolvePendingCheckoutRef, clearPendingCheckoutRef } from './checkoutRef';
 import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
+import { isPrint3dSku } from '../print3d/print3dSkus';
+import Print3dStoreCard from '../print3d/Print3dStoreCard';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -153,6 +155,15 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
       const next = new URLSearchParams(searchParams);
       next.delete('sku');
       setSearchParams(next, { replace: true });
+      return;
+    }
+    // v3.7.0 — ?sku=print3d_* derin bağlantısı ham detay sayfasına DEĞİL,
+    // sihirbaza gider. Ham SKU tek başına satılabilir olmamalı.
+    if (isPrint3dSku(sku)) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('sku');
+      setSearchParams(next, { replace: true });
+      window.location.assign('/admin/store/print3d');
       return;
     }
     // Services need a branch picker + dates; we send the buyer to the
@@ -337,10 +348,22 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
             </div>
           ) : (
             <>
+              {/* v3.7.0 — TEK 3D baskı kartı. Hizmet bölümünün DIŞINDA:
+                  bölüm kapısı ham print3d satırlarını eleyince kart da
+                  kaybolurdu. Kartın kendisi teklif available:false ise
+                  null render eder. */}
+              {(category === 'all' || category === 'service') && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <Print3dStoreCard />
+                </div>
+              )}
+
               {/* v2.8.87: services rendered in a dedicated section above
                   hardware (only when the filter is 'all' or 'service'). */}
               {(category === 'all' || category === 'service') &&
-                products.some((p) => p.category === 'service') && (
+                products.some(
+                  (p) => p.category === 'service' && !isPrint3dSku(p.sku),
+                ) && (
                   <section className="space-y-3">
                     <div>
                       <h2 className="text-base font-semibold text-gray-900">
@@ -352,7 +375,7 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {products
-                        .filter((p) => p.category === 'service')
+                        .filter((p) => p.category === 'service' && !isPrint3dSku(p.sku))
                         .map((p) => (
                           <ServiceCard key={p.id} p={p} />
                         ))}

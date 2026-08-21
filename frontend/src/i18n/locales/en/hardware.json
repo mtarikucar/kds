@@ -164,6 +164,7 @@
       "title": "3D printed figurine",
       "desc": "One 3D printed figurine for each product you pick from your menu. VAT and shipping included.",
       "price": "₺1,500 + ₺50 per product",
+      "priceLine": "{{base}} + {{perItem}} per product",
       "cta": "Start an order"
     },
     "wizard": {

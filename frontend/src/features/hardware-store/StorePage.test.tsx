@@ -33,6 +33,36 @@ vi.mock('./storeApi', async (importOriginal) => {
   };
 });
 
+// v3.7.0 — Print3dStoreCard renders unconditionally (category 'all'/'service')
+// once the offer is available, so every test in this file that hits the
+// products-loaded branch also mounts it. Mock its data hook + the
+// country-profile currency hook it now depends on (StorePage itself never
+// touches useFormatCurrency — this mock only exists to satisfy the card).
+const print3dOffer = {
+  data: {
+    available: true,
+    basePriceCents: 150000,
+    perItemCents: 5000,
+    currency: 'TRY',
+    minItems: 1,
+    maxItems: 50,
+    partnerName: 'Figurunica',
+    partnerUrl: 'https://figurunica.com',
+  },
+};
+vi.mock('../print3d/print3dApi', () => ({
+  useGetPrint3dOffer: () => print3dOffer,
+  print3dKeys: { offer: () => ['print3d', 'offer'] },
+}));
+vi.mock('../../hooks/useFormatCurrency', () => ({
+  useFormatCurrencyExtended: () => ({
+    formatCurrency: (a: number) => String(a),
+    formatWithCurrency: (a: number, c: string) => `${a} ${c}`,
+    currency: 'TRY',
+  }),
+  useFormatCurrency: () => (a: number) => String(a),
+}));
+
 vi.mock('../branches/branchesApi', () => ({
   useListBranches: () => ({ data: [] }),
 }));
@@ -441,5 +471,56 @@ describe('StorePage', () => {
     fireEvent.click(screen.getByText(enHardware.store.checkout));
     fireEvent.click(await screen.findByTestId('ship-submit'));
     expect(intent.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  describe('print3d single-card surface (Görev 15)', () => {
+    it('does not render the raw print3d SKUs as separate service cards', () => {
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service', name: '3D baskı figür — hizmet bedeli' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service', name: '3D baskı figür — ürün başına' }),
+        makeProduct({ id: 'p-s', sku: 'install-yazarkasa-gib', category: 'service', name: 'Yazarkasa kurulum' }),
+      ];
+      renderStore();
+      expect(screen.queryByText('3D baskı figür — hizmet bedeli')).toBeNull();
+      expect(screen.queryByText('3D baskı figür — ürün başına')).toBeNull();
+      expect(screen.getByText('Yazarkasa kurulum')).toBeTruthy();
+    });
+
+    it('renders a single 3D print card that links to the wizard', () => {
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service' }),
+      ];
+      renderStore();
+      const cards = screen.getAllByTestId('print3d-store-card');
+      expect(cards).toHaveLength(1);
+      expect(within(cards[0]).getByRole('link', { name: enHardware.print3d.card.cta })).toHaveAttribute(
+        'href',
+        '/admin/store/print3d',
+      );
+    });
+
+    it('hides the Hizmetler section heading when the only service rows are the print3d SKUs', () => {
+      // Filtreyi düzeltip kapıyı düzeltmemek, boş bir ızgaranın üstünde
+      // "Hizmetler" başlığı bırakırdı.
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service' }),
+      ];
+      renderStore();
+      expect(screen.queryByText(enHardware.store.servicesTitle)).toBeNull();
+    });
+
+    it('does not sell either raw print3d SKU as its own purchasable card even when it is the ONLY product', () => {
+      // A narrower single-row catalogue than the pairing tests above — this
+      // is the shape that would slip through if the filter only fired for
+      // "both rows present" instead of testing each row independently.
+      products.data = [makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' })];
+      renderStore();
+      expect(screen.queryByRole('button', { name: /sepete ekle|add to cart/i })).toBeNull();
+      // The only purchasable-looking card on the page is the single print3d
+      // wizard card — never a card keyed to the raw SKU itself.
+      expect(screen.getAllByTestId('print3d-store-card')).toHaveLength(1);
+    });
   });
 });

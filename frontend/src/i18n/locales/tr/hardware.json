@@ -164,6 +164,7 @@
       "title": "3D baskı figür",
       "desc": "Menünüzden seçtiğiniz her ürün için bir 3D baskı figür. KDV ve kargo dahil.",
       "price": "₺1.500 + ürün başına ₺50",
+      "priceLine": "{{base}} + ürün başına {{perItem}}",
       "cta": "Sipariş oluştur"
     },
     "wizard": {
