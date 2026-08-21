@@ -12,6 +12,7 @@ import {
   Layers,
   Banknote,
   Scale,
+  Boxes,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const navigation = [
   { nameKey: 'nav.marketplace', href: '/superadmin/marketplace', icon: Layers, defaultLabel: 'Katalog' },
   { nameKey: 'nav.auditLogs', href: '/superadmin/audit-logs', icon: FileText },
   { nameKey: 'nav.legal', href: '/superadmin/legal', icon: Scale, defaultLabel: 'Yasal Belgeler' },
+  { nameKey: 'nav.print3d', href: '/superadmin/print3d', icon: Boxes, defaultLabel: '3D Üretim' },
   { nameKey: 'nav.settings', href: '/superadmin/settings', icon: Settings },
 ];
 

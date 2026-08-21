@@ -42,6 +42,9 @@ const MarketplaceAdminPage = lazyWithReload(
 const LegalDocumentsPage = lazyWithReload(
   () => import("./pages/superadmin/LegalDocumentsPage"),
 );
+const Print3dProductionPage = lazyWithReload(
+  () => import("./pages/superadmin/Print3dProductionPage"),
+);
 import {
   SuperAdminLayout,
   SuperAdminProtectedRoute,
@@ -940,6 +943,10 @@ function App() {
                 element={<AuditLogsPage />}
               />
               <Route path="/superadmin/legal" element={<LegalDocumentsPage />} />
+              <Route
+                path="/superadmin/print3d"
+                element={<Print3dProductionPage />}
+              />
               <Route
                 path="/superadmin/settings"
                 element={<SuperAdminSettingsPage />}
