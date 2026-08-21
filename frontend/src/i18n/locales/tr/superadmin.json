@@ -22,6 +22,7 @@
     "marketplace": "Katalog",
     "auditLogs": "Denetim Kayıtları",
     "legal": "Yasal Belgeler",
+    "print3d": "3D Üretim",
     "settings": "Ayarlar",
     "signOut": "Çıkış yap"
   },
@@ -451,5 +452,15 @@
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
     }
+  },
+  "print3d": {
+    "title": "3D Üretim",
+    "subtitle": "Figurunica üretim kuyruğu",
+    "tabs": { "queued": "Kuyrukta", "in_production": "Üretimde", "produced": "Üretildi", "cancelled": "İptal" },
+    "col": { "tenant": "Kiracı", "items": "Kalem", "total": "Tutar", "date": "Tarih", "status": "Durum" },
+    "manifest": { "title": "Figurunica manifestosu", "product": "Ürün", "model": "3D model dosyası", "address": "Teslimat adresi", "itemStatus": "Kalem durumu" },
+    "actions": { "advance": "İlerlet", "cancel": "İptal et", "partnerRef": "Ortak iş no", "save": "Kaydet", "exportCsv": "CSV indir", "createShipment": "Kargo oluştur", "markDelivered": "Teslim edildi" },
+    "itemStatus": { "pending": "Bekliyor", "printed": "Basıldı", "rejected": "Reddedildi" },
+    "empty": "Bu durumda iş yok."
   }
 }

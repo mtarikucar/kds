@@ -158,6 +158,62 @@
       "unknown_service": "{{name}} topilmadi."
     }
   },
+  "print3d": {
+    "partnerLabel": "Ishlab chiqarish hamkori: Figurunica",
+    "card": {
+      "title": "3D bosma figurka",
+      "desc": "Menyudan tanlagan har bir taom uchun bitta 3D bosma figurka. QQS va yetkazib berish narxga kiritilgan.",
+      "price": "₺1 500 + har bir taom uchun ₺50",
+      "cta": "Buyurtma berish"
+    },
+    "wizard": {
+      "title": "3D bosma figurka buyurtmasi",
+      "stepProducts": "Taom tanlash",
+      "stepShipping": "Yetkazib berish",
+      "stepSummary": "Xulosa va to‘lov",
+      "next": "Davom etish",
+      "back": "Orqaga",
+      "unavailable": "Bu xizmat hozircha sotuvda emas."
+    },
+    "picker": {
+      "search": "Taom qidirish",
+      "allCategories": "Barcha turkumlar",
+      "selectedCount": "{{count}} ta taom tanlandi",
+      "maxReached": "Ko‘pi bilan {{max}} ta taom tanlash mumkin.",
+      "livePrice": "Taxminiy summa",
+      "empty": "Menyuda hali taom yo‘q."
+    },
+    "shipping": {
+      "notesLabel": "Ishlab chiqarish izohi (ixtiyoriy)",
+      "notesPlaceholder": "Rang, o‘lcham yoki taqdimot bo‘yicha istagingizni yozing.",
+      "continue": "Xulosaga o‘tish"
+    },
+    "summary": {
+      "baseLine": "Xizmat haqi",
+      "itemLine": "Har bir taom uchun figurka ({{count}} dona)",
+      "shipping": "Yetkazib berish",
+      "total": "Jami",
+      "consentTitle": "Huquqiy roziliklar",
+      "consentRequired": "To‘lovga o‘tish uchun uchala shartnomani ham tasdiqlang.",
+      "pay": "PayTR orqali to‘lash",
+      "verifying": "Summa tekshirilmoqda…",
+      "mismatch": "Server summani tasdiqlay olmadi; iltimos, ustani qaytadan boshlang."
+    },
+    "errors": {
+      "PRINT3D_NO_PRODUCTS": "Kamida bitta menyu taomini tanlang.",
+      "PRINT3D_TOO_MANY_PRODUCTS": "Ko‘pi bilan 50 ta taom tanlash mumkin.",
+      "PRINT3D_FOREIGN_PRODUCT": "Tanlangan taomlardan biri bu restoranga tegishli emas.",
+      "PRINT3D_INCOMPLETE_CART": "3D bosma buyurtmasi to‘liq emas; iltimos, ustani qaytadan boshlang.",
+      "PRINT3D_DUPLICATE_LINE": "3D bosma buyurtmasi to‘liq emas; iltimos, ustani qaytadan boshlang."
+    },
+    "order": {
+      "blockTitle": "3D bosma figurka buyurtmasi",
+      "itemLine": "{{count}} ta taom"
+    },
+    "result": {
+      "note": "Buyurtmangiz ishlab chiqarish navbatiga qo‘yildi."
+    }
+  },
   "shippingForm": {
     "continue": "Continue",
     "modeAria": "Delivery address mode",

@@ -158,6 +158,62 @@
       "unknown_service": "{{name}} bulunamadı."
     }
   },
+  "print3d": {
+    "partnerLabel": "Üretim ortağı: Figurunica",
+    "card": {
+      "title": "3D baskı figür",
+      "desc": "Menünüzden seçtiğiniz her ürün için bir 3D baskı figür. KDV ve kargo dahil.",
+      "price": "₺1.500 + ürün başına ₺50",
+      "cta": "Sipariş oluştur"
+    },
+    "wizard": {
+      "title": "3D baskı figür siparişi",
+      "stepProducts": "Ürün seçimi",
+      "stepShipping": "Teslimat",
+      "stepSummary": "Özet ve ödeme",
+      "next": "Devam et",
+      "back": "Geri",
+      "unavailable": "Bu hizmet şu anda satışa kapalı."
+    },
+    "picker": {
+      "search": "Ürün ara",
+      "allCategories": "Tüm kategoriler",
+      "selectedCount": "{{count}} ürün seçildi",
+      "maxReached": "En fazla {{max}} ürün seçebilirsiniz.",
+      "livePrice": "Tahmini tutar",
+      "empty": "Menünüzde ürün yok."
+    },
+    "shipping": {
+      "notesLabel": "Üretim notu (isteğe bağlı)",
+      "notesPlaceholder": "Renk, boyut veya sunum tercihiniz varsa yazın.",
+      "continue": "Özete geç"
+    },
+    "summary": {
+      "baseLine": "Hizmet bedeli",
+      "itemLine": "Ürün başına figür ({{count}} adet)",
+      "shipping": "Kargo",
+      "total": "Toplam",
+      "consentTitle": "Yasal onaylar",
+      "consentRequired": "Ödemeye geçmek için üç sözleşmeyi de onaylayın.",
+      "pay": "PayTR ile öde",
+      "verifying": "Tutar doğrulanıyor…",
+      "mismatch": "Tutar sunucu tarafından doğrulanamadı; lütfen sihirbazı yeniden başlatın."
+    },
+    "errors": {
+      "PRINT3D_NO_PRODUCTS": "En az bir menü ürünü seçmelisiniz.",
+      "PRINT3D_TOO_MANY_PRODUCTS": "En fazla 50 ürün seçebilirsiniz.",
+      "PRINT3D_FOREIGN_PRODUCT": "Seçilen ürünlerden biri bu restorana ait değil.",
+      "PRINT3D_INCOMPLETE_CART": "3D baskı siparişi eksik; lütfen sihirbazı yeniden başlatın.",
+      "PRINT3D_DUPLICATE_LINE": "3D baskı siparişi eksik; lütfen sihirbazı yeniden başlatın."
+    },
+    "order": {
+      "blockTitle": "3D baskı figür siparişi",
+      "itemLine": "{{count}} ürün"
+    },
+    "result": {
+      "note": "Siparişiniz üretim kuyruğuna alındı."
+    }
+  },
   "shippingForm": {
     "continue": "Devam et",
     "modeAria": "Teslimat adresi modu",

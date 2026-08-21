@@ -22,6 +22,7 @@
     "marketplace": "الكتالوج",
     "auditLogs": "Audit Logs",
     "legal": "المستندات القانونية",
+    "print3d": "إنتاج ثلاثي الأبعاد",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -451,5 +452,15 @@
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
     }
+  },
+  "print3d": {
+    "title": "إنتاج ثلاثي الأبعاد",
+    "subtitle": "طابور إنتاج Figurunica",
+    "tabs": { "queued": "في الطابور", "in_production": "قيد الإنتاج", "produced": "تم الإنتاج", "cancelled": "ملغى" },
+    "col": { "tenant": "المستأجر", "items": "البنود", "total": "المبلغ", "date": "التاريخ", "status": "الحالة" },
+    "manifest": { "title": "بيان Figurunica", "product": "الصنف", "model": "نموذج ثلاثي الأبعاد", "address": "عنوان التوصيل", "itemStatus": "حالة البند" },
+    "actions": { "advance": "تقديم", "cancel": "إلغاء", "partnerRef": "رقم عمل الشريك", "save": "حفظ", "exportCsv": "تنزيل CSV", "createShipment": "إنشاء شحنة", "markDelivered": "تعليم كمُسلَّم" },
+    "itemStatus": { "pending": "قيد الانتظار", "printed": "مطبوع", "rejected": "مرفوض" },
+    "empty": "لا توجد مهام في هذه الحالة."
   }
 }
