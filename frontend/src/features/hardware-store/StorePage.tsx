@@ -24,6 +24,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useListBranches } from '../branches/branchesApi';
 import HardwareCheckoutResult from './HardwareCheckoutResult';
 import { stashPendingCheckoutRef, resolvePendingCheckoutRef, clearPendingCheckoutRef } from './checkoutRef';
+import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
+import { isPrint3dSku } from '../print3d/print3dSkus';
+import Print3dStoreCard from '../print3d/Print3dStoreCard';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -135,6 +138,11 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
   // tweaking the cart after entering the address doesn't lose their typing.
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  // v3.7.0 — mesafeli satış onamı. Backend CreateCheckoutIntentDto bu üç
+  // id'yi zorunlu kılıyor; alan gönderilmediği için donanım mağazasından
+  // PayTR ödemesi bugüne kadar 400 alıyordu.
+  const [acceptedDocs, setAcceptedDocs] = useState<string[]>([]);
+  const consentGiven = useConsentComplete(acceptedDocs);
 
   // Auto-add the ?sku=<sku> product on mount. Guarded with `processed` so
   // re-renders + state changes don't keep adding. Once it's processed we
@@ -147,6 +155,15 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
       const next = new URLSearchParams(searchParams);
       next.delete('sku');
       setSearchParams(next, { replace: true });
+      return;
+    }
+    // v3.7.0 — ?sku=print3d_* derin bağlantısı ham detay sayfasına DEĞİL,
+    // sihirbaza gider. Ham SKU tek başına satılabilir olmamalı.
+    if (isPrint3dSku(sku)) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('sku');
+      setSearchParams(next, { replace: true });
+      window.location.assign('/admin/store/print3d');
       return;
     }
     // Services need a branch picker + dates; we send the buyer to the
@@ -193,7 +210,10 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
   }
 
   async function startCheckout(result: { address: ShippingAddress; branchId?: string }) {
-    if (lines.length === 0 || !user) return;
+    // Onam kapısı BURADA da duruyor: ShippingAddressForm'un disabled prop'u
+    // görsel kapı, bu ise para kapısı. İkisi ayrı olmalı — form ileride başka
+    // bir çağırandan da submit edilebilir.
+    if (lines.length === 0 || !user || !consentGiven) return;
     const { address, branchId } = result;
     setShippingAddress(address);
     const intentResult = await intent.mutateAsync({
@@ -216,6 +236,8 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
       // HardwareOrder.branchId. Address still in cart.shippingAddress
       // as the snapshot; branchId is the reference.
       branchId,
+      // v3.7.0 — yasal onam, PayTR jetonundan ÖNCE doğrulanıp kaydediliyor.
+      acceptedDocumentIds: acceptedDocs,
     });
     stashPendingCheckoutRef(intentResult.paymentRef);
     if (intentResult.paymentLink) {
@@ -326,10 +348,22 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
             </div>
           ) : (
             <>
+              {/* v3.7.0 — TEK 3D baskı kartı. Hizmet bölümünün DIŞINDA:
+                  bölüm kapısı ham print3d satırlarını eleyince kart da
+                  kaybolurdu. Kartın kendisi teklif available:false ise
+                  null render eder. */}
+              {(category === 'all' || category === 'service') && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <Print3dStoreCard />
+                </div>
+              )}
+
               {/* v2.8.87: services rendered in a dedicated section above
                   hardware (only when the filter is 'all' or 'service'). */}
               {(category === 'all' || category === 'service') &&
-                products.some((p) => p.category === 'service') && (
+                products.some(
+                  (p) => p.category === 'service' && !isPrint3dSku(p.sku),
+                ) && (
                   <section className="space-y-3">
                     <div>
                       <h2 className="text-base font-semibold text-gray-900">
@@ -341,7 +375,7 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {products
-                        .filter((p) => p.category === 'service')
+                        .filter((p) => p.category === 'service' && !isPrint3dSku(p.sku))
                         .map((p) => (
                           <ServiceCard key={p.id} p={p} />
                         ))}
@@ -505,11 +539,18 @@ export default function StorePage({ embedded = false }: { embedded?: boolean } =
         <p className="mb-4 text-xs text-gray-500">
           {t('store.deliveryNote')}
         </p>
+        <div className="mb-4 border-b pb-4">
+          <h3 className="mb-2 text-xs font-semibold text-gray-900">
+            {t('store.consentTitle')}
+          </h3>
+          <CheckoutConsent accepted={acceptedDocs} onChange={setAcceptedDocs} />
+        </div>
         <ShippingAddressForm
           initial={shippingAddress ?? undefined}
           branches={branches}
           onSubmit={startCheckout}
           submitting={intent.isPending}
+          disabled={!consentGiven}
           submitLabel={t('store.payWithPaytr')}
         />
         <p className="mt-3 text-[11px] text-gray-500">

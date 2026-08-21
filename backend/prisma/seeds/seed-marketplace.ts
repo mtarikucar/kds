@@ -418,7 +418,7 @@ export const PRODUCTS = [
 // `requiresBranch` forces the buyer to pick a branch at the SPA detail
 // page before "Add to cart" enables.
 
-const SERVICES = [
+export const SERVICES = [
   {
     sku: "install-yazarkasa-gib",
     category: "service",
@@ -740,6 +740,44 @@ const SERVICES = [
         "4 hafta boyunca haftalık 30 dk durum takibi çağrısı",
       ],
       requirements: ["3 veya daha fazla aktif şube"],
+    },
+  },
+
+  // v3.7.0 — 3D baskı figür hizmeti (üretim ortağı: Figurunica).
+  //
+  // İKİ SKU, çünkü QuoteService uçtan uca `unitCents × qty` çalışıyor ve
+  // PayTR sepeti amountCents'e BİREBİR toplanmak zorunda: "150.000 + 5.000×N"
+  // tek satırda ifade edilemez.
+  //
+  // status / saleMode BURADA YAZILMAZ — ortak upsert (aşağıda) ikisini de
+  // atıyor. complianceDocs de yazılmaz: SEED_DEFAULT_COMPLIANCE devreye girer
+  // ve migration ile birebir aynı değeri ({"invoiceIssued":true}) üretir.
+  {
+    sku: "print3d_base",
+    category: "service",
+    name: "3D baskı figür — hizmet bedeli",
+    description:
+      "Menünüzden seçtiğiniz ürünlerin 3D baskı figürleri. Kargo dahil. Üretim ortağı: Figurunica.",
+    priceCents: 150_000,
+    images: ["/products/_fallback-service.svg"],
+    serviceMeta: {
+      serviceType: "print3d",
+      partner: "figurunica",
+      role: "base",
+    },
+  },
+  {
+    sku: "print3d_item",
+    category: "service",
+    name: "3D baskı figür — ürün başına",
+    description:
+      "Seçilen her menü ürünü için bir figür. Taban hizmet bedeliyle birlikte alınır.",
+    priceCents: 5_000,
+    images: ["/products/_fallback-service.svg"],
+    serviceMeta: {
+      serviceType: "print3d",
+      partner: "figurunica",
+      role: "item",
     },
   },
 ];

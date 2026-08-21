@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 import { useListHardwareOrders } from './storeApi';
 import { useCartStore } from './cartStore';
+import PartnerBadge from '../print3d/PartnerBadge';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 30_000;
@@ -87,6 +88,12 @@ export default function HardwareCheckoutResult({
           <p className="mt-2 text-sm text-gray-500">
             {t('store.checkoutResult.successBody')}
           </p>
+          {matchedOrder?.print3dJob && (
+            <div className="mt-2 space-y-1">
+              <p className="text-sm text-gray-700">{t('print3d.result.note')}</p>
+              <PartnerBadge url="https://figurunica.com" />
+            </div>
+          )}
           <div className="mt-6 flex flex-col items-center gap-2">
             <Link
               to={`/admin/hardware-orders/${matchedOrder!.id}`}

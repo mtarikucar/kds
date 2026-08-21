@@ -120,6 +120,7 @@
     "close": "Close",
     "deliveryNote": "Your hardware will be shipped to this address. The information will be transferred to the secure PayTR payment page.",
     "payWithPaytr": "Pay with PayTR",
+    "consentTitle": "Юридические согласия",
     "paytrNote": "Payment is processed securely by PayTR. Your card details are not shared with HummyTummy.",
     "card": {
       "gibCertified": "GİB certified",
@@ -155,6 +156,63 @@
       "service_not_purchasable": "{{name}} нельзя приобрести как услугу.",
       "service_not_directly_purchasable": "{{name}} нельзя купить напрямую здесь (нужен запрос цены).",
       "unknown_service": "{{name}} не найдено."
+    }
+  },
+  "print3d": {
+    "partnerLabel": "Производственный партнёр: Figurunica",
+    "card": {
+      "title": "3D-печатная фигурка",
+      "desc": "По одной 3D-фигурке для каждого блюда из вашего меню. НДС и доставка включены.",
+      "price": "₺1 500 + ₺50 за позицию",
+      "priceLine": "{{base}} + {{perItem}} за позицию",
+      "cta": "Оформить заказ"
+    },
+    "wizard": {
+      "title": "Заказ 3D-печатных фигурок",
+      "stepProducts": "Выбор позиций",
+      "stepShipping": "Доставка",
+      "stepSummary": "Итог и оплата",
+      "next": "Продолжить",
+      "back": "Назад",
+      "unavailable": "Эта услуга сейчас недоступна."
+    },
+    "picker": {
+      "search": "Поиск позиций",
+      "allCategories": "Все категории",
+      "selectedCount": "Выбрано позиций: {{count}}",
+      "maxReached": "Можно выбрать не более {{max}} позиций.",
+      "livePrice": "Ориентировочная сумма",
+      "empty": "В вашем меню пока нет позиций."
+    },
+    "shipping": {
+      "notesLabel": "Примечание к производству (необязательно)",
+      "notesPlaceholder": "Укажите пожелания по цвету, размеру или подаче.",
+      "continue": "К итогу"
+    },
+    "summary": {
+      "baseLine": "Стоимость услуги",
+      "itemLine": "Фигурка за позицию ({{count}} шт.)",
+      "shipping": "Доставка",
+      "total": "Итого",
+      "consentTitle": "Юридические согласия",
+      "consentRequired": "Отметьте все три соглашения, чтобы перейти к оплате.",
+      "pay": "Оплатить через PayTR",
+      "verifying": "Проверяем сумму…",
+      "mismatch": "Сервер не подтвердил сумму; пожалуйста, начните заново."
+    },
+    "errors": {
+      "PRINT3D_NO_PRODUCTS": "Выберите хотя бы одну позицию меню.",
+      "PRINT3D_TOO_MANY_PRODUCTS": "Можно выбрать не более 50 позиций.",
+      "PRINT3D_FOREIGN_PRODUCT": "Одна из выбранных позиций не принадлежит этому ресторану.",
+      "PRINT3D_INCOMPLETE_CART": "Заказ 3D-печати неполный; пожалуйста, начните заново.",
+      "PRINT3D_DUPLICATE_LINE": "Заказ 3D-печати неполный; пожалуйста, начните заново."
+    },
+    "order": {
+      "blockTitle": "Заказ 3D-печатных фигурок",
+      "itemLine": "{{count}} позиций"
+    },
+    "result": {
+      "note": "Ваш заказ поставлен в очередь производства."
     }
   },
   "shippingForm": {

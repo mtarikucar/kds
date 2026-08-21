@@ -22,6 +22,7 @@
     "marketplace": "Каталог",
     "auditLogs": "Audit Logs",
     "legal": "Юридические документы",
+    "print3d": "3D-производство",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -451,5 +452,15 @@
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
     }
+  },
+  "print3d": {
+    "title": "3D-производство",
+    "subtitle": "Очередь производства Figurunica",
+    "tabs": { "queued": "В очереди", "in_production": "В производстве", "produced": "Произведено", "cancelled": "Отменено" },
+    "col": { "tenant": "Арендатор", "items": "Позиции", "total": "Сумма", "date": "Дата", "status": "Статус" },
+    "manifest": { "title": "Манифест Figurunica", "product": "Позиция", "model": "3D-модель", "address": "Адрес доставки", "itemStatus": "Статус позиции" },
+    "actions": { "advance": "Продвинуть", "cancel": "Отменить", "partnerRef": "Номер у партнёра", "save": "Сохранить", "exportCsv": "Скачать CSV", "createShipment": "Создать отправление", "markDelivered": "Отметить доставленным" },
+    "itemStatus": { "pending": "Ожидает", "printed": "Напечатано", "rejected": "Отклонено" },
+    "empty": "В этом статусе задач нет."
   }
 }

@@ -22,6 +22,7 @@
     "marketplace": "Catalog",
     "auditLogs": "Audit Logs",
     "legal": "Legal Documents",
+    "print3d": "3D Production",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -451,5 +452,15 @@
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
     }
+  },
+  "print3d": {
+    "title": "3D Production",
+    "subtitle": "Figurunica production queue",
+    "tabs": { "queued": "Queued", "in_production": "In production", "produced": "Produced", "cancelled": "Cancelled" },
+    "col": { "tenant": "Tenant", "items": "Items", "total": "Amount", "date": "Date", "status": "Status" },
+    "manifest": { "title": "Figurunica manifest", "product": "Product", "model": "3D model", "address": "Delivery address", "itemStatus": "Item status" },
+    "actions": { "advance": "Advance", "cancel": "Cancel", "partnerRef": "Partner job no", "save": "Save", "exportCsv": "Download CSV", "createShipment": "Create shipment", "markDelivered": "Mark delivered" },
+    "itemStatus": { "pending": "Pending", "printed": "Printed", "rejected": "Rejected" },
+    "empty": "No jobs in this state."
   }
 }

@@ -33,6 +33,36 @@ vi.mock('./storeApi', async (importOriginal) => {
   };
 });
 
+// v3.7.0 — Print3dStoreCard renders unconditionally (category 'all'/'service')
+// once the offer is available, so every test in this file that hits the
+// products-loaded branch also mounts it. Mock its data hook + the
+// country-profile currency hook it now depends on (StorePage itself never
+// touches useFormatCurrency — this mock only exists to satisfy the card).
+const print3dOffer = {
+  data: {
+    available: true,
+    basePriceCents: 150000,
+    perItemCents: 5000,
+    currency: 'TRY',
+    minItems: 1,
+    maxItems: 50,
+    partnerName: 'Figurunica',
+    partnerUrl: 'https://figurunica.com',
+  },
+};
+vi.mock('../print3d/print3dApi', () => ({
+  useGetPrint3dOffer: () => print3dOffer,
+  print3dKeys: { offer: () => ['print3d', 'offer'] },
+}));
+vi.mock('../../hooks/useFormatCurrency', () => ({
+  useFormatCurrencyExtended: () => ({
+    formatCurrency: (a: number) => String(a),
+    formatWithCurrency: (a: number, c: string) => `${a} ${c}`,
+    currency: 'TRY',
+  }),
+  useFormatCurrency: () => (a: number) => String(a),
+}));
+
 vi.mock('../branches/branchesApi', () => ({
   useListBranches: () => ({ data: [] }),
 }));
@@ -40,6 +70,24 @@ vi.mock('../branches/branchesApi', () => ({
 vi.mock('../../store/authStore', () => ({
   useAuthStore: (sel: any) =>
     sel({ user: { email: 'op@x.com', firstName: 'Op', lastName: 'Erator' } }),
+}));
+
+// Onamın kendi spec'i var; burada üç yasal-belge sorgusunu her senaryoya
+// sürüklerdi. CatalogStore.test.tsx'teki yerleşik desen: `useConsentComplete`
+// bir bayrakla değiştirilir. Fark: buradaki stub GERÇEKTEN onChange çağırır,
+// çünkü testin iddiası "hangi id'ler gönderildi" — `default: () => null`
+// olsaydı acceptedDocs sonsuza dek [] kalır ve iddia hiç yeşile dönmezdi.
+let consentComplete = true;
+vi.mock('../legal/CheckoutConsent', () => ({
+  default: ({ onChange }: { onChange: (ids: string[]) => void }) => (
+    <button
+      data-testid="tick-consents"
+      onClick={() => onChange(['doc-kvkk', 'doc-sales', 'doc-refund'])}
+    >
+      consents
+    </button>
+  ),
+  useConsentComplete: () => consentComplete,
 }));
 
 // ShippingAddressForm has its own spec; stub it to a button that calls
@@ -111,6 +159,7 @@ describe('StorePage', () => {
     intent.isPending = false;
     hardwareOrders.data = [];
     hardwareOrders.refetch.mockReset();
+    consentComplete = true;
     // Reset the shared in-memory cart between tests.
     useCartStore.getState().clear();
     window.sessionStorage.clear();
@@ -363,6 +412,115 @@ describe('StorePage', () => {
         </MemoryRouter>,
       );
       expect(screen.getByText('Confirming your payment')).toBeInTheDocument();
+    });
+  });
+
+  it('sends acceptedDocumentIds with the checkout intent', async () => {
+    products.data = [makeProduct()];
+    intent.mutateAsync.mockResolvedValue({ paymentRef: 'CK-1', paymentLink: '' });
+    const { rerender } = renderStore();
+    fireEvent.click(screen.getAllByText(enHardware.store.card.addToCart)[0]);
+    // Checkout stays locked until a quote exists (quote-before-pay lock) —
+    // mirror the existing "opens the checkout modal…" test's pattern.
+    quote.data = {
+      lines: [],
+      currency: 'TRY',
+      subtotalCents: 50000,
+      taxCents: 9000,
+      shippingCents: 2500,
+      totalCents: 61500,
+      warnings: [],
+      isPureRecurring: false,
+    };
+    rerender(
+      <MemoryRouter>
+        <StorePage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(enHardware.store.checkout));
+    fireEvent.click(await screen.findByTestId('tick-consents'));
+    fireEvent.click(screen.getByTestId('ship-submit'));
+    await waitFor(() => expect(intent.mutateAsync).toHaveBeenCalled());
+    expect(intent.mutateAsync.mock.calls[0][0].acceptedDocumentIds).toEqual([
+      'doc-kvkk',
+      'doc-sales',
+      'doc-refund',
+    ]);
+  });
+
+  it('does not start a checkout while the three consents are unticked', async () => {
+    consentComplete = false;
+    products.data = [makeProduct()];
+    const { rerender } = renderStore();
+    fireEvent.click(screen.getAllByText(enHardware.store.card.addToCart)[0]);
+    quote.data = {
+      lines: [],
+      currency: 'TRY',
+      subtotalCents: 50000,
+      taxCents: 9000,
+      shippingCents: 2500,
+      totalCents: 61500,
+      warnings: [],
+      isPureRecurring: false,
+    };
+    rerender(
+      <MemoryRouter>
+        <StorePage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText(enHardware.store.checkout));
+    fireEvent.click(await screen.findByTestId('ship-submit'));
+    expect(intent.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  describe('print3d single-card surface (Görev 15)', () => {
+    it('does not render the raw print3d SKUs as separate service cards', () => {
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service', name: '3D baskı figür — hizmet bedeli' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service', name: '3D baskı figür — ürün başına' }),
+        makeProduct({ id: 'p-s', sku: 'install-yazarkasa-gib', category: 'service', name: 'Yazarkasa kurulum' }),
+      ];
+      renderStore();
+      expect(screen.queryByText('3D baskı figür — hizmet bedeli')).toBeNull();
+      expect(screen.queryByText('3D baskı figür — ürün başına')).toBeNull();
+      expect(screen.getByText('Yazarkasa kurulum')).toBeTruthy();
+    });
+
+    it('renders a single 3D print card that links to the wizard', () => {
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service' }),
+      ];
+      renderStore();
+      const cards = screen.getAllByTestId('print3d-store-card');
+      expect(cards).toHaveLength(1);
+      expect(within(cards[0]).getByRole('link', { name: enHardware.print3d.card.cta })).toHaveAttribute(
+        'href',
+        '/admin/store/print3d',
+      );
+    });
+
+    it('hides the Hizmetler section heading when the only service rows are the print3d SKUs', () => {
+      // Filtreyi düzeltip kapıyı düzeltmemek, boş bir ızgaranın üstünde
+      // "Hizmetler" başlığı bırakırdı.
+      products.data = [
+        makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' }),
+        makeProduct({ id: 'p-i', sku: 'print3d_item', category: 'service' }),
+      ];
+      renderStore();
+      expect(screen.queryByText(enHardware.store.servicesTitle)).toBeNull();
+    });
+
+    it('does not sell either raw print3d SKU as its own purchasable card even when it is the ONLY product', () => {
+      // A narrower single-row catalogue than the pairing tests above — this
+      // is the shape that would slip through if the filter only fired for
+      // "both rows present" instead of testing each row independently.
+      products.data = [makeProduct({ id: 'p-b', sku: 'print3d_base', category: 'service' })];
+      renderStore();
+      expect(screen.queryByRole('button', { name: /sepete ekle|add to cart/i })).toBeNull();
+      // The only purchasable-looking card on the page is the single print3d
+      // wizard card — never a card keyed to the raw SKU itself.
+      expect(screen.getAllByTestId('print3d-store-card')).toHaveLength(1);
     });
   });
 });

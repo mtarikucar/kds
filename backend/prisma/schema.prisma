@@ -522,6 +522,7 @@ model Product {
   comboGroups       ComboGroup[] // slots when THIS product is a COMBO
   componentInCombos ComboGroupItem[] // combo slots that include THIS product
   collections       ProductCollection[] // classification (kategoriden bağımsız)
+  print3dJobItems   Print3dJobItem[] // 3D baskı siparişlerinde bu ürünü işaret eden kalemler
 
   @@index([tenantId])
   @@index([categoryId])
@@ -5480,6 +5481,7 @@ model HardwareOrder {
   items         HardwareOrderItem[]
   shipments     Shipment[]
   installations InstallationRequest[]
+  print3dJob    Print3dJob?
 
   @@index([tenantId, status])
   @@index([createdAt])
@@ -5612,6 +5614,83 @@ model InstallationRequest {
   @@index([tenantId, status])
   @@index([scheduledFor])
   @@map("installation_requests")
+}
+
+/// 3D baskı figür üretim işi (üretim ortağı: Figurunica).
+///
+/// Bir Print3dJob, ödenmiş bir HardwareOrder'ın SONUCUDUR — başka yaratım
+/// yolu yoktur (kiracı tarafında POST endpoint'i yok; InstallationRequest'ten
+/// farkı budur). Bu yüzden hwOrderId NOT NULL + Cascade: sipariş yoksa iş de
+/// yoktur.
+///
+/// Durum YALNIZCA üretimi izler. Kargo/teslim Shipment'ta ve
+/// HardwareOrder.status'ta yaşar.
+///   queued -> in_production -> produced
+///   queued|in_production -> cancelled   (terminal)
+model Print3dJob {
+  id             String        @id @default(uuid())
+  tenantId       String
+  branchId       String?
+  hwOrderId      String        @unique
+  hwOrder        HardwareOrder @relation(fields: [hwOrderId], references: [id], onDelete: Cascade)
+  status         String        @default("queued")
+  /// Üretim ortağı kimliği. Bugün her zaman 'figurunica'; ikinci ortak
+  /// geldiğinde bu kolon kuyruğu bölmeye yeter.
+  partner        String        @default("figurunica")
+  /// Satın alma anındaki fiyat anlık görüntüsü — SKU sonradan yeniden
+  /// fiyatlansa bile bu işin ne kadara satıldığı değişmez.
+  basePriceCents Int
+  perItemCents   Int
+  itemCount      Int
+  totalCents     Int
+  currency       String        @default("TRY")
+  /// Alıcının sihirbazda yazdığı serbest not (üretim talimatı).
+  note           String?       @db.Text
+  /// Figurunica'nın kendi iş numarası; operatör panelden girer.
+  partnerRef     String?
+  /// Operatörün kuyruk notu (üretim/iptal gerekçesi).
+  opsNote        String?       @db.Text
+  producedAt     DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  items Print3dJobItem[]
+
+  @@index([tenantId, status])
+  @@index([status, createdAt])
+  @@map("print3d_jobs")
+}
+
+/// İşin bir kalemi = seçilmiş BİR menü ürünü = BİR figür.
+///
+/// productId NULLABLE + SetNull: menü ürünleri GERÇEKTEN siliniyor
+/// (menu/services/products.service.ts). Restrict olsaydı kiracı ürünü hiç
+/// silemezdi; Cascade olsaydı ödenmiş siparişin kalemi yok olurdu. Snapshot
+/// alanları bağ koptuğunda da manifestoyu ayakta tutar.
+model Print3dJobItem {
+  id              String     @id @default(uuid())
+  jobId           String
+  job             Print3dJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /// Sipariş anındaki ad — sonraki menü düzenlemesi siparişi yeniden yazamaz.
+  productName     String
+  /// Sipariş anındaki birincil fotoğraf URL'i. NULL ise üretim yalnızca ADLA
+  /// çalışır (ürün fotoğrafsızdı) — bu bilinçli bir üründür, hata değil.
+  productImageUrl String?
+  /// Ürün zaten bir GLB taşıyorsa yazıcıya ek referans olarak iletilir.
+  /// Meshy/AI hattı BU AKIŞTA ÇALIŞTIRILMAZ; yalnızca mevcut değer kopyalanır.
+  model3dUrl      String?
+  position        Int
+  status          String     @default("pending")
+  opsNote         String?    @db.Text
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@unique([jobId, productId])
+  @@index([jobId, position])
+  @@map("print3d_job_items")
 }
 
 model Warranty {

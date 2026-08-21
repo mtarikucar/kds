@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { ValidationPipe, ArgumentMetadata } from '@nestjs/common';
 import { ROLES_KEY } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 import { CheckoutController } from '../checkout.controller';
@@ -225,5 +226,82 @@ describe('CartDto / ConfirmCheckoutDto (iter-88)', () => {
       // Read-only pricing — any tenant role is OK.
       expect(roles).toBeUndefined();
     });
+  });
+});
+
+describe("CartItemDto — print3d productIds (v3.7.0)", () => {
+  const base = {
+    type: "service" as const,
+    code: "print3d_item",
+    qty: 1,
+    productIds: [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ],
+  };
+
+  /**
+   * main.ts's app.useGlobalPipes(...) config, verbatim. A unit test that
+   * constructs the DTO directly (plainToInstance + validate) never exercises
+   * this — the silent strip happens INSIDE ValidationPipe#transform, which
+   * runs class-validator's `whitelist` option as a side effect of validate()
+   * and returns the (possibly stripped) instance to the controller. Only a
+   * real pipe.transform() call over a raw, HTTP-shaped payload proves the
+   * field survives the actual request path.
+   */
+  const realPipe = new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    forbidNonWhitelisted: false,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
+  });
+
+  it("keeps productIds through the REAL app ValidationPipe (whitelist:true would otherwise silently delete it)", async () => {
+    // This is the actual pipe instance shape wired up in main.ts, fed a
+    // plain object exactly as it would arrive off the wire — not a DTO
+    // instance constructed by the test. If `productIds` isn't declared with
+    // a validation decorator on CartItemDto, class-validator's whitelist
+    // strips it here with NO error, and the controller never sees it.
+    const metadata: ArgumentMetadata = {
+      type: "body",
+      metatype: CartItemDto,
+      data: "",
+    };
+    const result = await realPipe.transform({ ...base }, metadata);
+    expect(result).toBeInstanceOf(CartItemDto);
+    expect((result as CartItemDto).productIds).toEqual(base.productIds);
+  });
+
+  it("keeps productIds on a service item (whitelist:true would otherwise delete it)", async () => {
+    // ValidationPipe main.ts'te whitelist:true ile kurulu: BEYAN EDİLMEMİŞ her
+    // alan sessizce silinir. Alan burada beyan edilmezse dizi kaybolur ve
+    // print3d_item adedi 1'e düşer — 50 figür 50 kuruşa satılır.
+    const dto = plainToInstance(CartItemDto, base, {
+      excludeExtraneousValues: false,
+    });
+    const errors = await validate(dto, { whitelist: true });
+    expect(errors).toHaveLength(0);
+    expect(dto.productIds).toEqual(base.productIds);
+  });
+
+  it("rejects a non-UUID entry in productIds", async () => {
+    const dto = plainToInstance(CartItemDto, {
+      ...base,
+      productIds: ["not-a-uuid"],
+    });
+    const errors = await validate(dto);
+    expect(errors.map((e) => e.property)).toContain("productIds");
+  });
+
+  it("rejects more than 50 productIds", async () => {
+    const many = Array.from(
+      { length: 51 },
+      (_, i) => `1111111${String(i).padStart(4, "0")}-1111-4111-8111-111111111111`,
+    );
+    const dto = plainToInstance(CartItemDto, { ...base, productIds: many });
+    const errors = await validate(dto);
+    expect(errors.map((e) => e.property)).toContain("productIds");
   });
 });

@@ -60,6 +60,7 @@ import { SmsCoreModule } from "./modules/sms-core/sms-core.module";
 import { PaymentTerminalModule } from "./modules/payment-terminal/payment-terminal.module";
 import { CallerModule } from "./modules/caller/caller.module";
 import { FulfillmentModule } from "./modules/fulfillment/fulfillment.module";
+import { Print3dModule } from "./modules/print3d/print3d.module";
 import { IntegrationGatewayModule } from "./modules/integration-gateway/integration-gateway.module";
 import { HealthDashboardModule } from "./modules/health-dashboard/health-dashboard.module";
 import { WebhooksOutboundModule } from "./modules/webhooks-outbound/webhooks-outbound.module";
@@ -166,6 +167,8 @@ import { validate } from "./config/env.validation";
     CallerModule,
     // HummyTummy Phase 10: shipments, warranty, installation.
     FulfillmentModule,
+    // v3.7.0 — 3D baskı figür hizmeti: canlı teklif + kiracı iş okumaları.
+    Print3dModule,
     // HummyTummy Phase 11: unified integration gateway.
     IntegrationGatewayModule,
     // HummyTummy Phase 12: branch health-score dashboard.

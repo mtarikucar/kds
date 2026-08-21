@@ -186,4 +186,72 @@ describe('HardwareOrderDetailPage', () => {
     expect(screen.getByText('yurtici')).toBeInTheDocument();
     expect(screen.getByText(/TRK-999/)).toBeInTheDocument();
   });
+
+  // v3.7.0 — a paid service-only print3d order has NO HardwareOrderItem rows
+  // (Görev 9's include exists precisely because this used to render an empty
+  // table to a customer who had already paid). This proves the fix reaches
+  // the tenant screen, not just the backend response.
+  it('renders the 3D print block instead of an empty item table when the order carries a print3dJob', () => {
+    orderState.data = makeOrder({
+      items: [],
+      print3dJob: {
+        id: 'job-1',
+        status: 'queued',
+        itemCount: 2,
+        totalCents: 160000,
+        partner: 'figurunica',
+        items: [
+          { productName: 'Adana Kebap', productImageUrl: '/img/a.jpg', position: 0, status: 'pending' },
+          { productName: 'Lahmacun', productImageUrl: null, position: 1, status: 'pending' },
+        ],
+      },
+    } as any);
+    renderPage();
+    expect(screen.getByText(enHardware.print3d.order.blockTitle)).toBeInTheDocument();
+    expect(screen.getByText('Adana Kebap')).toBeInTheDocument();
+    expect(screen.getByText('Lahmacun')).toBeInTheDocument();
+    expect(screen.getByText(enHardware.print3d.partnerLabel)).toBeInTheDocument();
+    // The old empty <table> must be gone, not just hidden behind the block.
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  // A deleted product resolves server-side to productId: null,
+  // name: "Silinmiş ürün" (quote.service.ts) rather than throwing — the
+  // print3d job item snapshot carries that fallback name straight through.
+  // The row must render it like any other name, not break on a null image.
+  it('renders a deleted product line as "Silinmiş ürün" with no photo instead of breaking the row', () => {
+    orderState.data = makeOrder({
+      items: [],
+      print3dJob: {
+        id: 'job-2',
+        status: 'produced',
+        itemCount: 1,
+        totalCents: 155000,
+        partner: 'figurunica',
+        items: [
+          { productName: 'Silinmiş ürün', productImageUrl: null, position: 0, status: 'printed' },
+        ],
+      },
+    } as any);
+    renderPage();
+    expect(screen.getByText(enHardware.print3d.order.blockTitle)).toBeInTheDocument();
+    expect(screen.getByText('Silinmiş ürün')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('renders the normal item table (not the print3d block) when the order has real items, even if print3dJob is present', () => {
+    orderState.data = makeOrder({
+      print3dJob: {
+        id: 'job-3',
+        status: 'queued',
+        itemCount: 1,
+        totalCents: 155000,
+        partner: 'figurunica',
+        items: [{ productName: 'Adana Kebap', productImageUrl: null, position: 0, status: 'pending' }],
+      },
+    } as any);
+    renderPage();
+    expect(screen.getByText('KDS Screen 15"')).toBeInTheDocument();
+    expect(screen.queryByText(enHardware.print3d.order.blockTitle)).not.toBeInTheDocument();
+  });
 });

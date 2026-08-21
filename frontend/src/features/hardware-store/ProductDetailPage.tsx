@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,6 +14,7 @@ import { useListBranches } from '../branches/branchesApi';
 import { useAuthStore } from '../../store/authStore';
 import { prettyKey, prettyValue, localizeDetails } from './productDetailHelpers';
 import PhoneInput from '../../components/ui/PhoneInput';
+import { isPrint3dSku } from '../print3d/print3dSkus';
 
 // Mirrors the language resolution that localizeDetails used to do
 // internally (document.documentElement.lang with a TR fallback). Kept at
@@ -63,6 +64,19 @@ export default function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
   const navigate = useNavigate();
   const { data: product, isLoading, error } = useGetProductBySku(sku);
+
+  // v3.7.0 — ham print3d SKU'su TEK BAŞINA SATILABİLİR OLMAMALI.
+  // /admin/store/print3d_base bu guard olmadan tam bir satın alma paneli
+  // (şube seçici + tercih edilen tarihler + "Sepete ekle") basıyor ve quote
+  // motoru ancak form doldurulduktan SONRA PRINT3D_INCOMPLETE_CART ile
+  // reddediyordu. Üstelik etiket zinciri bilinmeyen serviceType'ı 'onsite'e
+  // düşürdüğü için sayfa bir 3D baskı hizmetini "Yerinde kurulum" diye
+  // etiketliyordu. (React Router statik segmenti dinamikten önce sıralar,
+  // yani /admin/store/print3d rotası zaten kazanır; bu guard yazılan ya da
+  // yer imlenen HAM SKU URL'leri içindir.)
+  if (sku && isPrint3dSku(sku)) {
+    return <Navigate to="/admin/store/print3d" replace />;
+  }
 
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-500">{t('productDetail.loading')}</div>;

@@ -60,6 +60,17 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
   private pruning = false;
   private stopping = false;
+  // Tracks whatever tick()/pruneOnce() call is currently mid-flight so
+  // onModuleDestroy can wait for it. Without this, clearing the timers only
+  // stops FUTURE polls — an already-running tick keeps awaiting Prisma calls
+  // after PrismaService.onModuleDestroy() disconnects the client, throwing
+  // "Engine is not yet connected" into a logger call that fires after the
+  // owning module has torn down. In the e2e harness (which boots/closes the
+  // full AppModule per spec file) that surfaced as a `console.error` after
+  // Jest's environment for the file was gone — "Cannot log after tests are
+  // done" — which fails the whole run even though every assertion passed.
+  private inFlightTick: Promise<void> | null = null;
+  private inFlightPrune: Promise<void> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -92,25 +103,37 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     this.schedulePrune(60_000);
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
     if (this.pruneTimer) clearTimeout(this.pruneTimer);
+    // Let whatever tick/prune is already mid-flight finish (or fail on its
+    // own terms) before this hook resolves, so the app-shutdown sequence
+    // doesn't proceed to PrismaService.onModuleDestroy() — and disconnect
+    // the client — out from under an in-progress Prisma call.
+    await Promise.allSettled([this.inFlightTick, this.inFlightPrune]);
   }
 
   private scheduleNext(delayMs: number): void {
     if (this.stopping) return;
-    this.timer = setTimeout(() => this.tick().catch(() => undefined), delayMs);
+    this.timer = setTimeout(() => {
+      this.inFlightTick = this.tick().finally(() => {
+        this.inFlightTick = null;
+      });
+    }, delayMs);
   }
 
   private schedulePrune(delayMs: number): void {
     if (this.stopping) return;
     this.pruneTimer = setTimeout(() => {
-      this.pruneOnce()
+      this.inFlightPrune = this.pruneOnce()
         .catch((e) =>
           this.logger.warn(`outbox prune failed: ${(e as Error).message}`),
         )
-        .finally(() => this.schedulePrune(this.PRUNE_INTERVAL_MS));
+        .finally(() => {
+          this.schedulePrune(this.PRUNE_INTERVAL_MS);
+          this.inFlightPrune = null;
+        });
     }, delayMs);
   }
 

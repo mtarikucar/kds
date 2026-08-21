@@ -120,6 +120,7 @@
     "close": "Close",
     "deliveryNote": "Your hardware will be shipped to this address. The information will be transferred to the secure PayTR payment page.",
     "payWithPaytr": "Pay with PayTR",
+    "consentTitle": "Legal consents",
     "paytrNote": "Payment is processed securely by PayTR. Your card details are not shared with HummyTummy.",
     "card": {
       "gibCertified": "GİB certified",
@@ -155,6 +156,63 @@
       "service_not_purchasable": "{{name}} can't be purchased as a service.",
       "service_not_directly_purchasable": "{{name}} can't be bought directly here (quote required).",
       "unknown_service": "{{name}} could not be found."
+    }
+  },
+  "print3d": {
+    "partnerLabel": "Production partner: Figurunica",
+    "card": {
+      "title": "3D printed figurine",
+      "desc": "One 3D printed figurine for each product you pick from your menu. VAT and shipping included.",
+      "price": "₺1,500 + ₺50 per product",
+      "priceLine": "{{base}} + {{perItem}} per product",
+      "cta": "Start an order"
+    },
+    "wizard": {
+      "title": "3D printed figurine order",
+      "stepProducts": "Pick products",
+      "stepShipping": "Delivery",
+      "stepSummary": "Summary & payment",
+      "next": "Continue",
+      "back": "Back",
+      "unavailable": "This service is currently not on sale."
+    },
+    "picker": {
+      "search": "Search products",
+      "allCategories": "All categories",
+      "selectedCount": "{{count}} product(s) selected",
+      "maxReached": "You can pick at most {{max}} products.",
+      "livePrice": "Estimated total",
+      "empty": "Your menu has no products yet."
+    },
+    "shipping": {
+      "notesLabel": "Production note (optional)",
+      "notesPlaceholder": "Tell us if you have a colour, size or presentation preference.",
+      "continue": "Go to summary"
+    },
+    "summary": {
+      "baseLine": "Service fee",
+      "itemLine": "Per-product figurine ({{count}})",
+      "shipping": "Shipping",
+      "total": "Total",
+      "consentTitle": "Legal consents",
+      "consentRequired": "Tick all three agreements to continue to payment.",
+      "pay": "Pay with PayTR",
+      "verifying": "Verifying the amount…",
+      "mismatch": "The server could not confirm this amount; please restart the wizard."
+    },
+    "errors": {
+      "PRINT3D_NO_PRODUCTS": "Pick at least one menu product.",
+      "PRINT3D_TOO_MANY_PRODUCTS": "You can pick at most 50 products.",
+      "PRINT3D_FOREIGN_PRODUCT": "One of the selected products does not belong to this restaurant.",
+      "PRINT3D_INCOMPLETE_CART": "The 3D print order is incomplete; please restart the wizard.",
+      "PRINT3D_DUPLICATE_LINE": "The 3D print order is incomplete; please restart the wizard."
+    },
+    "order": {
+      "blockTitle": "3D printed figurine order",
+      "itemLine": "{{count}} product(s)"
+    },
+    "result": {
+      "note": "Your order has entered the production queue."
     }
   },
   "shippingForm": {

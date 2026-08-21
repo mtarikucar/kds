@@ -87,6 +87,10 @@ export interface CartItem {
   // InstallationRequest by the backend checkout pipeline.
   preferredDates?: string[]; // ISO YYYY-MM-DD, max 3
   notes?: string;            // max 500 chars
+  // v3.7.0 — 3D baskı figür hizmeti: alıcının KENDİ menüsünden seçtiği ürün
+  // id'leri. SADECE `print3d_item` hizmet satırında anlamlı. Satırın ADEDİ
+  // sunucuda bu diziden TÜRETİLİR (QuoteService); buradaki `qty` yok sayılır.
+  productIds?: string[];
 }
 
 export interface PricedLine {
@@ -287,6 +291,17 @@ export const useCreateCheckoutIntent = () => {
     mutationFn: async (args: {
       cart: { items: CartItem[]; shippingAddress?: ShippingAddress; billingAddress?: ShippingAddress };
       buyer: CheckoutBuyer;
+      /**
+       * v3.7.0 — Mesafeli satış onamı. KVKK + Mesafeli Satış Sözleşmesi +
+       * İade Politikası'nın O AN YÜRÜRLÜKTEKİ üç doküman id'si.
+       *
+       * ZORUNLU (opsiyonel değil): backend CreateCheckoutIntentDto bunu
+       * @ArrayMinSize(3) ile şart koşuyor ve alan yokken ValidationPipe 400
+       * veriyor — yani donanım mağazasından PayTR ödemesi bugüne kadar hiç
+       * başlamadı. Zorunlu tutmak, derleyicinin her çağıranı yakalamasını
+       * sağlar. `CheckoutConsent` + `useConsentComplete` üretir.
+       */
+      acceptedDocumentIds: string[];
       returnUrl?: string;
       // v2.8.99.3 — "Ship to my branch" reference. When the buyer
       // picks one of their tenant's branches in ShippingAddressForm,
@@ -333,6 +348,26 @@ export interface HardwareOrderInstallation {
   notes: string | null;
 }
 
+/**
+ * v3.7.0 — a service-only print3d order carries EMPTY `items` (service
+ * lines never produce a HardwareOrderItem row). The job record is the only
+ * place the item names, photos and count actually live; the tenant order
+ * screens branch on this instead of rendering a blank item table.
+ */
+export interface HardwareOrderPrint3dJob {
+  id: string;
+  status: string;
+  itemCount: number;
+  totalCents: number;
+  partner: string;
+  items: {
+    productName: string;
+    productImageUrl: string | null;
+    position: number;
+    status: string;
+  }[];
+}
+
 export interface HardwareOrderSummary {
   id: string;
   status: string;
@@ -346,6 +381,7 @@ export interface HardwareOrderSummary {
   createdAt: string;
   updatedAt: string;
   itemCount: number;
+  print3dJob?: HardwareOrderPrint3dJob | null;
 }
 
 export interface HardwareOrderDetail extends HardwareOrderSummary {

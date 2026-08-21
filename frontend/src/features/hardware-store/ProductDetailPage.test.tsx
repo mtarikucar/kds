@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import i18next from 'i18next';
 import enHardware from '../../i18n/locales/en/hardware.json';
 import type { HardwareProduct } from './storeApi';
@@ -45,11 +45,19 @@ vi.mock('sonner', () => ({ toast: { success: (m: string) => toastSuccess(m), err
 vi.mock('../../hooks/useCountryProfile', () => ({
   useCountryProfile: () => ({ countryCode: 'TR' }),
 }));
+// v3.7.0 — the print3d guard tests below route through <Routes>/<Route> with
+// a REAL :sku param in the URL (initialEntries=['/admin/store/print3d_base']),
+// so useParams can no longer be pinned to a literal 'KDS-15'. `paramsSku` is
+// a mutable test-local default that individual tests can override — mirrors
+// the `navigate`/`productState` mutable-fixture pattern already used in this
+// file — while every pre-existing test keeps its original 'KDS-15' behaviour
+// via the beforeEach reset below.
+let paramsSku = 'KDS-15';
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
     ...actual,
-    useParams: () => ({ sku: 'KDS-15' }),
+    useParams: () => ({ sku: paramsSku }),
     useNavigate: () => navigate,
   };
 });
@@ -97,6 +105,7 @@ describe('ProductDetailPage', () => {
     toastSuccess.mockReset();
     toastError.mockReset();
     useCartStore.getState().clear();
+    paramsSku = 'KDS-15';
   });
 
   it('shows the loading copy while the product query is pending', () => {
@@ -213,5 +222,67 @@ describe('ProductDetailPage', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ type: 'service', branchId: 'br-1' });
     expect(navigate).toHaveBeenCalledWith('/admin/store?tab=hardware');
+  });
+
+  describe('print3d raw-SKU guard (Görev 15)', () => {
+    it('redirects a print3d sku to the wizard instead of rendering a buyable service panel', () => {
+      paramsSku = 'print3d_base';
+      productState.data = {
+        ...makeProduct(),
+        sku: 'print3d_base',
+        category: 'service',
+        name: '3D baskı figür — hizmet bedeli',
+        serviceMeta: { serviceType: 'print3d', role: 'base' },
+      } as any;
+      render(
+        <MemoryRouter initialEntries={['/admin/store/print3d_base']}>
+          <Routes>
+            <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
+            <Route path="/admin/store/print3d" element={<div>WIZARD</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText('WIZARD')).toBeTruthy();
+      // "Sepete ekle" paneli HİÇ basılmamalı: ham SKU tek başına sepete
+      // girerse quote motoru ancak form doldurulduktan SONRA reddeder.
+      expect(screen.queryByText(enHardware.common.addToCart)).toBeNull();
+    });
+
+    it('never labels a print3d service as Yerinde kurulum', () => {
+      paramsSku = 'print3d_item';
+      productState.data = {
+        ...makeProduct(),
+        sku: 'print3d_item',
+        category: 'service',
+        serviceMeta: { serviceType: 'print3d', role: 'item' },
+      } as any;
+      const { container } = render(
+        <MemoryRouter initialEntries={['/admin/store/print3d_item']}>
+          <Routes>
+            <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
+            <Route path="/admin/store/print3d" element={<div>WIZARD</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      // Etiket zinciri bilinmeyen her serviceType'ı 'onsite'e düşürüyordu.
+      expect(container.textContent).not.toContain(enHardware.store.service_.onsite);
+    });
+
+    it('does not redirect a non-print3d sku (the guard is scoped to the two known SKUs)', () => {
+      // Regression guard for the guard itself — asserts isPrint3dSku, not a
+      // substring/prefix match, drives the redirect.
+      paramsSku = 'print3d-accessory-stand';
+      productState.data = makeProduct({ sku: 'print3d-accessory-stand' });
+      render(
+        <MemoryRouter initialEntries={['/admin/store/print3d-accessory-stand']}>
+          <Routes>
+            <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
+            <Route path="/admin/store/print3d" element={<div>WIZARD</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.queryByText('WIZARD')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Add to cart' })).toBeInTheDocument();
+    });
   });
 });

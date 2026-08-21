@@ -22,6 +22,7 @@
     "marketplace": "Katalog",
     "auditLogs": "Audit Logs",
     "legal": "Huquqiy hujjatlar",
+    "print3d": "3D ishlab chiqarish",
     "settings": "Settings",
     "signOut": "Sign out"
   },
@@ -451,5 +452,15 @@
       "publishing": "Yayınlanıyor...",
       "publish": "Yayınla"
     }
+  },
+  "print3d": {
+    "title": "3D ishlab chiqarish",
+    "subtitle": "Figurunica ishlab chiqarish navbati",
+    "tabs": { "queued": "Navbatda", "in_production": "Ishlab chiqarilmoqda", "produced": "Ishlab chiqarildi", "cancelled": "Bekor qilindi" },
+    "col": { "tenant": "Ijarachi", "items": "Bandlar", "total": "Summa", "date": "Sana", "status": "Holat" },
+    "manifest": { "title": "Figurunica manifesti", "product": "Taom", "model": "3D model fayli", "address": "Yetkazib berish manzili", "itemStatus": "Band holati" },
+    "actions": { "advance": "Keyingi holat", "cancel": "Bekor qilish", "partnerRef": "Hamkor ish raqami", "save": "Saqlash", "exportCsv": "CSV yuklab olish", "createShipment": "Jo‘natma yaratish", "markDelivered": "Yetkazildi deb belgilash" },
+    "itemStatus": { "pending": "Kutilmoqda", "printed": "Bosildi", "rejected": "Rad etildi" },
+    "empty": "Bu holatda ish yo‘q."
   }
 }

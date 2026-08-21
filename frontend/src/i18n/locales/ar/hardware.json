@@ -120,6 +120,7 @@
     "close": "Close",
     "deliveryNote": "Your hardware will be shipped to this address. The information will be transferred to the secure PayTR payment page.",
     "payWithPaytr": "Pay with PayTR",
+    "consentTitle": "الموافقات القانونية",
     "paytrNote": "Payment is processed securely by PayTR. Your card details are not shared with HummyTummy.",
     "card": {
       "gibCertified": "GİB certified",
@@ -155,6 +156,63 @@
       "service_not_purchasable": "لا يمكن شراء {{name}} كخدمة.",
       "service_not_directly_purchasable": "لا يمكن شراء {{name}} مباشرة من هنا (يلزم عرض سعر).",
       "unknown_service": "تعذّر العثور على {{name}}."
+    }
+  },
+  "print3d": {
+    "partnerLabel": "شريك الإنتاج: Figurunica",
+    "card": {
+      "title": "مجسّم مطبوع ثلاثي الأبعاد",
+      "desc": "مجسّم مطبوع ثلاثي الأبعاد لكل صنف تختاره من قائمتك. الضريبة والشحن مشمولان.",
+      "price": "١٥٠٠ ₺ + ٥٠ ₺ لكل صنف",
+      "priceLine": "{{base}} + {{perItem}} لكل صنف",
+      "cta": "إنشاء طلب"
+    },
+    "wizard": {
+      "title": "طلب مجسّمات مطبوعة ثلاثية الأبعاد",
+      "stepProducts": "اختيار الأصناف",
+      "stepShipping": "التوصيل",
+      "stepSummary": "الملخّص والدفع",
+      "next": "متابعة",
+      "back": "رجوع",
+      "unavailable": "هذه الخدمة غير متاحة للبيع حالياً."
+    },
+    "picker": {
+      "search": "ابحث عن صنف",
+      "allCategories": "كل الفئات",
+      "selectedCount": "تم اختيار {{count}} صنف",
+      "maxReached": "يمكنك اختيار {{max}} صنف كحدّ أقصى.",
+      "livePrice": "المبلغ التقديري",
+      "empty": "لا توجد أصناف في قائمتك بعد."
+    },
+    "shipping": {
+      "notesLabel": "ملاحظة الإنتاج (اختياري)",
+      "notesPlaceholder": "اكتب تفضيلك في اللون أو الحجم أو طريقة التقديم.",
+      "continue": "إلى الملخّص"
+    },
+    "summary": {
+      "baseLine": "رسوم الخدمة",
+      "itemLine": "مجسّم لكل صنف ({{count}})",
+      "shipping": "الشحن",
+      "total": "الإجمالي",
+      "consentTitle": "الموافقات القانونية",
+      "consentRequired": "وافق على الاتفاقيات الثلاث للمتابعة إلى الدفع.",
+      "pay": "الدفع عبر PayTR",
+      "verifying": "جارٍ التحقّق من المبلغ…",
+      "mismatch": "تعذّر على الخادم تأكيد المبلغ؛ يُرجى إعادة بدء المعالج."
+    },
+    "errors": {
+      "PRINT3D_NO_PRODUCTS": "اختر صنفاً واحداً على الأقل من القائمة.",
+      "PRINT3D_TOO_MANY_PRODUCTS": "يمكنك اختيار ٥٠ صنفاً كحدّ أقصى.",
+      "PRINT3D_FOREIGN_PRODUCT": "أحد الأصناف المختارة لا يخصّ هذا المطعم.",
+      "PRINT3D_INCOMPLETE_CART": "طلب الطباعة ثلاثية الأبعاد غير مكتمل؛ يُرجى إعادة بدء المعالج.",
+      "PRINT3D_DUPLICATE_LINE": "طلب الطباعة ثلاثية الأبعاد غير مكتمل؛ يُرجى إعادة بدء المعالج."
+    },
+    "order": {
+      "blockTitle": "طلب مجسّمات مطبوعة ثلاثية الأبعاد",
+      "itemLine": "{{count}} صنف"
+    },
+    "result": {
+      "note": "تم إدراج طلبك في قائمة الإنتاج."
     }
   },
   "shippingForm": {

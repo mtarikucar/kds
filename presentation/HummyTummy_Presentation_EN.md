@@ -299,7 +299,7 @@ The free core is granted to every account unconditionally and does not expire. O
 - **Maintenance, Support & Updates** (₺4.900/year): the prerequisite for buying and using any paid module; includes priority support, e-invoice filing, all version updates and daily backups
 - **Modules, integrations, capacity**: annual, bought one at a time
 - **Credits**: one-time purchases with no expiry, valid until consumed
-- **Services**: one-time (on-site installation and training)
+- **Services**: one-time (on-site installation and training; 3D print figurine production)
 
 ### Payment Integration
 - **PayTR**: our payment provider for licence, module and credit purchases
@@ -598,6 +598,7 @@ Every paid item is annual unless marked otherwise, and every module requires the
 | Service | Price |
 |---|---:|
 | On-site installation & training (full day) | ₺7.500 |
+| 3D print figurine (base + per product) | ₺1.500 + ₺50/product, VAT and shipping included |
 
 ## How Billing Works
 

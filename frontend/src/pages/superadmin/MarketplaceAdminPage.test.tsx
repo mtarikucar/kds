@@ -402,4 +402,14 @@ describe('MarketplaceAdminPage — product receive-stock & archive', () => {
     expect(window.confirm).toHaveBeenCalledWith('marketplace.products.confirmArchive::KDS-15');
     expect(archiveProductMutate).toHaveBeenCalledWith('prod-9');
   });
+
+  it('offers the service category in the product form select', async () => {
+    // Bu seçenek olmadan iki print3d satırı panelden HİÇ oluşturulamaz:
+    // form `category` alanını gönderiyor ve <select> 'service' sunmuyordu.
+    renderPage();
+    switchToProductsTab();
+    fireEvent.click(screen.getByRole('button', { name: 'marketplace.products.new' }));
+    const options = await screen.findAllByRole('option');
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toContain('service');
+  });
 });

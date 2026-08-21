@@ -36,6 +36,27 @@ export class HardwareOrdersService {
             deliveredAt: true,
           },
         },
+        // v3.7.0 — hizmet satırları HardwareOrderItem üretmiyor, bu yüzden
+        // yalnız-hizmet bir print3d siparişi boş kalem tablosu + sıfır-olmayan
+        // toplam gösteriyordu. Kiracı ekranı işi buradan okur.
+        print3dJob: {
+          select: {
+            id: true,
+            status: true,
+            itemCount: true,
+            totalCents: true,
+            partner: true,
+            items: {
+              select: {
+                productName: true,
+                productImageUrl: true,
+                position: true,
+                status: true,
+              },
+              orderBy: { position: "asc" },
+            },
+          },
+        },
       },
     });
   }
@@ -47,6 +68,27 @@ export class HardwareOrdersService {
         items: true,
         shipments: true,
         installations: true,
+        // v3.7.0 — hizmet satırları HardwareOrderItem üretmiyor, bu yüzden
+        // yalnız-hizmet bir print3d siparişi boş kalem tablosu + sıfır-olmayan
+        // toplam gösteriyordu. Kiracı ekranı işi buradan okur.
+        print3dJob: {
+          select: {
+            id: true,
+            status: true,
+            itemCount: true,
+            totalCents: true,
+            partner: true,
+            items: {
+              select: {
+                productName: true,
+                productImageUrl: true,
+                position: true,
+                status: true,
+              },
+              orderBy: { position: "asc" },
+            },
+          },
+        },
       },
     });
     if (!row) throw new NotFoundException("Order not found");

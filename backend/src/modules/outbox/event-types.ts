@@ -73,6 +73,8 @@ export const EventTypes = {
   HardwareOrderPlaced: "hardware.order.placed.v1",
   HardwareOrderShipped: "hardware.order.shipped.v1",
   HardwareOrderDelivered: "hardware.order.delivered.v1",
+  // v3.7.0 — 3D baskı figür üretim işi doğdu (ödeme yerleşti).
+  Print3dJobCreated: "print3d.job.created.v1",
 
   // Fiscal / e-Fatura.
   FiscalReceiptFailed: "fiscal.receipt.failed.v1",

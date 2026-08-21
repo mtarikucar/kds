@@ -597,6 +597,7 @@ Tüm fiyatlar **TL ve KDV dahildir**. "/yıl" işaretli kalemler yıllıktır.
 | Hizmet | Fiyat |
 |---|---:|
 | Yerinde Kurulum & Eğitim (tam gün) | 7.500₺ tek seferlik |
+| 3D Baskı Figür (taban + ürün başına) | 1.500₺ + 50₺/ürün, KDV ve kargo dahil |
 
 ## Faturalama Nasıl İşler?
 

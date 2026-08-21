@@ -19,6 +19,11 @@ import { DeviceService } from "../device-mesh/device.service";
 import { Cart, CartQuote } from "./checkout.types";
 import { QuoteService } from "./quote.service";
 import { DemoGuardService } from "../demo/demo-guard.service";
+import {
+  PRINT3D_BASE_SKU,
+  PRINT3D_ITEM_SKU,
+  PRINT3D_PARTNER,
+} from "../print3d/print3d.const";
 
 /**
  * Checkout orchestrator — turns a Cart into:
@@ -424,6 +429,75 @@ export class CheckoutService {
                 notes:
                   meta.notes ??
                   `Auto-created from checkout (service: ${l.code})`,
+              },
+            });
+          }
+
+          // v3.7.0 — 3D baskı figür işi. AYNI Serializable tx içinde basılır:
+          // ödeme ile üretim kaydı ya birlikte var olur ya hiç.
+          //
+          // serviceType yalnızca 'onsite' iken InstallationRequest basılıyordu;
+          // bu ikinci dal 'print3d' içindir ve InstallationRequest BASMAZ
+          // (saha ziyareti yok, order.installation NULL kalır).
+          //
+          // Yinelenmezlik iki katmanlı: confirmAndProvision'ın paymentRef
+          // idempotans kapısı PayTR yeniden denemesinde erken döner, ve
+          // Print3dJob.hwOrderId üzerindeki @unique bunu veritabanı düzeyinde
+          // de garanti eder.
+          const p3dItemLine = hardwareLines.find(
+            (l) => l.type === "service" && l.code === PRINT3D_ITEM_SKU,
+          );
+          const p3dBaseLine = hardwareLines.find(
+            (l) => l.type === "service" && l.code === PRINT3D_BASE_SKU,
+          );
+          if (p3dItemLine && p3dBaseLine) {
+            const snapshots = p3dItemLine.meta?.print3dSnapshots ?? [];
+            const p3dTotalCents =
+              p3dBaseLine.subtotalCents + p3dItemLine.subtotalCents;
+            await tx.print3dJob.create({
+              data: {
+                id: uuidv7(),
+                tenantId,
+                branchId: validatedBranchId,
+                hwOrderId: order.id,
+                status: "queued",
+                partner: PRINT3D_PARTNER,
+                basePriceCents: p3dBaseLine.unitCents,
+                perItemCents: p3dItemLine.unitCents,
+                itemCount: p3dItemLine.qty,
+                totalCents: p3dTotalCents,
+                currency: quote.currency,
+                note: p3dItemLine.meta?.notes ?? null,
+                items: {
+                  create: snapshots.map((s) => ({
+                    id: uuidv7(),
+                    productId: s.productId,
+                    productName: s.name,
+                    productImageUrl: s.imageUrl,
+                    model3dUrl: s.model3dUrl,
+                    position: s.position,
+                    status: "pending",
+                  })),
+                },
+              },
+            });
+            await tx.outboxEvent.create({
+              data: {
+                id: uuidv7(),
+                type: EventTypes.Print3dJobCreated,
+                tenantId,
+                payload: {
+                  tenantId,
+                  hardwareOrderId: order.id,
+                  itemCount: p3dItemLine.qty,
+                  totalCents: p3dTotalCents,
+                  partner: PRINT3D_PARTNER,
+                } as any,
+                // Sabit anahtar (uuidv7 DEĞİL): bir yeniden deneme aynı
+                // siparişe ikinci bir "iş doğdu" olayı yazmasın.
+                idempotencyKey: `print3d-job:${order.id}`,
+                status: "queued",
+                nextAttemptAt: new Date(),
               },
             });
           }

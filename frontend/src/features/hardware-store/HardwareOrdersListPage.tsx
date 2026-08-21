@@ -139,7 +139,12 @@ function OrderRow({ order }: { order: HardwareOrderSummary }) {
     <tr className="hover:bg-gray-50">
       <td className="px-4 py-2 font-mono text-xs">#{order.id.slice(0, 8)}</td>
       <td className="px-4 py-2 text-gray-700">{date}</td>
-      <td className="px-4 py-2 text-gray-700">{order.itemCount}</td>
+      {/* v3.7.0 — backend never returns itemCount for a service-only
+          print3d order (no HardwareOrderItem rows); the job record's own
+          itemCount is the real count for that case. */}
+      <td className="px-4 py-2 text-gray-700">
+        {order.print3dJob?.itemCount ?? order.itemCount}
+      </td>
       <td className="px-4 py-2 font-medium">
         {(order.totalCents / 100).toLocaleString('tr-TR', {
           style: 'currency',

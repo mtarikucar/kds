@@ -97,6 +97,7 @@ Kullanıcı, masa, ürün, kategori ve **aylık sipariş sayısı sınırsızdı
 | 100 AI görsel · 20 AI video · 10 AI 3D model | kontör / tek seferlik | ₺690 · ₺890 · ₺790 |
 | 500 SMS | kontör / tek seferlik | ₺490 |
 | Yerinde Kurulum & Eğitim | hizmet / tek seferlik | ₺7.500 |
+| 3D baskı figür (taban + ürün başına) | hizmet / tek seferlik | ₺1.500 + ₺50/ürün |
 
 - **Lisans ön koşuludur**: modül, entegrasyon ve kapasite kalemleri hem satın almak hem de kullanmak için aktif lisans ister (`requiresLicense`). Lisans karardığında bu kalemlerin hakları verilmez; ücretsiz çekirdek etkilenmez
 - **Kontör bağımlılığı**: AI kontörleri `module_ai_studio`, SMS kontörü `sms_integration` sahipliği ister. Kontörler süresizdir, tükenene kadar geçerlidir ve yenilemeye girmez

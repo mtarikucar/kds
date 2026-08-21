@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGetHardwareOrder, type ShippingAddress } from './storeApi';
 import { formatAddress } from './formatAddress';
+import PartnerBadge from '../print3d/PartnerBadge';
 
 /**
  * v2.8.84 — single hardware order view.
@@ -73,40 +74,64 @@ export default function HardwareOrderDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="space-y-2 rounded border bg-white p-4 lg:col-span-2">
           <h2 className="text-sm font-semibold">{t('orderDetail.products')}</h2>
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-gray-500">
-              <tr>
-                <th className="py-1">{t('orderDetail.col.product')}</th>
-                <th className="py-1">{t('orderDetail.col.type')}</th>
-                <th className="py-1 text-right">{t('orderDetail.col.qty')}</th>
-                <th className="py-1 text-right">{t('orderDetail.col.unit')}</th>
-                <th className="py-1 text-right">{t('orderDetail.col.total')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {order.items.map((it) => (
-                <tr key={it.id}>
-                  <td className="py-2">
-                    <div className="font-medium">{it.name}</div>
-                    <div className="text-xs text-gray-500">{t('orderDetail.sku')} {it.sku}</div>
-                    {it.serials.length > 0 && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        {t('orderDetail.serial')} {it.serials.join(', ')}
-                      </div>
+          {order.items.length === 0 && order.print3dJob ? (
+            // v3.7.0 — a service-only print3d order has no HardwareOrderItem
+            // rows; the job record (Görev 9's include) carries the item
+            // names, photos and count instead. A customer who paid must not
+            // land on a blank table.
+            <div className="space-y-2" data-testid="print3d-order-block">
+              <h3 className="text-sm font-semibold">{t('print3d.order.blockTitle')}</h3>
+              <p className="text-xs text-gray-500">
+                {t('print3d.order.itemLine', { count: order.print3dJob.itemCount })}
+              </p>
+              <ul className="divide-y text-sm">
+                {order.print3dJob.items.map((it) => (
+                  <li key={`${it.position}-${it.productName}`} className="flex items-center gap-2 py-2">
+                    {it.productImageUrl && (
+                      <img src={it.productImageUrl} alt="" className="h-8 w-8 rounded object-cover" />
                     )}
-                  </td>
-                  <td className="py-2 text-xs">
-                    {it.acquisition === 'rent' ? t('orderDetail.acquisitionRent') : t('orderDetail.acquisitionBuy')}
-                  </td>
-                  <td className="py-2 text-right">{it.qty}</td>
-                  <td className="py-2 text-right">{fmt(it.unitCents)}</td>
-                  <td className="py-2 text-right font-medium">
-                    {fmt(it.unitCents * it.qty)}
-                  </td>
+                    <span>{it.productName}</span>
+                  </li>
+                ))}
+              </ul>
+              <PartnerBadge url="https://figurunica.com" />
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-gray-500">
+                <tr>
+                  <th className="py-1">{t('orderDetail.col.product')}</th>
+                  <th className="py-1">{t('orderDetail.col.type')}</th>
+                  <th className="py-1 text-right">{t('orderDetail.col.qty')}</th>
+                  <th className="py-1 text-right">{t('orderDetail.col.unit')}</th>
+                  <th className="py-1 text-right">{t('orderDetail.col.total')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {order.items.map((it) => (
+                  <tr key={it.id}>
+                    <td className="py-2">
+                      <div className="font-medium">{it.name}</div>
+                      <div className="text-xs text-gray-500">{t('orderDetail.sku')} {it.sku}</div>
+                      {it.serials.length > 0 && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          {t('orderDetail.serial')} {it.serials.join(', ')}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 text-xs">
+                      {it.acquisition === 'rent' ? t('orderDetail.acquisitionRent') : t('orderDetail.acquisitionBuy')}
+                    </td>
+                    <td className="py-2 text-right">{it.qty}</td>
+                    <td className="py-2 text-right">{fmt(it.unitCents)}</td>
+                    <td className="py-2 text-right font-medium">
+                      {fmt(it.unitCents * it.qty)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           <div className="mt-3 space-y-1 border-t pt-3 text-sm">
             <Row label={t('orderDetail.subtotal')} value={fmt(order.subtotalCents)} />
