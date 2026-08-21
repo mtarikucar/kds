@@ -65,6 +65,14 @@ export interface RegisterRequest {
   role?: UserRole;
   restaurantName?: string;
   tenantId?: string;
+  /**
+   * Required. The country the restaurant operates in — drives tax bands,
+   * currency, phone region and receipt locale server-side (see backend
+   * COUNTRY_PROFILES). The operator's own explicit choice, pre-filled from
+   * the phone's E.164 region as a suggestion only. Must be one of
+   * SUPPORTED_COUNTRY_CODES (frontend/src/lib/countries.ts).
+   */
+  countryCode: string;
 }
 
 export interface AuthResponse {

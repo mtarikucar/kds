@@ -40,12 +40,42 @@ function roleListValues(source, constName, file) {
   return [...match[1].matchAll(/UserRole\.([A-Z_]+)/g)].map((m) => m[1]);
 }
 
+/**
+ * Extract the top-level 2-space-indented keys from
+ * `export const NAME = { TR: {...}, UZ: {...} } satisfies ...`.
+ */
+function objectTopLevelKeys(source, constName, file) {
+  const match = source.match(
+    new RegExp(`export const ${constName}\\s*=\\s*\\{([\\s\\S]*?)\\n\\} satisfies`),
+  );
+  if (!match) {
+    throw new Error(`const ${constName} not found in ${file}`);
+  }
+  return [...match[1].matchAll(/\n {2}([A-Z][A-Z0-9_]*):\s*\{/g)].map(
+    (m) => m[1],
+  );
+}
+
+/** Extract `["TR", "UZ"]` from `export const NAME = ['TR', 'UZ'] as const;`. */
+function stringArrayValues(source, constName, file) {
+  const match = source.match(
+    new RegExp(`${constName}\\s*=\\s*\\[([\\s\\S]*?)\\]`),
+  );
+  if (!match) {
+    throw new Error(`const ${constName} not found in ${file}`);
+  }
+  return [...match[1].matchAll(/["']([A-Z]+)["']/g)].map((m) => m[1]);
+}
+
 const BACKEND_ROLES = "backend/src/common/constants/roles.enum.ts";
 const BACKEND_ORDER = "backend/src/common/constants/order-status.enum.ts";
 const BACKEND_DELIVERY =
   "backend/src/modules/delivery-platforms/constants/platform.enum.ts";
+const BACKEND_COUNTRY_PROFILES =
+  "backend/src/common/country/country-profile.const.ts";
 const FRONTEND_TYPES = "frontend/src/types/index.ts";
 const FRONTEND_ROLES = "frontend/src/types/roles.ts";
+const FRONTEND_COUNTRIES = "frontend/src/lib/countries.ts";
 
 const CHECKS = [
   {
@@ -91,6 +121,27 @@ const CHECKS = [
       enumValues(read(BACKEND_DELIVERY), "DeliveryPlatform", BACKEND_DELIVERY),
     frontend: () =>
       enumValues(read(FRONTEND_TYPES), "DeliveryPlatform", FRONTEND_TYPES),
+  },
+  {
+    // Registration's country selector (and every other frontend surface
+    // that lists "the countries this platform supports") must offer
+    // EXACTLY the countries backend COUNTRY_PROFILES has a real profile
+    // for — a frontend option with no backend profile silently resolves to
+    // DEFAULT_COUNTRY server-side and misleads the operator into thinking
+    // their choice took effect.
+    name: "COUNTRY_PROFILES keys ↔ SUPPORTED_COUNTRY_CODES",
+    backend: () =>
+      objectTopLevelKeys(
+        read(BACKEND_COUNTRY_PROFILES),
+        "COUNTRY_PROFILES",
+        BACKEND_COUNTRY_PROFILES,
+      ),
+    frontend: () =>
+      stringArrayValues(
+        read(FRONTEND_COUNTRIES),
+        "SUPPORTED_COUNTRY_CODES",
+        FRONTEND_COUNTRIES,
+      ),
   },
 ];
 
