@@ -122,6 +122,36 @@ describe("TenantProvisioningService", () => {
     expect(data.featureOverrides).toBeUndefined();
   });
 
+  describe("countryCode / currency", () => {
+    // The marketing (kds-marketing) side of this contract does not send a
+    // countryCode yet — ProvisionTenantForLeadCommand#countryCode is
+    // OPTIONAL to avoid a synchronized cross-repo deploy. This CORE side
+    // must still write an EXPLICIT value on every tenant it creates
+    // instead of leaning on the schema default, so the intent stays
+    // visible in the write itself (same rule as every other
+    // tenant-creating path in this codebase).
+    it("defaults to TR/TRY when the command carries no countryCode", async () => {
+      await svc.provisionTenantForLead(command);
+      const data = (prisma.tenant.create as jest.Mock).mock.calls[0][0].data;
+      expect(data.countryCode).toBe("TR");
+      expect(data.currency).toBe("TRY");
+    });
+
+    it("writes the command's countryCode and derives currency from the profile", async () => {
+      await svc.provisionTenantForLead({ ...command, countryCode: "UZ" });
+      const data = (prisma.tenant.create as jest.Mock).mock.calls[0][0].data;
+      expect(data.countryCode).toBe("UZ");
+      expect(data.currency).toBe("UZS");
+    });
+
+    it("falls back to TR/TRY for an unrecognized countryCode rather than writing garbage", async () => {
+      await svc.provisionTenantForLead({ ...command, countryCode: "XX" });
+      const data = (prisma.tenant.create as jest.Mock).mock.calls[0][0].data;
+      expect(data.countryCode).toBe("TR");
+      expect(data.currency).toBe("TRY");
+    });
+  });
+
   it("is idempotent: a prior ledger row returns the same tenant without writing", async () => {
     prisma.tenantProvisioningLog.findUnique.mockResolvedValue({
       leadId: "lead-1",

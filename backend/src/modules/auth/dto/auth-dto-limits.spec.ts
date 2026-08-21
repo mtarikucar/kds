@@ -59,9 +59,31 @@ describe("Auth DTO length caps (iter-43)", () => {
       // lands a natural TR number as E.164.
       phone: "0555 123 45 67",
       restaurantName: "Z",
+      // Required — the country a new tenant operates in must be an explicit
+      // operator choice, never a silent schema default. See
+      // country-profile.const.ts for the supported keys.
+      countryCode: "TR",
     };
     it("accepts a typical registration", async () => {
       expect(await validateDto(RegisterDto, base)).toEqual([]);
+    });
+    it("requires countryCode — a tenant must never silently default", async () => {
+      const { countryCode, ...noCountry } = base;
+      void countryCode;
+      const msgs = await validateDto(RegisterDto, noCountry);
+      expect(msgs.some((m) => /countryCode/i.test(m))).toBe(true);
+    });
+    it("rejects a countryCode with no COUNTRY_PROFILES entry", async () => {
+      const msgs = await validateDto(RegisterDto, {
+        ...base,
+        countryCode: "US",
+      });
+      expect(msgs.some((m) => /countryCode/i.test(m))).toBe(true);
+    });
+    it("accepts every real COUNTRY_PROFILES key (TR and UZ today)", async () => {
+      expect(
+        await validateDto(RegisterDto, { ...base, countryCode: "UZ" }),
+      ).toEqual([]);
     });
     it("requires phone (PayTR checkout needs it)", async () => {
       const { phone, ...noPhone } = base;

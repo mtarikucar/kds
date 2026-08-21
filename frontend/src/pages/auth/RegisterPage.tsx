@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,11 +12,17 @@ import Input from '../../components/ui/Input';
 import PasswordInput from '../../components/ui/PasswordInput';
 import PasswordStrength from '../../components/ui/PasswordStrength';
 import PhoneInput from '../../components/ui/PhoneInput';
+import { splitE164 } from '../../components/ui/phoneInputLogic';
 import Checkbox from '../../components/ui/Checkbox';
 import FormSelect from '../../components/ui/FormSelect';
 import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { UserRole, RegisterRequest } from '../../types';
+import {
+  SUPPORTED_COUNTRY_CODES,
+  DEFAULT_COUNTRY_CODE,
+  isSupportedCountryCode,
+} from '../../lib/countries';
 
 const RegisterPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
@@ -51,6 +57,16 @@ const RegisterPage = () => {
     role: z.nativeEnum(UserRole),
     restaurantName: z.string().optional(),
     tenantId: z.string().optional(),
+    // Required — the country the restaurant operates in. Only the
+    // platform's supported countries are ever valid input (see
+    // lib/countries.ts); a full ISO list would let the operator pick a
+    // country with no backend profile, which silently resolves to the
+    // default and misleads them into thinking their choice took effect.
+    countryCode: z.enum(SUPPORTED_COUNTRY_CODES, {
+      errorMap: () => ({
+        message: t('validation:validation.required', 'This field is required'),
+      }),
+    }),
   }).superRefine((data, ctx) => {
     // Attach the error to the field the CURRENT role actually renders:
     // admins see the restaurant-name input, staff see the tenant select.
@@ -81,17 +97,47 @@ const RegisterPage = () => {
     handleSubmit,
     watch,
     control,
+    setValue,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       role: UserRole.ADMIN,
+      countryCode: DEFAULT_COUNTRY_CODE,
     },
   });
 
   const selectedRole = watch('role');
   const password = watch('password') || '';
   const isAdmin = selectedRole === UserRole.ADMIN;
+
+  // Pre-fill countryCode from the phone's E.164 region — a SUGGESTION only.
+  // Once the operator picks a country themselves, countryPinned flips and
+  // this effect stops touching the field: a later phone edit must never
+  // silently overwrite an explicit choice. Mirrors PhoneInput's own
+  // countryPinned pattern (see PhoneInput.tsx) for the identical reason.
+  const countryPinned = useRef(false);
+  const phoneValue = watch('phone');
+  useEffect(() => {
+    if (countryPinned.current) return;
+    const parsed = splitE164(phoneValue || '');
+    const guessed = parsed?.country as string | undefined;
+    if (isSupportedCountryCode(guessed)) {
+      setValue('countryCode', guessed, { shouldValidate: true });
+    }
+    // An unsupported or absent region (incomplete phone, or a country the
+    // platform doesn't support) leaves the current selection untouched
+    // rather than flickering back to the default.
+  }, [phoneValue, setValue]);
+
+  const countryOptions = useMemo(
+    () =>
+      SUPPORTED_COUNTRY_CODES.map((code) => ({
+        value: code,
+        label: t(`auth:register.countryNames.${code}`, code),
+      })),
+    [t],
+  );
 
   const onSubmit = (data: RegisterFormData) => {
     if (!acceptedTerms) {
@@ -105,6 +151,7 @@ const RegisterPage = () => {
       lastName: data.lastName,
       phone: data.phone,
       role: data.role,
+      countryCode: data.countryCode,
     };
 
     if (isAdmin && data.restaurantName) {
@@ -253,6 +300,33 @@ const RegisterPage = () => {
                   value={field.value || ''}
                   onChange={field.onChange}
                   error={errors.phone?.message}
+                />
+              )}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Controller
+              name="countryCode"
+              control={control}
+              render={({ field }) => (
+                <FormSelect
+                  label={t('auth:register.country')}
+                  hint={t(
+                    'auth:register.countryHint',
+                    "We suggest a country from your phone number — change it if it's wrong.",
+                  )}
+                  options={countryOptions}
+                  error={errors.countryCode?.message}
+                  value={field.value}
+                  name={field.name}
+                  onChange={(e) => {
+                    // A manual pick is the operator's own choice — the
+                    // phone-derived pre-fill effect above must never
+                    // silently overwrite it again after this.
+                    countryPinned.current = true;
+                    field.onChange(e);
+                  }}
                 />
               )}
             />

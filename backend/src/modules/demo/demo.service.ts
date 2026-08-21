@@ -6,6 +6,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { PlanProjectorService } from "../entitlements/plan-projector.service";
 import { TenantMarketplaceService } from "../marketplace/tenant-marketplace.service";
 import { DEMO_PLAN_NAME } from "./demo.constants";
+import { resolveCountryProfile } from "../../common/country/country.service";
+import { DEFAULT_COUNTRY } from "../../common/country/country-profile.const";
 import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 import { UserRole } from "../../common/constants/roles.enum";
 import {
@@ -42,6 +44,11 @@ export class DemoService {
   // DEMO_PLAN_NAME directly so both sides can never drift apart.
   private static readonly PLAN_NAME = DEMO_PLAN_NAME;
   private static readonly BRANCH_CODE = "MAIN";
+  // The demo restaurant is explicitly Turkish (its sample menu is in
+  // Turkish — see seedContent below). Resolved once through the ONE door
+  // to a country profile rather than hardcoding "TR"/"TRY" a second time.
+  private static readonly COUNTRY_PROFILE =
+    resolveCountryProfile(DEFAULT_COUNTRY);
 
   /**
    * Everything the demo tenant is given, as `override:admin` GRANTS.
@@ -331,6 +338,11 @@ export class DemoService {
         subdomain: DemoService.SUBDOMAIN,
         status: "ACTIVE",
         currentPlanId: plan.id,
+        // The demo restaurant is Turkish — written EXPLICITLY rather than
+        // relying on the schema default, so the intent is visible here the
+        // same way every other tenant-creating path states its country.
+        countryCode: DemoService.COUNTRY_PROFILE.code,
+        currency: DemoService.COUNTRY_PROFILE.currency,
         // Grant-mode overrides: plain `true` grants, never `__replace:false`.
         featureOverrides: DemoService.featureOverridePayload() as any,
       },

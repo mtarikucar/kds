@@ -16,6 +16,8 @@ import {
   ResourceAlreadyExistsException,
   ResourceNotFoundException,
 } from "../../../common/exceptions";
+import { resolveCountryProfile } from "../../../common/country/country.service";
+import { DEFAULT_COUNTRY } from "../../../common/country/country-profile.const";
 
 /**
  * Parameters for the shared user-creation step. Mirrors the closure the
@@ -211,15 +213,29 @@ export class AuthProvisioningService {
     args: {
       restaurantName: string;
       finalSubdomain: string;
+      // The operator's own choice (RegisterDto#countryCode), validated
+      // against COUNTRY_PROFILES at the DTO boundary. Resolved again here
+      // through resolveCountryProfile() (the ONE door to a profile) rather
+      // than trusted as-is, so an unexpected value degrades to
+      // DEFAULT_COUNTRY instead of writing garbage to a NOT NULL column.
+      countryCode: string;
       userParams: CreateUserParams;
     },
   ) {
-    const { restaurantName, finalSubdomain, userParams } = args;
+    const { restaurantName, finalSubdomain, countryCode, userParams } = args;
+    const countryProfile = resolveCountryProfile(countryCode);
 
     const created = await tx.tenant.create({
       data: {
         name: restaurantName,
         subdomain: finalSubdomain,
+        // The single piece of country DATA, plus its DERIVED currency
+        // mirror — never written from user input directly (Task 7's rule).
+        // Before this, no tenant-creating path ever wrote countryCode at
+        // all, so every tenant silently landed on the schema default ("TR")
+        // with no way to leave it.
+        countryCode: countryProfile.code,
+        currency: countryProfile.currency,
       },
     });
     // v3.0.0 — every new tenant ships with a Main branch.
@@ -291,11 +307,23 @@ export class AuthProvisioningService {
     //
     // Tenant + Main branch + user in one transaction so a failure midway does
     // not leave orphaned rows.
+    // Social sign-up (Google/Apple) carries no explicit country signal — the
+    // OAuth callback has no registration form to collect one from. Writing
+    // DEFAULT_COUNTRY explicitly (rather than omitting the field and
+    // leaning on the schema default) keeps the intent visible in the write
+    // itself, matching every other tenant-creating path in this file.
+    const socialCountryProfile = resolveCountryProfile(DEFAULT_COUNTRY);
+
     let user;
     try {
       user = await this.prisma.$transaction(async (tx) => {
         const tenant = await tx.tenant.create({
-          data: { name: restaurantName, subdomain },
+          data: {
+            name: restaurantName,
+            subdomain,
+            countryCode: socialCountryProfile.code,
+            currency: socialCountryProfile.currency,
+          },
         });
         // Every new tenant ships with a Main branch (matches register()), so
         // the dashboard never prompts "create a branch" against the

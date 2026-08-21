@@ -168,6 +168,80 @@ describe('RegisterPage payload shaping by role', () => {
   });
 });
 
+describe('RegisterPage country selector', () => {
+  async function fillRequiredFieldsExceptPhoneAndCountry() {
+    fireEvent.change(screen.getByLabelText('auth:register.email'), {
+      target: { value: 'owner@x.com' },
+    });
+    fireEvent.change(screen.getByLabelText('auth:register.password'), {
+      target: { value: 'password1' },
+    });
+    fireEvent.change(screen.getByLabelText('auth:register.firstName'), {
+      target: { value: 'Ann' },
+    });
+    fireEvent.change(screen.getByLabelText('auth:register.lastName'), {
+      target: { value: 'Owner' },
+    });
+    fireEvent.change(screen.getByLabelText('auth:register.restaurantName'), {
+      target: { value: 'My Diner' },
+    });
+  }
+
+  async function submit() {
+    fireEvent.click(screen.getByLabelText('terms'));
+    fireEvent.click(screen.getByRole('button', { name: 'auth:register.submit' }));
+    await waitFor(() => expect(registerUser).toHaveBeenCalledTimes(1));
+    return registerUser.mock.calls[0][0];
+  }
+
+  it('offers ONLY the platform-supported countries (TR, UZ) — never a full ISO list', () => {
+    renderRegister();
+    const select = screen.getByLabelText('auth:register.country') as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toEqual(['TR', 'UZ']);
+  });
+
+  it('defaults to TR before any phone/country interaction', async () => {
+    renderRegister();
+    await fillRequiredFieldsExceptPhoneAndCountry();
+    const payload = await submit();
+    expect(payload.countryCode).toBe('TR');
+  });
+
+  it("pre-fills the country from the phone's E.164 region (a +998 number suggests UZ)", async () => {
+    renderRegister();
+    await fillRequiredFieldsExceptPhoneAndCountry();
+    // "Telefon" is PhoneInput's label fallback (auth:register.phone, 'Telefon').
+    fireEvent.change(screen.getByLabelText('Telefon'), {
+      target: { value: '+998901234567' },
+    });
+    const payload = await submit();
+    expect(payload.countryCode).toBe('UZ');
+    expect(payload.phone).toBe('+998901234567');
+  });
+
+  it("the operator's own country choice wins and is NOT silently overwritten by a later phone edit", async () => {
+    renderRegister();
+    await fillRequiredFieldsExceptPhoneAndCountry();
+
+    // Operator manually picks UZ first.
+    fireEvent.change(screen.getByLabelText('auth:register.country'), {
+      target: { value: 'UZ' },
+    });
+
+    // Then types a Turkish phone number — must NOT silently flip the
+    // country back to TR. Pre-fill is a suggestion; the operator's
+    // explicit choice wins once made.
+    fireEvent.change(screen.getByLabelText('Telefon'), {
+      target: { value: '+905551234567' },
+    });
+
+    const payload = await submit();
+    expect(payload.countryCode).toBe('UZ');
+    expect(payload.phone).toBe('+905551234567');
+  });
+});
+
 describe('RegisterPage post-register navigation', () => {
   async function submitAdmin() {
     fireEvent.change(screen.getByLabelText('auth:register.restaurantName'), {

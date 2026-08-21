@@ -26,6 +26,7 @@ describe("SuperAdminTenantsService", () => {
 
   const ACTOR_ID = "sa-1";
   let entitlements: { getForTenant: jest.Mock };
+  let country: { invalidate: jest.Mock };
   const ACTOR_EMAIL = "ops@platform.com";
   const TENANT_ID = "tenant-1";
 
@@ -46,6 +47,7 @@ describe("SuperAdminTenantsService", () => {
         computedAt: new Date().toISOString(),
       }),
     };
+    country = { invalidate: jest.fn() };
     svc = new SuperAdminTenantsService(
       prisma as any,
       audit as any,
@@ -53,6 +55,7 @@ describe("SuperAdminTenantsService", () => {
       email as any,
       outbox as any,
       entitlements as any,
+      country as any,
     );
     // Drive $transaction(cb => ...) with the real prisma mock as the tx.
     (prisma.$transaction as jest.Mock).mockImplementation(async (cb: any) =>
@@ -203,6 +206,137 @@ describe("SuperAdminTenantsService", () => {
       expect(prisma.user.updateMany).toHaveBeenCalled();
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "ACTIVATE" }),
+      );
+    });
+  });
+
+  describe("updateCountry", () => {
+    it("throws NotFound for a missing tenant and writes no audit", async () => {
+      prisma.tenant.findUnique.mockResolvedValue(null as any);
+      await expect(
+        svc.updateCountry(
+          TENANT_ID,
+          { countryCode: "UZ" } as any,
+          ACTOR_ID,
+          ACTOR_EMAIL,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(audit.log).not.toHaveBeenCalled();
+      expect(country.invalidate).not.toHaveBeenCalled();
+    });
+
+    it("writes the new countryCode AND the derived currency (never the raw input)", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        name: "Toshkent Bistro",
+        countryCode: "TR",
+        currency: "TRY",
+      } as any);
+      (prisma.tenant.update as jest.Mock).mockResolvedValue({
+        id: TENANT_ID,
+        countryCode: "UZ",
+        currency: "UZS",
+      });
+
+      const result = await svc.updateCountry(
+        TENANT_ID,
+        { countryCode: "UZ" } as any,
+        ACTOR_ID,
+        ACTOR_EMAIL,
+      );
+
+      expect(prisma.tenant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: TENANT_ID },
+          data: expect.objectContaining({
+            countryCode: "UZ",
+            currency: "UZS",
+          }),
+        }),
+      );
+      expect(result).toEqual({ countryCode: "UZ", currency: "UZS" });
+    });
+
+    // THE decisive wiring proof this task exists for: CountryService caches
+    // tenant→country for the process lifetime (RequestContextInterceptor's
+    // synchronous fast path). Writing a new countryCode without invalidating
+    // that cache means the correction never takes effect until the process
+    // restarts — CountryService.invalidate() was built for exactly this
+    // caller and had none before this.
+    it("calls CountryService.invalidate(tenantId) after writing the new country", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        name: "Toshkent Bistro",
+        countryCode: "TR",
+        currency: "TRY",
+      } as any);
+      (prisma.tenant.update as jest.Mock).mockResolvedValue({
+        id: TENANT_ID,
+        countryCode: "UZ",
+        currency: "UZS",
+      });
+
+      await svc.updateCountry(
+        TENANT_ID,
+        { countryCode: "UZ" } as any,
+        ACTOR_ID,
+        ACTOR_EMAIL,
+      );
+
+      expect(country.invalidate).toHaveBeenCalledTimes(1);
+      expect(country.invalidate).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it("is a no-op (no write, no audit, no invalidate) when the country is unchanged", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        name: "Acme",
+        countryCode: "TR",
+        currency: "TRY",
+      } as any);
+
+      await svc.updateCountry(
+        TENANT_ID,
+        { countryCode: "TR" } as any,
+        ACTOR_ID,
+        ACTOR_EMAIL,
+      );
+
+      expect(prisma.tenant.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+      expect(country.invalidate).not.toHaveBeenCalled();
+    });
+
+    it("audits the correction with before/after countryCode and currency", async () => {
+      prisma.tenant.findUnique.mockResolvedValue({
+        id: TENANT_ID,
+        name: "Toshkent Bistro",
+        countryCode: "TR",
+        currency: "TRY",
+      } as any);
+      (prisma.tenant.update as jest.Mock).mockResolvedValue({
+        id: TENANT_ID,
+        countryCode: "UZ",
+        currency: "UZS",
+      });
+
+      await svc.updateCountry(
+        TENANT_ID,
+        { countryCode: "UZ" } as any,
+        ACTOR_ID,
+        ACTOR_EMAIL,
+      );
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "UPDATE",
+          entityType: "TENANT",
+          entityId: TENANT_ID,
+          actorId: ACTOR_ID,
+          actorEmail: ACTOR_EMAIL,
+          previousData: { countryCode: "TR", currency: "TRY" },
+          newData: { countryCode: "UZ", currency: "UZS" },
+        }),
       );
     });
   });

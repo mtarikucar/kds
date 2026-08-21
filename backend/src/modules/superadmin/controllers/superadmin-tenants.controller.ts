@@ -15,6 +15,7 @@ import {
   UpdateTenantStatusDto,
 } from "../dto/tenant-filter.dto";
 import { UpdateTenantOverridesDto } from "../dto/update-tenant-overrides.dto";
+import { UpdateTenantCountryDto } from "../dto/update-tenant-country.dto";
 import { SuperAdminGuard } from "../guards/superadmin.guard";
 import { SuperAdminRoute } from "../decorators/superadmin.decorator";
 import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
@@ -48,6 +49,20 @@ export class SuperAdminTenantsController {
     @CurrentSuperAdmin("email") actorEmail: string,
   ) {
     return this.tenantsService.updateStatus(id, updateDto, actorId, actorEmail);
+  }
+
+  @Patch(":id/country")
+  @ApiOperation({
+    summary:
+      "Correct a mis-registered tenant's country (drives tax bands, currency, phone region, receipt locale)",
+  })
+  async updateCountry(
+    @Param("id") id: string,
+    @Body() dto: UpdateTenantCountryDto,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
+  ) {
+    return this.tenantsService.updateCountry(id, dto, actorId, actorEmail);
   }
 
   @Get(":id/users")

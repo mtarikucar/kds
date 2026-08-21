@@ -69,6 +69,7 @@ describe("Auth (HTTP, real validation)", () => {
         lastName: "Phone",
         restaurantName: "Diner",
         phone: "0555 123 45 67",
+        countryCode: "TR",
       })
       .expect(201);
 

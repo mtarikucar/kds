@@ -256,6 +256,7 @@ export class AuthService {
           this.provisioning.provisionNewTenantWithAdmin(tx, {
             restaurantName: registerDto.restaurantName,
             finalSubdomain,
+            countryCode: registerDto.countryCode,
             userParams: {
               email: registerDto.email,
               hashedPassword,
