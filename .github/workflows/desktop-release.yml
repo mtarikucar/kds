@@ -608,33 +608,73 @@ jobs:
 
           echo "📤 Pushing release to backend API over SSH (production loopback)..."
 
-          # The whole exchange (both POSTs) runs INSIDE this one SSH exec, on
-          # the box, against its own localhost — never through hummytummy.com.
+          # Build the exact JSON request body LOCALLY and let jq do the
+          # escaping (quotes/backslashes/newlines/unicode). The previous
+          # version hand-interpolated raw values into a JSON string
+          # *inside the remote script* ("...\"windowsSignature\": \"$WINDOWS_SIG\"...")
+          # — that breaks the instant any value contains a `"` or `\`.
+          # windowsSignature/linuxSignature are legitimately empty when a
+          # release has no signing key (create-release.dto.ts marks both
+          # @IsOptional()); jq renders an empty --arg as "" — valid JSON,
+          # not a vanished token.
+          RELEASE_NOTES="Release ${TAG} of HummyTummy Desktop App"
+          PAYLOAD_JSON=$(jq -nc \
+            --arg version "$VERSION" \
+            --arg releaseTag "$TAG" \
+            --arg windowsUrl "$WINDOWS_URL" \
+            --arg windowsSignature "$WINDOWS_SIG" \
+            --arg linuxUrl "$LINUX_URL" \
+            --arg linuxSignature "$LINUX_SIG" \
+            --arg releaseNotes "$RELEASE_NOTES" \
+            '{version: $version, releaseTag: $releaseTag, windowsUrl: $windowsUrl,
+              windowsSignature: $windowsSignature, linuxUrl: $linuxUrl,
+              linuxSignature: $linuxSignature, releaseNotes: $releaseNotes,
+              published: false}')
+
+          # Transport: ssh concatenates all of `bash -s --`'s positional
+          # arguments into ONE string, and the remote login shell
+          # word-splits that string again — the local quoting the previous
+          # version relied on (`"$VERSION" "$TAG" ... "$WINDOWS_SIG" ...`)
+          # is consumed by *this* shell and never reaches the remote side.
+          # An empty argument (WINDOWS_SIG/LINUX_SIG, above) disappears
+          # entirely once re-split remotely and every later positional
+          # argument shifts down — that's what produced
+          # "line 8: $6: unbound variable" when both signatures were empty.
           #
-          # Dynamic values are passed as positional parameters to `bash -s --`
-          # rather than interpolated into the script text: the heredoc below
-          # is a *quoted* delimiter ('REMOTE_SCRIPT'), so nothing — least of
-          # all API_KEY — is substituted by the local shell into the script
-          # body. That means the key is never written into a command string
-          # that a `set -x` or an `::error::` message could echo; it only
-          # ever exists as $7 inside the remote script's own memory, and the
-          # remote script never prints it.
+          # Fix: base64-encode the finished JSON body and the API key
+          # separately, then join them with a literal `:` (not part of the
+          # base64 alphabet, so splitting on the first `:` is unambiguous)
+          # into a SINGLE token. Base64 output is pure [A-Za-z0-9+/=] — no
+          # spaces, quotes, `$`, backticks or newlines — so it can't be
+          # word-split and can't inject shell syntax on the remote side.
+          # And unlike one-field-per-argument, it can never collapse to
+          # nothing: the combined token always contains at least the `:`
+          # separator plus the JSON's `{}`, even when both signatures are
+          # empty. `-w0` disables base64's default 76-column line
+          # wrapping, which would otherwise reintroduce literal newlines
+          # into the token — i.e. reintroduce the exact splitting bug this
+          # replaces.
           #
+          # The API key travels the same way and is decoded only inside
+          # the remote script's own memory; it is never interpolated into
+          # a command string, so no `set -x` (there isn't one — this file
+          # stays free of it) or `::error::` line can echo it.
+          PAYLOAD_B64=$(printf '%s' "$PAYLOAD_JSON" | base64 -w0)
+          KEY_B64=$(printf '%s' "$API_KEY" | base64 -w0)
+          COMBINED="${KEY_B64}:${PAYLOAD_B64}"
+
           # No `-n`: the heredoc is this ssh invocation's stdin, and that's
           # exactly the channel `bash -s` reads its script from.
           ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
             root@"${SERVER_HOST}" bash -s -- \
-            "$VERSION" "$TAG" "$WINDOWS_URL" "$LINUX_URL" "$WINDOWS_SIG" "$LINUX_SIG" "$API_KEY" \
+            "$COMBINED" \
             <<'REMOTE_SCRIPT'
           set -euo pipefail
 
-          VERSION="$1"
-          TAG="$2"
-          WINDOWS_URL="$3"
-          LINUX_URL="$4"
-          WINDOWS_SIG="$5"
-          LINUX_SIG="$6"
-          API_KEY="$7"
+          KEY_B64="${1%%:*}"
+          PAYLOAD_B64="${1#*:}"
+          API_KEY=$(printf '%s' "$KEY_B64" | base64 -d)
+          BODY_JSON=$(printf '%s' "$PAYLOAD_B64" | base64 -d)
 
           # Blue/green aware port resolution — same state file, same
           # default-to-blue, same port mapping as release-deploy.yml's
@@ -648,8 +688,6 @@ jobs:
           if [ "$active" = green ]; then port=3010; else port=3000; fi
           BASE_URL="http://localhost:${port}"
           echo "Resolved active color: ${active} (port ${port})"
-
-          RELEASE_NOTES="Release ${TAG} of HummyTummy Desktop App"
 
           # A JSON API response starts with `{` or `[`. Anything else here
           # would mean something is wrong with the loopback request itself
@@ -667,16 +705,7 @@ jobs:
           RESPONSE=$(curl -X POST "${BASE_URL}/api/desktop/ci/releases" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: ${API_KEY}" \
-            -d "{
-              \"version\": \"$VERSION\",
-              \"releaseTag\": \"$TAG\",
-              \"windowsUrl\": \"$WINDOWS_URL\",
-              \"windowsSignature\": \"$WINDOWS_SIG\",
-              \"linuxUrl\": \"$LINUX_URL\",
-              \"linuxSignature\": \"$LINUX_SIG\",
-              \"releaseNotes\": \"$RELEASE_NOTES\",
-              \"published\": false
-            }" \
+            -d "$BODY_JSON" \
             -w "\n%{http_code}" \
             -s)
 
