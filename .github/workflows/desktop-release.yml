@@ -478,28 +478,27 @@ jobs:
             # Fallback: any .exe that's not .nupkg
             WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.exe$" | grep -v "\.nupkg" | head -n 1 | cut -d'|' -f1)
           fi
-          LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | head -n 1 | cut -d'|' -f1)
+          # Anchored: the release also carries a "<installer>.AppImage.sig" asset,
+          # and an unanchored match would happily return that as the installer.
+          LINUX_FILE=$(echo "$ASSETS" | grep -E "\.AppImage$" | head -n 1 | cut -d'|' -f1)
 
-          # Get updater bundle URLs (for auto-update) - these are the .zip/.tar.gz versions
-          WINDOWS_UPDATER=$(echo "$ASSETS" | grep "\.msi\.zip$" | head -n 1 | cut -d'|' -f1)
-          LINUX_UPDATER=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz$" | head -n 1 | cut -d'|' -f1)
+          # Under Tauri v2 the installer IS the updater artifact: there is no
+          # separate .msi.zip / .AppImage.tar.gz to prefer. This job used to look
+          # for those v1 names, never match, and fall through to empty signatures.
+          WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
 
-          # Construct download URLs - use updater bundles if available, otherwise use installers
-          if [ -n "$WINDOWS_UPDATER" ]; then
-            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_UPDATER"
-          else
-            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          # Derive each signature from the installer it signs rather than
+          # searching independently — a signature verifies only against the exact
+          # bytes the client downloads, so the pair must be chosen together.
+          WINDOWS_SIG_FILE=""
+          LINUX_SIG_FILE=""
+          if [ -n "$WINDOWS_FILE" ] && echo "$ASSETS" | grep -qF "${WINDOWS_FILE}.sig|"; then
+            WINDOWS_SIG_FILE="${WINDOWS_FILE}.sig"
           fi
-
-          if [ -n "$LINUX_UPDATER" ]; then
-            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_UPDATER"
-          else
-            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
+          if [ -n "$LINUX_FILE" ] && echo "$ASSETS" | grep -qF "${LINUX_FILE}.sig|"; then
+            LINUX_SIG_FILE="${LINUX_FILE}.sig"
           fi
-
-          # Get signature files
-          WINDOWS_SIG_FILE=$(echo "$ASSETS" | grep "\.msi\.zip\.sig$" | head -n 1 | cut -d'|' -f1)
-          LINUX_SIG_FILE=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz\.sig$" | head -n 1 | cut -d'|' -f1)
 
           # Download and read signature content
           WINDOWS_SIG=""

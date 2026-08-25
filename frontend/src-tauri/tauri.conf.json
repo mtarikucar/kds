@@ -63,7 +63,7 @@
         "https://hummytummy.com/api/desktop/updates/{{target}}/{{current_version}}"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERDMTNDN0ExMzA4NEU2RUMKUldUczVvUXdvY2NUM0RvUlVmSlZSREQ2NlFPUG1YWXJkOERIbjNqUDcxRmxaSDN3ekdJZnkxMU0K"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIyMEI0RTNGQjFCNDY1ODMKUldTRFpiU3hQMDRMc2d1RS9rZW13RHBBRkc5NCtQMWI5d0g0NW9Xc0svVzMrSTIwVFh4UnExQVQK"
     }
   }
 }
