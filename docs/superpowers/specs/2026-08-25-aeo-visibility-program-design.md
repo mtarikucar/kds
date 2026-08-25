@@ -1,7 +1,33 @@
 # AI Answer-Engine Visibility Program — Design
 
 **Date:** 2026-08-25
-**Status:** Approved (owner approved 2026-08-25; judgment calls (a) and (b) resolved in favour of the recommendations)
+**Status:** Implemented on `feat/aeo-visibility-program` (11 commits). Phases 0–3 complete;
+Phase 4 is the owner checklist at `docs/marketing/AEO_OWNER_CHECKLIST.md`.
+
+Two things changed during implementation and are recorded here rather than left
+in commit messages:
+
+1. **The truth audit was wider than this spec assumed.** It found 5 blocker and
+   6 high-severity claims, not the 4 listed below. Also corrected: blanket
+   at-rest encryption (in the privacy policy), "tam uyumluluk", multi-currency,
+   custom domain, tip *distribution*, multilingual menu *content*, and legal
+   documents stamped "Ocak 2025". The camera heat map surfaced later still, in
+   the ported SPA copy — see 3.
+
+2. **Two research claims in this spec were wrong and are corrected.** The TCMB
+   instrument is "Ödeme Hizmetlerinde TR Karekodun Üretilmesi ve Kullanılması
+   Hakkında Yönetmelik", not "Ödemelerde Karekod Kullanımı Hakkında Yönetmelik";
+   and it does **not** bind a POS software vendor directly — generation is
+   reserved to licensed PSPs, and the 6493 md.27 fine reaches only system
+   operators and payment service providers. The date and number (RG 21/8/2020,
+   31220) were right.
+
+3. **The port carried a false claim across, exactly as this spec warned.** The
+   `analitik` module page is 985 words about a camera-fed table-occupancy heat
+   map gated behind `CAMERA_ANALYTICS_ENABLED`, which is set in no environment
+   file. The same claim had also leaked into `raporlar` and `stok-envanter`.
+   The module is not published, the leaks are removed, and claims-check has a
+   rule for it. This is the single best argument for the guard existing.
 **Branch:** `feat/aeo-visibility-program`
 
 ## Goal
