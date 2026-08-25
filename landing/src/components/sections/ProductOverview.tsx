@@ -87,9 +87,16 @@ export default function ProductOverview() {
               {/* Panel 2 - What the free core includes.
                   This panel used to render platform-wide totals (revenue,
                   orders, active restaurants) sourced from a stats file whose
-                  formatter turned a real zero into "500+". Those numbers were
-                  never measured. It now states what the free baseline grants,
-                  each line of which is enforced in
+                  formatter substituted an invented figure whenever the real
+                  value was zero. Those numbers were never measured.
+
+                  The retired strings are deliberately not repeated here —
+                  scripts/claims-check.mjs holds them as fixtures, and quoting
+                  them again makes an audit grep report a hit on a file that is
+                  clean.
+
+                  It now states what the free baseline grants, each line of
+                  which is enforced in
                   backend/src/modules/entitlements/free-baseline.const.ts. */}
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-4">

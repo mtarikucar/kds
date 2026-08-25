@@ -66,15 +66,23 @@ export default function TrustSecurity() {
                 </p>
 
                 {/* Trust indicators.
-                    These were hardcoded English literals — 99.9% Uptime,
-                    24/7 Monitoring, 256-bit Encryption — sitting outside the
-                    message catalogs, which is how they survived the claim
-                    removal that took the same "%99.9 SLA" wording out of all
-                    five locales: the gate only scanned the catalogs. There is
-                    no uptime measurement, no status page and no 24/7 rota, and
-                    AES-256 covers specific credential columns rather than
-                    everything. Each tile now states something enforced in code
-                    and is translated like the rest of the section. */}
+                    These were hardcoded English literals — an uptime
+                    percentage, a round-the-clock monitoring claim and a
+                    blanket encryption claim — sitting outside the message
+                    catalogs, which is how they survived the removal that took
+                    the same wording out of all five locales: the gate only
+                    scanned the catalogs at the time. None of the three was
+                    supportable — there is no uptime measurement, no status
+                    page and no round-the-clock rota, and AES-256 covers
+                    specific credential columns rather than everything.
+
+                    The retired strings are deliberately not repeated here.
+                    scripts/claims-check.mjs holds them as fixtures and is the
+                    one place they belong; spelling them out again in a comment
+                    makes an audit grep report a hit on a file that is clean.
+
+                    Each tile now states something enforced in code, and is
+                    translated like the rest of the section. */}
                 <div className="grid grid-cols-2 gap-4">
                   {(t.raw('visual.tiles') as { value: string; label: string }[]).map((tile) => (
                     <div key={tile.label} className="bg-slate-50 rounded-xl p-4">
