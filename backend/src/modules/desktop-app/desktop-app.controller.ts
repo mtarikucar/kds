@@ -22,7 +22,15 @@ import { Throttle } from "@nestjs/throttler";
 import { DesktopAppService } from "./desktop-app.service";
 
 const VERSION_REGEX = /^v?\d+\.\d+\.\d+$/;
-const PLATFORM_REGEX = /^[a-z0-9-]{1,32}$/i;
+// Tauri v2's updater plugin resolves `{{target}}` to identifiers like
+// `windows-x86_64`, `linux-x86_64`, `darwin-x86_64`, `darwin-aarch64` —
+// i.e. `<os>-<arch>` with an underscore inside the arch component. The
+// previous `[a-z0-9-]` class had no underscore, so every Windows and
+// Linux client's own update check got rejected with 400 (darwin-aarch64
+// only "worked" because it happens to contain no underscore). Still a
+// real bound on a path parameter: letters, digits, hyphens, underscores
+// only, capped length — not a permissive catch-all.
+const PLATFORM_REGEX = /^[a-z0-9_-]{1,32}$/i;
 import { CreateReleaseDto } from "./dto/create-release.dto";
 import { UpdateReleaseDto } from "./dto/update-release.dto";
 import { UpdateManifestDto } from "./dto/update-manifest.dto";
