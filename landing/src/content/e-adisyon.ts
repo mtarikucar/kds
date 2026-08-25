@@ -111,39 +111,34 @@ export const SECTIONS: { heading: string; body: string[] }[] = [
  * The karekod section. Kept on this page because the two questions arrive
  * together in practice, and separating them is most of the value.
  */
+/**
+ * A summary only. The full treatment — three kinds of karekod, what the payload
+ * actually contains, placement, and the contradiction between the tebliğ and the
+ * kılavuz — lives at /tr/karekod-rehberi. Splitting them keeps each page
+ * answering one question: this one answers "is e-Adisyon mandatory", that one
+ * answers "which karekod is which".
+ */
 export const KAREKOD = {
   heading: 'Peki “fiş karekod” / e-Belge karekodu?',
   body: [
-    'Restoran bağlamında “karekod” üç ayrı şeyi anlatır ve üçü birbiriyle ilgisizdir:',
+    'Bu, e-Adisyon zorunluluğuyla sık karıştırılan ama ayrı bir konudur. Kısaca: restoran bağlamında “karekod” üç ayrı şeyi anlatır ve üçünün birbiriyle ilgisi yoktur.',
   ],
   items: [
     {
       title: 'Karekod menü (QR menü)',
-      text: 'Masadaki koda telefonla okutulan dijital menü. Hiçbir vergi mevzuatıyla ilgisi yoktur, zorunlu değildir, tamamen ticari bir tercihtir.',
+      text: 'Masadaki koda telefonla okutulan dijital menü. Hiçbir vergi mevzuatına tabi değildir, zorunlu değildir.',
     },
     {
       title: 'e-Belgelerde GİB karekodu',
-      text: '509 No.lu Tebliğ, 13 ayrı “…da Bulunması Gereken Bilgiler” bölümünde belgede karekod bulunmasını şart koşar; ancak madde kendini askıya alır — “duyuruda belirtilecek tarihten itibaren” der. Tarihi veren 17/02/2023 tarihli GİB duyurusudur: karekod, **1/9/2023** tarihinden itibaren 8 belge türünde zorunludur — e-Fatura, e-Arşiv Fatura, e-İrsaliye, e-Serbest Meslek Makbuzu, e-Müstahsil Makbuzu, e-Sigorta Komisyon Gider Belgesi, e-Döviz ve Kıymetli Maden Alım Satım Belgesi ve e-Adisyon. 509’da karekod maddesi bulunan diğer belge türleri için (e-Gider Pusulası, e-Bilet gibi) hâlâ bir tarih verilmemiştir.',
+      text: '17/02/2023 tarihli GİB duyurusuyla, 1/9/2023 tarihinden itibaren 8 belge türünde zorunludur — bunlardan biri e-Adisyon’dur. Dikkat: bu, e-Adisyon uygulamasına geçmenin zorunlu olduğu anlamına gelmez; yalnızca e-Adisyon düzenleyenlerin belgesinde karekod bulunması gerektiği anlamına gelir.',
     },
     {
       title: 'TR Karekod (ödeme karekodu)',
-      text: 'Ödeme Hizmetlerinde TR Karekodun Üretilmesi ve Kullanılması Hakkında Yönetmelik (RG 21/8/2020, 31220) ile TCMB tarafından düzenlenir. Madde 4/1, 6493 sayılı Kanun çerçevesinde ödeme hizmeti kapsamına giren ve karekod kullanılarak yapılan her ödeme işleminde TR Karekod kullanılmasını şart koşar. Buradaki koşul çifttir: karekod, ancak altındaki işlem bir ödeme hizmetiyse bu kurala girer — QR menü girmez.',
+      text: 'TCMB’nin ödeme karekodu standardıdır (RG 21/8/2020, 31220) ve yalnızca ödeme işlemlerini bağlar. Karekod menü kapsamına girmez.',
     },
   ],
-  facts: [
-    {
-      q: 'Karekod ne içerir — link mi?',
-      a: 'Hayır. Karekod Standardı Kılavuzu’na (Sürüm 1.2, Kasım 2023) göre karekodun içeriği bir JSON verisidir: VKN/TCKN, senaryo, belge tarihi ve numarası, ETTN, para birimi, mal-hizmet toplamı, KDV matrahı gibi alanlar. Birçok kaynak karekodu okutunca “GİB doğrulama sayfası açılır” diye yazar; bu doğru değildir. Doğrulama ayrı bir araçla, dijital.gib.gov.tr üzerinden yapılır.',
-    },
-    {
-      q: 'Karekod belgenin neresinde olmalı?',
-      a: 'Kılavuzun 3. bölümü belgenin **sağ üst köşesi** der.',
-    },
-    {
-      q: 'Yazarkasa (ÖKC) fişinde karekod zorunlu mu?',
-      a: 'Yeni Nesil ÖKC teknik kılavuzunda karekod, barkod/karekod okuyucu çevre birimi ve TR Karekod ödeme tipi bağlamında geçer; perakende satış fişine GİB karekodu basılmasını şart koşan bir düzenlemeye rastlanmamıştır. Karekod zorunluluğu e-Belgeler içindir.',
-    },
-  ],
+  moreHref: '/karekod-rehberi',
+  moreLabel: 'Üçünün ayrıntılı karşılaştırması, kaynaklarıyla →',
 };
 
 /**
@@ -170,13 +165,5 @@ export const FAQ: { q: string; a: string }[] = [
   {
     q: 'e-Belgelerde karekod zorunluluğu ne zaman başladı?',
     a: '17/02/2023 tarihli GİB duyurusu ile 1/9/2023 tarihinden itibaren düzenlenen elektronik belgelerde zorunlu hâle geldi. Duyuru 8 belge türünü sayar; bunlardan biri e-Adisyon’dur.',
-  },
-  {
-    q: 'Karekodu okutunca GİB doğrulama sayfası mı açılır?',
-    a: 'Hayır. Karekod Standardı Kılavuzu Sürüm 1.2’ye göre karekodun içeriği bir JSON verisidir, bir bağlantı değil. Belge doğrulaması dijital.gib.gov.tr üzerindeki e-Belge Doğrulama aracıyla ayrıca yapılır.',
-  },
-  {
-    q: 'QR menü ile e-Belge karekodu aynı şey mi?',
-    a: 'Hayır, tamamen ilgisiz iki şeydir. QR menü, misafirin masadaki kodu okutup menüyü görmesidir ve hiçbir vergi düzenlemesine tabi değildir. e-Belge karekodu, 509 No.lu Tebliğ kapsamında elektronik belgenin üzerinde bulunması gereken ve içeriği GİB tarafından belirlenen karekoddur.',
   },
 ];

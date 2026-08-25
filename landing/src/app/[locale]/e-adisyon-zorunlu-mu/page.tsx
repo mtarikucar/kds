@@ -190,14 +190,12 @@ export default async function EAdisyonPage({ params }: Props) {
               })}
             </div>
 
-            <dl className="mt-8 space-y-6">
-              {KAREKOD.facts.map((fact) => (
-                <div key={fact.q}>
-                  <dt className="font-semibold text-slate-900 mb-1">{fact.q}</dt>
-                  <dd className="text-slate-600 leading-relaxed">{fact.a}</dd>
-                </div>
-              ))}
-            </dl>
+            <Link
+              href={KAREKOD.moreHref}
+              className="mt-6 inline-flex items-center gap-2 font-medium text-orange-700 hover:text-orange-900"
+            >
+              {KAREKOD.moreLabel}
+            </Link>
           </section>
 
           <section className="mt-14">

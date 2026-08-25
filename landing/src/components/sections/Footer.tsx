@@ -50,6 +50,7 @@ export default function Footer() {
       ? [
           { label: t('links.eAdisyon'), href: '/e-adisyon-zorunlu-mu' },
           { label: t('links.pricingIndex'), href: '/restoran-yazilimi-fiyatlari' },
+          { label: t('links.karekodGuide'), href: '/karekod-rehberi' },
         ]
       : []),
     { label: t('links.contact'), href: '/contact' },

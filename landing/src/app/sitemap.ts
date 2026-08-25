@@ -70,6 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const trOnlyRoutes: Array<{ path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }> = [
     { path: '/e-adisyon-zorunlu-mu', priority: 0.9, changeFrequency: 'monthly' },
     { path: '/restoran-yazilimi-fiyatlari', priority: 0.9, changeFrequency: 'monthly' },
+    { path: '/karekod-rehberi', priority: 0.85, changeFrequency: 'monthly' },
     { path: '/ozellikler', priority: 0.85, changeFrequency: 'weekly' },
     { path: '/cozumler', priority: 0.85, changeFrequency: 'weekly' },
     // Deep-dive pages. Only slugs that actually render are submitted: a module
