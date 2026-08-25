@@ -804,6 +804,36 @@ jobs:
             echo "This might be expected if the release is not yet published"
           fi
 
+      - name: Verify auto-update is actually offered
+        run: |
+          # The end-to-end assertion this workflow never made. Every release since
+          # the Tauri v2 upgrade published installers with no signature and stayed
+          # green, because each job only warned when it failed to find one. Ask the
+          # endpoint the desktop client itself calls, from a version old enough that
+          # an update must be offered, and require a non-empty signature: a manifest
+          # without one is a manifest the client refuses to install.
+          ENDPOINT="https://hummytummy.com/api/desktop/updates/windows-x86_64/0.0.1"
+          BODY=""
+
+          for attempt in 1 2 3 4 5 6; do
+            BODY=$(curl -s --max-time 20 "$ENDPOINT" || true)
+            SIG=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].signature // empty' 2>/dev/null || true)
+            URL=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].url // empty' 2>/dev/null || true)
+
+            if [ -n "$SIG" ] && [ -n "$URL" ]; then
+              echo "Update offered: $URL"
+              echo "Signature present (${#SIG} chars)"
+              exit 0
+            fi
+
+            echo "Attempt $attempt: no signed update offered yet, retrying in 20s"
+            sleep 20
+          done
+
+          echo "::error title=Auto-update not offered::$ENDPOINT served no signed windows-x86_64 update, so installed clients cannot update."
+          echo "Last response: $BODY"
+          exit 1
+
       - name: Test download URLs
         continue-on-error: true  # Don't fail workflow if URLs aren't immediately accessible
         run: |
