@@ -2,6 +2,10 @@ import React from 'react'
 import { useConfig } from 'nextra-theme-docs'
 import { useRouter } from 'next/router'
 
+// Env-provided so a staging deploy does not stamp production URLs into every
+// canonical tag.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://developer.hummytummy.com').replace(/\/+$/, '')
+
 const Logo = () => {
   const { locale } = useRouter()
   return (
@@ -78,7 +82,10 @@ const config = {
   // in `head` instead. `title` from useConfig() is the current page's title.
   head: () => {
     const { frontMatter, title } = useConfig()
-    const { locale } = useRouter()
+    const { locale, asPath } = useRouter()
+    // asPath carries the locale prefix; strip it so both hreflang links can be
+    // rebuilt for the same page. Slugs are shared across locales by design.
+    const slug = asPath.replace(/^\/(tr|en)(?=\/|$)/, '')
     const brand = locale === 'en' ? 'HummyTummy Developer' : 'HummyTummy Geliştirici'
     const pageTitle = title ? `${title} — ${brand}` : brand
     const desc =
@@ -94,6 +101,14 @@ const config = {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={desc} />
         <meta name="og:type" content="website" />
+        {/* Canonical + hreflang. Neither existed, across 61 duplicate tr/en
+            page pairs — so every page had a same-content sibling with nothing
+            telling a crawler which one to index, or that they are translations
+            of each other rather than duplicates. */}
+        <link rel="canonical" href={`${SITE_URL}${asPath}`} />
+        <link rel="alternate" hrefLang="tr" href={`${SITE_URL}/tr${slug}`} />
+        <link rel="alternate" hrefLang="en" href={`${SITE_URL}/en${slug}`} />
+        <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}/tr${slug}`} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

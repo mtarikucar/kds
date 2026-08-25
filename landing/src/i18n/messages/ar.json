@@ -286,17 +286,12 @@
       "integrations": "التكاملات",
       "qrMenu": "قائمة QR",
       "cloudKitchen": "المطبخ السحابي",
-      "about": "حولنا",
-      "blog": "المدونة",
-      "careers": "الوظائف",
       "contact": "اتصل بنا",
       "helpCenter": "مركز المساعدة",
       "documentation": "التوثيق",
       "apiReference": "مرجع API",
-      "status": "الحالة",
       "privacy": "سياسة الخصوصية",
-      "terms": "شروط الخدمة",
-      "cookies": "سياسة ملفات تعريف الارتباط"
+      "terms": "شروط الخدمة"
     },
     "copyright": "HummyTummy. جميع الحقوق محفوظة."
   },

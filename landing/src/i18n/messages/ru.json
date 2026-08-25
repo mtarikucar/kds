@@ -286,17 +286,12 @@
       "integrations": "Интеграции",
       "qrMenu": "QR-меню",
       "cloudKitchen": "Облачная кухня",
-      "about": "О нас",
-      "blog": "Блог",
-      "careers": "Карьера",
       "contact": "Контакты",
       "helpCenter": "Центр помощи",
       "documentation": "Документация",
       "apiReference": "API справочник",
-      "status": "Статус",
       "privacy": "Политика конфиденциальности",
-      "terms": "Условия использования",
-      "cookies": "Политика cookies"
+      "terms": "Условия использования"
     },
     "copyright": "HummyTummy. Все права защищены."
   },

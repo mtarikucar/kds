@@ -286,17 +286,12 @@
       "integrations": "Integrations",
       "qrMenu": "QR Menu",
       "cloudKitchen": "Cloud Kitchen",
-      "about": "About",
-      "blog": "Blog",
-      "careers": "Careers",
       "contact": "Contact",
       "helpCenter": "Help Center",
       "documentation": "Documentation",
       "apiReference": "API Reference",
-      "status": "Status",
       "privacy": "Privacy Policy",
-      "terms": "Terms of Service",
-      "cookies": "Cookie Policy"
+      "terms": "Terms of Service"
     },
     "copyright": "HummyTummy. All rights reserved."
   },

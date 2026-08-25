@@ -237,6 +237,11 @@ services:
     restart: always
     environment:
       NODE_ENV: production
+      # Read at request time by pages/sitemap.xml.tsx, pages/robots.txt.tsx and
+      # the canonical/hreflang tags in theme.config.tsx. Must match the vhost
+      # that actually serves this container, or the portal advertises URLs on a
+      # host it does not answer on.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_DEVELOPER_BASE_URL:-https://developer.hummytummy.com}
     ports:
       - '3200:3000'
     healthcheck:
@@ -264,6 +269,8 @@ services:
     restart: always
     environment:
       NODE_ENV: production
+      # See the developer service above: same runtime routes, different vhost.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_HELP_BASE_URL:-https://help.hummytummy.com}
     ports:
       - '3201:3000'
     healthcheck:

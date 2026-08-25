@@ -286,17 +286,12 @@
       "integrations": "Entegrasyonlar",
       "qrMenu": "QR Menü",
       "cloudKitchen": "Bulut Mutfak",
-      "about": "Hakkımızda",
-      "blog": "Blog",
-      "careers": "Kariyer",
       "contact": "İletişim",
       "helpCenter": "Yardım Merkezi",
       "documentation": "Dokümantasyon",
       "apiReference": "API Referansı",
-      "status": "Durum",
       "privacy": "Gizlilik Politikası",
-      "terms": "Kullanım Şartları",
-      "cookies": "Çerez Politikası"
+      "terms": "Kullanım Şartları"
     },
     "copyright": "HummyTummy. Tüm hakları saklıdır."
   },
