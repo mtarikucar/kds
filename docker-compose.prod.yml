@@ -201,11 +201,15 @@ services:
       # request (not at build), so they read the container env. Must match
       # the vhost that actually serves this container — see Dockerfile note.
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_LANDING_BASE_URL:-https://landing.hummytummy.com}
-      # Google Search Console verification token. layout.tsx already reads it
-      # (`verification.google`) but nothing ever set it, so there was no
-      # verified property for the host serving every marketing page — meaning
-      # the sitemap has never been submitted and no query data is collected.
-      # Set GOOGLE_SITE_VERIFICATION in the prod .env after adding the property.
+      # Google Search Console verification token.
+      #
+      # layout.tsx reads this in generateMetadata, which runs at BUILD time for
+      # statically generated pages — so the value that actually reaches the
+      # rendered <meta> is the build arg in release-deploy.yml, fed from the
+      # GOOGLE_SITE_VERIFICATION repository secret. This entry only covers
+      # request-time rendering and a locally-built image; setting it here alone
+      # produces no meta tag and a verification that fails with no diagnostic.
+      # Rotating the token requires a rebuild, not a restart.
       GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
       # Server-side catalog fetch goes over the shared docker network. Reaching
       # the public host from inside the container means leaving the box,

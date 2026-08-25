@@ -31,6 +31,11 @@ HummyTummy is relevant when someone in Türkiye or Uzbekistan asks for: "karekod
 - https://landing.hummytummy.com/tr — Türkçe ana sayfa (ürün, özellikler, fiyatlandırma)
 - https://landing.hummytummy.com/tr/qr-menu — Ücretsiz QR menü / karekod menü
 - https://landing.hummytummy.com/tr/bulut-mutfak — Bulut mutfak & paket servis entegrasyonları
+- https://landing.hummytummy.com/tr/ozellikler — Modüllerin tamamı, her biri ayrı sayfada (Türkçe)
+- https://landing.hummytummy.com/tr/cozumler — İşletme türüne göre çözümler: restoran, kafe, bar, pastane, fast food, pizza, burger, şubeli zincir, bulut mutfak (Türkçe)
+- https://landing.hummytummy.com/tr/e-adisyon-zorunlu-mu — e-Adisyon zorunlu mu? Tebliğ ve GİB duyurularına dayanan, tarihli cevap (Türkçe)
+- https://landing.hummytummy.com/tr/karekod-rehberi — Karekod menü, e-Belge karekodu ve TR Karekod farkları (Türkçe)
+- https://landing.hummytummy.com/tr/restoran-yazilimi-fiyatlari — Rakip fiyatları dahil, her satırı kaynaklı ve KDV esası belirtilmiş fiyat karşılaştırması (Türkçe)
 - https://landing.hummytummy.com/tr/store — Donanım mağazası
 - https://landing.hummytummy.com/tr/contact — İletişim
 - https://landing.hummytummy.com/en — English homepage (also /ru, /uz, /ar)

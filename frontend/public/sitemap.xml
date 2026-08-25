@@ -9,14 +9,16 @@
   HTML shell at /sitemap.xml — a crawler asking for a sitemap received a web
   page claiming to be one, which is worse than a 404.
 -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<!--
+  No hreflang cluster here on purpose. A cluster has to be reciprocal: every
+  member names every other, including itself. This host publishes one URL and
+  landing never points back at it, so anything declared here is discarded — and
+  it would have named 2 locales where landing publishes 5.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://hummytummy.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="tr" href="https://landing.hummytummy.com/tr"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://landing.hummytummy.com/en"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://landing.hummytummy.com/tr"/>
   </url>
 </urlset>

@@ -116,7 +116,9 @@ const RULES = [
  * anything — that is a build failure, not a warning.
  */
 function selfTest() {
-  const broken = RULES.filter((r) => !r.pattern.test(r.retired));
+  // The fixture goes through the same normalisation as a real source, so the
+  // self-test proves the rule works on what it will actually be handed.
+  const broken = RULES.filter((r) => !r.pattern.test(normalise(r.retired)));
   if (broken.length) {
     console.error('\nclaims-check SELF-TEST FAILED — rule(s) no longer match the claim they retired:\n');
     for (const r of broken) {
@@ -194,6 +196,29 @@ if (existsSync(contentDir)) {
  *
  * Everything a visitor can read is in scope, wherever it is written.
  */
+/**
+ * Normalise a source before matching.
+ *
+ * JavaScript's /i does not fold Turkish I: `SINIRSIZ ŞUBE` does not match
+ * /sınırsız şube/i, because dotless ı and capital I are different letters that
+ * only Turkish casing rules relate. Every rule here is written for Turkish
+ * copy, so ALL-CAPS marketing text would have walked straight through. Unicode
+ * spaces and line breaks inside a JSON value do the same thing: a claim split
+ * across two lines is invisible to a pattern with a literal space in it.
+ *
+ * Matching therefore runs on an NFKC-normalised, Turkish-lowercased copy with
+ * horizontal whitespace — including NBSP and the other Unicode spaces —
+ * collapsed. Line breaks are deliberately left alone: several patterns use
+ * [^.\n] to stay inside one sentence, and folding newlines away made them span
+ * unrelated lines of source and match things like two adjacent translation keys.
+ */
+function normalise(text) {
+  return text
+    .normalize('NFKC')
+    .replace(/[^\S\r\n]+/gu, ' ')
+    .toLocaleLowerCase('tr');
+}
+
 function walkFiles(dir, exts, acc = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
@@ -238,8 +263,9 @@ for (const rel of [
 
 const violations = [];
 for (const [where, text] of targets) {
+  const haystack = normalise(text);
   for (const rule of RULES) {
-    const m = text.match(rule.pattern);
+    const m = haystack.match(rule.pattern);
     if (m) violations.push({ where, rule, excerpt: m[0] });
   }
 }

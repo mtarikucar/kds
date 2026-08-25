@@ -9,11 +9,20 @@ başkasının sayfasından gelir; kendi siteniz yüzeyin %10–18'i kadardır.
 
 ## 1. Hemen yapılabilir (dakikalar)
 
-- [ ] **Google Search Console** — `landing.hummytummy.com` mülkünü ekleyin,
-      doğrulama kodunu prod `.env` dosyasına `GOOGLE_SITE_VERIFICATION=` olarak
-      yazın. Kod zaten okunuyor (`landing/src/app/[locale]/layout.tsx`) ve
-      compose'a bağlandı; sadece değer eksik. Bu olmadan sitemap hiç
-      gönderilmemiş sayılır ve hangi sorgudan geldiğinizi göremezsiniz.
+- [ ] **Google Search Console** — `landing.hummytummy.com` mülkünü ekleyin.
+      Doğrulama kodunu **GitHub deposunda `GOOGLE_SITE_VERIFICATION` secret'ı
+      olarak** tanımlayın, `.env` dosyasına değil: `layout.tsx` bu değeri
+      `generateMetadata` içinde okur ve o fonksiyon statik üretilen sayfalar
+      için **derleme zamanında** çalışır. Yalnızca `.env`'e yazarsanız hiçbir
+      sayfada meta etiketi oluşmaz ve doğrulama sessizce başarısız olur.
+      Secret'ı ekledikten sonra bir dağıtım yapın (token değişimi yeniden
+      derleme ister, yeniden başlatma yetmez).
+
+      Beklemek istemiyorsanız **DNS TXT** yöntemiyle doğrulama, dağıtımdan
+      bağımsız çalışır ve aynı anda dört host için de kullanılabilir.
+
+      Bu adım olmadan sitemap hiç gönderilmemiş sayılır ve hangi sorgudan
+      geldiğinizi göremezsiniz.
 - [ ] Aynı işlemi `hummytummy.com`, `help.hummytummy.com` ve
       `developer.hummytummy.com` için de yapın, her birinin sitemap'ini
       gönderin.

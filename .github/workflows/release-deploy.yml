@@ -285,14 +285,18 @@ jobs:
             NEXT_PUBLIC_API_URL=https://hummytummy.com/api
             NEXT_PUBLIC_SITE_URL=https://hummytummy.com
             NEXT_PUBLIC_BASE_URL=https://landing.hummytummy.com
+            GOOGLE_SITE_VERIFICATION=${{ secrets.GOOGLE_SITE_VERIFICATION }}
             SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
             SENTRY_ORG=${{ secrets.SENTRY_ORG }}
             SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT_LANDING }}
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache
           cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache,mode=max
 
-      # Developer docs portal (Nextra). Standalone Next build; takes no
-      # NEXT_PUBLIC_* / Sentry build-args (the Dockerfile declares none),
+      # Developer docs portal (Nextra). Standalone Next build. Takes
+      # NEXT_PUBLIC_SITE_URL as a build arg because the canonical and hreflang
+      # tags are baked into the statically generated pages — a runtime-only
+      # value leaves them on the fallback literal while /sitemap.xml and
+      # /robots.txt, which are request-time routes, use the runtime one.
       # so this mirrors the landing step minus the args block. Served at
       # developer.hummytummy.com (host 3200 → container 3000).
       - name: Build & push developer
@@ -301,6 +305,8 @@ jobs:
           context: ./developer
           file: ./developer/Dockerfile
           push: true
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://developer.hummytummy.com
           tags: |
             ${{ env.GHCR_BASE }}/developer:${{ steps.version.outputs.VERSION }}
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/developer:buildcache
@@ -314,6 +320,8 @@ jobs:
           context: ./help
           file: ./help/Dockerfile
           push: true
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://help.hummytummy.com
           tags: |
             ${{ env.GHCR_BASE }}/help:${{ steps.version.outputs.VERSION }}
           cache-from: type=registry,ref=${{ env.GHCR_BASE }}/help:buildcache
