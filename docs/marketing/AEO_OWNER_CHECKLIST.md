@@ -50,6 +50,69 @@ başkasının sayfasından gelir; kendi siteniz yüzeyin %10–18'i kadardır.
       katalogdan kaldırılan "alerjen eşleme" ifadesi, seed çalışana kadar
       canlıda `/store` sayfasında görünmeye devam eder.
 
+## 1c. v3.14.0 sonrası canlıda ölçülen iki kırık (sunucu tarafı)
+
+Bunlar kod değil, sunucu/DNS ayarı. Dağıtım başarılı bitti ve kodun geri kalanı
+canlıda çalışıyor; aşağıdaki ikisi ayrı.
+
+- [ ] **`/robots.txt` apex ve help'te 404 veriyor.** Kanıt: gövde
+      `nginx/1.24.0 (Ubuntu)` — yani konteynerin değil, **host nginx'inin**
+      404'ü. Aynı hostta bilinmeyen bir yol (`/zzz-unknown.txt`) uygulamaya
+      ulaşıp 200 dönüyor ve `/sitemap.xml` çalışıyor; yani sorun yalnız bu yola
+      özel. `landing.hummytummy.com/robots.txt` sorunsuz.
+
+          hummytummy.com        robots=404  sitemap=200
+          help.hummytummy.com   robots=404  sitemap=200
+          landing.hummytummy…   robots=200  sitemap=200
+
+      Sebep: canlı vhost, repodaki `ops/nginx/*.conf` kopyasından farklı — o
+      dosyalar zaten "RECONSTRUCTED, canlıyla mutabık kıl" uyarısı taşıyor.
+
+      ⚠️ **Bu dosyalar dağıtımla gitmiyor.** Ne `release-deploy.yml` ne de
+      `scripts/deploy.sh` nginx'e dokunuyor; `ops/nginx/apply.sh` sunucuda elle
+      çalıştırılıyor. Yani PR #373 merge edilse bile canlıda hiçbir şey
+      değişmez.
+
+      ⚠️ Ve `apply.sh` canlı vhost'u repo kopyasıyla **değiştirir**. Repo
+      kopyası eksik olduğu için (canlıda olan robots kuralını bilmiyoruz,
+      başka kurallar da olabilir) körlemesine çalıştırmak canlıda çalışan
+      kuralları düşürebilir. Doğru sıra:
+
+          # 1. canlı hâli al ve repodakiyle karşılaştır
+          ssh root@38.242.233.166 "nginx -T" > /tmp/live-nginx.txt
+          sed -n '/server_name hummytummy.com/,/^}/p' /tmp/live-nginx.txt
+          # 2. /robots.txt'yi kesen kuralı bul, repodaki dosyaya canlıda olup
+          #    repoda olmayan diğer kuralları taşı, robots kuralını çıkar
+          # 3. ancak ondan sonra uygula (yedekler, nginx -t koşar,
+          #    test geçmezse geri alır)
+          sudo ops/nginx/apply.sh hummytummy.com.conf
+          sudo ops/nginx/apply.sh help.hummytummy.com.conf
+          # 4. doğrula
+          curl -s -o /dev/null -w "%{http_code}\n" https://hummytummy.com/robots.txt
+
+      Repodaki iki vhost'a niyeti sabitleyen açık bir
+      `location = /robots.txt { proxy_pass … }` kuralı eklendi; yukarıdaki
+      mutabakat yapılmadan uygulanmamalı.
+
+      Neden önemli: robots.txt, dört sitemap'in crawler'a duyurulduğu yer.
+      404 olduğu sürece keşif tamamen elle Search Console gönderimine kalır.
+
+- [ ] **`developer.hummytummy.com` dağıtılan konteyneri sunmuyor.** Dağıtım
+      `kds_developer_prod`'u v3.14.0'a çıkardı ve doğruladı, ama alan adı başka
+      bir derlemeyi sunuyor:
+
+          canlı developer buildId : UMZYHwQRbj0LAUImFtDrC
+          v3.14.0 imajı buildId   : akK_FIMW9ymon9zvZYatt
+
+      İmajın kendisi doğru — yerelde çalıştırdım, `/robots.txt`, `/sitemap.xml`
+      ve canonical etiketi çalışıyor. Karşılaştırma için help doğru bağlı:
+      canlı buildId'si imajınkiyle birebir aynı.
+
+      Yapılacak: `developer.hummytummy.com` DNS/Cloudflare kaydının VPS'e ve
+      host vhost'unun `127.0.0.1:3200`'e gittiğini doğrulayın. Bu düzelene
+      kadar developer portalının sitemap'i, robots'u ve canonical etiketleri
+      canlıda yok.
+
 ## 2. Bu ay
 
 - [ ] **Şikayetvar profilini sahiplenin** — ilk şikâyet gelmeden. Bu sayfalar
