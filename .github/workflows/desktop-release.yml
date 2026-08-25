@@ -357,53 +357,52 @@ jobs:
 
           echo "✅ Renamed and copied: $(basename $ARTIFACT) -> $NEW_NAME"
           echo "ARTIFACT_NAME=$NEW_NAME" >> $GITHUB_ENV
+          # The signature must be derived from THIS file, not found independently:
+          # the sig is only valid for the exact bytes the client downloads.
+          echo "ARTIFACT_SOURCE_PATH=$ARTIFACT" >> $GITHUB_ENV
           echo "ARTIFACT_PATH=output/$NEW_NAME" >> $GITHUB_ENV
           echo "ARTIFACT_EXTENSION=$EXT" >> $GITHUB_ENV
 
-      - name: Find updater bundles and signatures
+      - name: Find updater signature
         shell: bash
         working-directory: frontend
         run: |
-          echo "🔍 Looking for updater bundles and signatures..."
+          # Tauri v2 ships the installer ITSELF as the updater artifact and writes
+          # the signature next to it as "<installer>.sig". Tauri v1 wrapped it in
+          # .msi.zip / .AppImage.tar.gz — this step used to search for those v1
+          # names, matched nothing on every run, and took the "not configured"
+          # branch. Result: every release since the v2 upgrade shipped with no
+          # signature while the workflow stayed green, so no client could ever
+          # auto-update. Derive the path from the installer we actually upload.
+          UPDATER_SIG="${ARTIFACT_SOURCE_PATH}.sig"
+          echo "Looking for signature: $UPDATER_SIG"
 
-          # Tauri updater creates .tar.gz (Linux) and .zip (Windows) bundles with .sig files
-          if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
-            echo "🪟 Looking for Windows updater bundles (.msi.zip and .msi.zip.sig)..."
-            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.msi.zip" | head -n 1)
-            UPDATER_SIG=$(find src-tauri/target -type f -name "*.msi.zip.sig" | head -n 1)
-          else
-            echo "🐧 Looking for Linux updater bundles (.AppImage.tar.gz and .AppImage.tar.gz.sig)..."
-            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.AppImage.tar.gz" | head -n 1)
-            UPDATER_SIG=$(find src-tauri/target -type f -name "*.AppImage.tar.gz.sig" | head -n 1)
-          fi
+          if [ -f "$UPDATER_SIG" ]; then
+            # Name it after the RENAMED installer so asset and signature pair up.
+            SIG_NAME="${ARTIFACT_NAME}.sig"
+            cp "$UPDATER_SIG" "output/$SIG_NAME"
+            echo "Found signature -> output/$SIG_NAME"
 
-          if [ -n "$UPDATER_BUNDLE" ] && [ -n "$UPDATER_SIG" ]; then
-            echo "✅ Found updater bundle: $UPDATER_BUNDLE"
-            echo "✅ Found signature file: $UPDATER_SIG"
-
-            # Copy to output directory
-            cp "$UPDATER_BUNDLE" output/
-            cp "$UPDATER_SIG" output/
-
-            BUNDLE_NAME=$(basename "$UPDATER_BUNDLE")
-            SIG_NAME=$(basename "$UPDATER_SIG")
-
-            echo "UPDATER_BUNDLE_NAME=$BUNDLE_NAME" >> $GITHUB_ENV
             echo "UPDATER_SIG_NAME=$SIG_NAME" >> $GITHUB_ENV
-            echo "HAS_UPDATER_BUNDLE=true" >> $GITHUB_ENV
+            echo "HAS_UPDATER_SIG=true" >> $GITHUB_ENV
 
-            # Read signature content for backend API
             SIGNATURE_CONTENT=$(cat "$UPDATER_SIG")
             echo "SIGNATURE_CONTENT<<EOF" >> $GITHUB_ENV
             echo "$SIGNATURE_CONTENT" >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
-
-            echo "✅ Updater files prepared for upload"
+          elif [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "HAS_UPDATER_SIG=false" >> $GITHUB_ENV
+            echo "::warning title=Updater disabled::TAURI_SIGNING_PRIVATE_KEY is not set - this release ships without an update signature, so installed clients cannot auto-update."
           else
-            echo "⚠️ Updater bundles not found (signing may not be configured)"
-            echo "  This is normal if TAURI_SIGNING_PRIVATE_KEY is not set"
-            echo "HAS_UPDATER_BUNDLE=false" >> $GITHUB_ENV
+            # The key IS configured, so a missing signature means the bundler did
+            # not emit one. Failing here is the point: a silent skip is what hid
+            # this for every prior release.
+            echo "::error title=Updater signature missing::TAURI_SIGNING_PRIVATE_KEY is set but no signature was produced next to $ARTIFACT_SOURCE_PATH. Check that bundle.createUpdaterArtifacts is true in tauri.conf.json."
+            find src-tauri/target -type f -name "*.sig" 2>/dev/null || echo "no .sig files anywhere"
+            exit 1
           fi
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
 
       - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -411,14 +410,12 @@ jobs:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: frontend/output/${{ env.ARTIFACT_NAME }}
 
-      - name: Upload updater bundles to GitHub Release
-        if: env.HAS_UPDATER_BUNDLE == 'true'
+      - name: Upload updater signature to GitHub Release
+        if: env.HAS_UPDATER_SIG == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
-          files: |
-            frontend/output/${{ env.UPDATER_BUNDLE_NAME }}
-            frontend/output/${{ env.UPDATER_SIG_NAME }}
+          files: frontend/output/${{ env.UPDATER_SIG_NAME }}
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -481,28 +478,27 @@ jobs:
             # Fallback: any .exe that's not .nupkg
             WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.exe$" | grep -v "\.nupkg" | head -n 1 | cut -d'|' -f1)
           fi
-          LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | head -n 1 | cut -d'|' -f1)
+          # Anchored: the release also carries a "<installer>.AppImage.sig" asset,
+          # and an unanchored match would happily return that as the installer.
+          LINUX_FILE=$(echo "$ASSETS" | grep -E "\.AppImage$" | head -n 1 | cut -d'|' -f1)
 
-          # Get updater bundle URLs (for auto-update) - these are the .zip/.tar.gz versions
-          WINDOWS_UPDATER=$(echo "$ASSETS" | grep "\.msi\.zip$" | head -n 1 | cut -d'|' -f1)
-          LINUX_UPDATER=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz$" | head -n 1 | cut -d'|' -f1)
+          # Under Tauri v2 the installer IS the updater artifact: there is no
+          # separate .msi.zip / .AppImage.tar.gz to prefer. This job used to look
+          # for those v1 names, never match, and fall through to empty signatures.
+          WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
 
-          # Construct download URLs - use updater bundles if available, otherwise use installers
-          if [ -n "$WINDOWS_UPDATER" ]; then
-            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_UPDATER"
-          else
-            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          # Derive each signature from the installer it signs rather than
+          # searching independently — a signature verifies only against the exact
+          # bytes the client downloads, so the pair must be chosen together.
+          WINDOWS_SIG_FILE=""
+          LINUX_SIG_FILE=""
+          if [ -n "$WINDOWS_FILE" ] && echo "$ASSETS" | grep -qF "${WINDOWS_FILE}.sig|"; then
+            WINDOWS_SIG_FILE="${WINDOWS_FILE}.sig"
           fi
-
-          if [ -n "$LINUX_UPDATER" ]; then
-            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_UPDATER"
-          else
-            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
+          if [ -n "$LINUX_FILE" ] && echo "$ASSETS" | grep -qF "${LINUX_FILE}.sig|"; then
+            LINUX_SIG_FILE="${LINUX_FILE}.sig"
           fi
-
-          # Get signature files
-          WINDOWS_SIG_FILE=$(echo "$ASSETS" | grep "\.msi\.zip\.sig$" | head -n 1 | cut -d'|' -f1)
-          LINUX_SIG_FILE=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz\.sig$" | head -n 1 | cut -d'|' -f1)
 
           # Download and read signature content
           WINDOWS_SIG=""
@@ -807,6 +803,36 @@ jobs:
             echo "⚠️ Backend API shows different version"
             echo "This might be expected if the release is not yet published"
           fi
+
+      - name: Verify auto-update is actually offered
+        run: |
+          # The end-to-end assertion this workflow never made. Every release since
+          # the Tauri v2 upgrade published installers with no signature and stayed
+          # green, because each job only warned when it failed to find one. Ask the
+          # endpoint the desktop client itself calls, from a version old enough that
+          # an update must be offered, and require a non-empty signature: a manifest
+          # without one is a manifest the client refuses to install.
+          ENDPOINT="https://hummytummy.com/api/desktop/updates/windows-x86_64/0.0.1"
+          BODY=""
+
+          for attempt in 1 2 3 4 5 6; do
+            BODY=$(curl -s --max-time 20 "$ENDPOINT" || true)
+            SIG=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].signature // empty' 2>/dev/null || true)
+            URL=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].url // empty' 2>/dev/null || true)
+
+            if [ -n "$SIG" ] && [ -n "$URL" ]; then
+              echo "Update offered: $URL"
+              echo "Signature present (${#SIG} chars)"
+              exit 0
+            fi
+
+            echo "Attempt $attempt: no signed update offered yet, retrying in 20s"
+            sleep 20
+          done
+
+          echo "::error title=Auto-update not offered::$ENDPOINT served no signed windows-x86_64 update, so installed clients cannot update."
+          echo "Last response: $BODY"
+          exit 1
 
       - name: Test download URLs
         continue-on-error: true  # Don't fail workflow if URLs aren't immediately accessible
