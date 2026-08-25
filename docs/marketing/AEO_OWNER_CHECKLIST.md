@@ -67,9 +67,32 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
 
       Sebep: canlı vhost, repodaki `ops/nginx/*.conf` kopyasından farklı — o
       dosyalar zaten "RECONSTRUCTED, canlıyla mutabık kıl" uyarısı taşıyor.
-      Yapılacak: sunucuda `nginx -T` alıp `/robots.txt`'yi kesen kuralı bulun
-      ve kaldırın. Repodaki iki vhost'a niyeti sabitleyen açık bir
-      `location = /robots.txt { proxy_pass … }` kuralı eklendi.
+
+      ⚠️ **Bu dosyalar dağıtımla gitmiyor.** Ne `release-deploy.yml` ne de
+      `scripts/deploy.sh` nginx'e dokunuyor; `ops/nginx/apply.sh` sunucuda elle
+      çalıştırılıyor. Yani PR #373 merge edilse bile canlıda hiçbir şey
+      değişmez.
+
+      ⚠️ Ve `apply.sh` canlı vhost'u repo kopyasıyla **değiştirir**. Repo
+      kopyası eksik olduğu için (canlıda olan robots kuralını bilmiyoruz,
+      başka kurallar da olabilir) körlemesine çalıştırmak canlıda çalışan
+      kuralları düşürebilir. Doğru sıra:
+
+          # 1. canlı hâli al ve repodakiyle karşılaştır
+          ssh root@38.242.233.166 "nginx -T" > /tmp/live-nginx.txt
+          sed -n '/server_name hummytummy.com/,/^}/p' /tmp/live-nginx.txt
+          # 2. /robots.txt'yi kesen kuralı bul, repodaki dosyaya canlıda olup
+          #    repoda olmayan diğer kuralları taşı, robots kuralını çıkar
+          # 3. ancak ondan sonra uygula (yedekler, nginx -t koşar,
+          #    test geçmezse geri alır)
+          sudo ops/nginx/apply.sh hummytummy.com.conf
+          sudo ops/nginx/apply.sh help.hummytummy.com.conf
+          # 4. doğrula
+          curl -s -o /dev/null -w "%{http_code}\n" https://hummytummy.com/robots.txt
+
+      Repodaki iki vhost'a niyeti sabitleyen açık bir
+      `location = /robots.txt { proxy_pass … }` kuralı eklendi; yukarıdaki
+      mutabakat yapılmadan uygulanmamalı.
 
       Neden önemli: robots.txt, dört sitemap'in crawler'a duyurulduğu yer.
       404 olduğu sürece keşif tamamen elle Search Console gönderimine kalır.
