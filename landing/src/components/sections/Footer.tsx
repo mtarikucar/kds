@@ -44,6 +44,11 @@ export default function Footer() {
     { label: t('links.helpCenter'), href: `https://help.hummytummy.com/${docsLocale}` },
     { label: t('links.documentation'), href: `https://developer.hummytummy.com/${docsLocale}` },
     { label: t('links.apiReference'), href: `https://developer.hummytummy.com/${docsLocale}/api` },
+    // Turkish-only page; linking it from other locales would send readers to a
+    // 404 (its generateStaticParams returns 'tr' alone).
+    ...(locale === 'tr'
+      ? [{ label: t('links.eAdisyon'), href: '/e-adisyon-zorunlu-mu' }]
+      : []),
     { label: t('links.contact'), href: '/contact' },
   ];
 

@@ -291,7 +291,8 @@
       "documentation": "Documentation",
       "apiReference": "API Reference",
       "privacy": "Privacy Policy",
-      "terms": "Terms of Service"
+      "terms": "Terms of Service",
+      "eAdisyon": "Is e-Adisyon mandatory?"
     },
     "copyright": "HummyTummy. All rights reserved."
   },

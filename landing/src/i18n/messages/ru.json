@@ -291,7 +291,8 @@
       "documentation": "Документация",
       "apiReference": "API справочник",
       "privacy": "Политика конфиденциальности",
-      "terms": "Условия использования"
+      "terms": "Условия использования",
+      "eAdisyon": "Обязателен ли e-Adisyon?"
     },
     "copyright": "HummyTummy. Все права защищены."
   },

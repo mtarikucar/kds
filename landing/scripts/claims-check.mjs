@@ -13,7 +13,7 @@
  * because the product gained the capability, delete the rule in the same commit
  * that ships the capability — never to make a build pass.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -125,6 +125,17 @@ for (const file of readdirSync(messagesDir).filter((f) => f.endsWith('.json'))) 
   targets.push(...strings.map(([p, v]) => [`messages/${file}:${p}`, v]));
 }
 targets.push(['public/llms.txt', readFileSync(join(root, 'public/llms.txt'), 'utf8')]);
+
+// Long-form page copy that lives outside the message catalogs. Turkish-only
+// pages keep their content in src/content so it is not forced through
+// five-locale parity; it is still marketing copy on a public page and is held
+// to exactly the same standard.
+const contentDir = join(root, 'src/content');
+if (existsSync(contentDir)) {
+  for (const file of readdirSync(contentDir).filter((f) => f.endsWith('.ts'))) {
+    targets.push([`content/${file}`, readFileSync(join(contentDir, file), 'utf8')]);
+  }
+}
 
 const violations = [];
 for (const [where, text] of targets) {

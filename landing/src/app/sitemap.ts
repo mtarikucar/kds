@@ -60,6 +60,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/privacy', priority: 0.3, changeFrequency: 'monthly' },
   ];
 
+  // Turkish-only routes. These answer questions about Turkish regulation and
+  // exist in Turkish alone; generateStaticParams on each page returns only
+  // 'tr' and the other locales notFound(). Fanning them across five locales
+  // would submit four 404s per route.
+  const trOnlyRoutes: Array<{ path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }> = [
+    { path: '/e-adisyon-zorunlu-mu', priority: 0.9, changeFrequency: 'monthly' },
+  ];
+
   const entries: MetadataRoute.Sitemap = [];
   const now = new Date();
 
@@ -86,6 +94,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         alternates: { languages: languagesFor(route.path) },
       });
     }
+  }
+
+  for (const route of trOnlyRoutes) {
+    entries.push({
+      url: `${baseUrl}/${defaultLocale}${route.path}`,
+      lastModified: now,
+      changeFrequency: route.changeFrequency,
+      priority: route.priority,
+      // No `alternates`: there is one language, and declaring hreflang for a
+      // single locale tells a crawler nothing it cannot see from the URL.
+    });
   }
 
   // v2.8.98 — fan out the catalog SKUs across every locale. Each SKU
