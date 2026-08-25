@@ -94,8 +94,13 @@ başkasının sayfasından gelir; kendi siteniz yüzeyin %10–18'i kadardır.
 
 - **Canonical**: her dağıtımdan sonra çalıştırın —
 
-      node --use-system-ca landing/scripts/canonical-check.mjs https://landing.hummytummy.com
+      node --use-system-ca landing/scripts/canonical-check.mjs \
+        https://landing.hummytummy.com \
+        --expect-origin=https://landing.hummytummy.com
 
-  Sitemap'teki her URL'in kendisini gösterdiğini doğrular. Bu hata bir kez
+  Sitemap'teki her URL'in kendisini gösterdiğini doğrular. `--expect-origin`
+  host'u da kontrol eder: yaşanan gerçek olay yanlış host'tu (canonical'lar
+  apex'i gösteriyordu, orada her URL'e SPA kabuğu dönüyor) ve yalnızca yol
+  karşılaştıran bir kontrol bunu "temiz" diye raporlar. Bu hata bir kez
   sessizce yaşandı: sayfalar doğru render oluyordu ve yalnızca indekslenmemeyi
   istiyorlardı.

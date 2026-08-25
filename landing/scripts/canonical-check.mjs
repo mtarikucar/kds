@@ -14,11 +14,29 @@
  *
  *   node scripts/canonical-check.mjs https://landing.hummytummy.com
  *   node scripts/canonical-check.mjs            # defaults to localhost:3000
+ *   node scripts/canonical-check.mjs https://landing.hummytummy.com \\
+ *        --expect-origin=https://landing.hummytummy.com
  *
  * Behind a TLS-inspecting corporate proxy Node will not trust the intercepting
  * CA even when curl does; run it as `node --use-system-ca scripts/…` there.
  */
-const base = (process.argv[2] || 'http://localhost:3000').replace(/\/+$/, '');
+const args = process.argv.slice(2);
+const base = (args.find((a) => !a.startsWith('--')) || 'http://localhost:3000').replace(/\/+$/, '');
+
+/**
+ * --expect-origin=https://landing.hummytummy.com
+ *
+ * Without it this compares paths only, because the canonical's host comes from
+ * the build-time NEXT_PUBLIC_BASE_URL and legitimately differs from the origin
+ * being probed when checking a local build. But the incident this repo actually
+ * had was a wrong HOST — canonicals pointing at the apex, where every URL is
+ * answered by the SPA shell — and a path-only comparison reports that as fine.
+ * Pass this against a deployed site to check the half that bit us.
+ */
+const expectOrigin = args
+  .find((a) => a.startsWith('--expect-origin='))
+  ?.slice('--expect-origin='.length)
+  .replace(/\/+$/, '');
 const LIMIT = Number(process.env.CANONICAL_CHECK_LIMIT || 0); // 0 = all
 
 const fail = [];
@@ -74,8 +92,19 @@ async function worker() {
           return u.replace(/\/+$/, '');
         }
       };
+      const origin = (u) => {
+        try {
+          return new URL(u).origin;
+        } catch {
+          return null;
+        }
+      };
       if (!canonical) {
         fail.push(`${url}\n      no <link rel="canonical"> at all`);
+      } else if (expectOrigin && origin(canonical) !== expectOrigin) {
+        fail.push(
+          `${url}\n      canonical host is ${origin(canonical)}, expected ${expectOrigin}`,
+        );
       } else if (path(canonical) !== path(url)) {
         fail.push(`${url}\n      canonicalises to ${canonical}`);
       }
