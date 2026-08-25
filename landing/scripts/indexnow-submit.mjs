@@ -61,6 +61,17 @@ const sitemap = await fetch(`${base}/sitemap.xml`).then((r) => {
   if (!r.ok) throw new Error(`sitemap.xml returned HTTP ${r.status}`);
   return r.text();
 });
+
+// A bot-check page answers 200 with HTML and would otherwise surface as
+// "no <loc> entries", which reads like a broken sitemap rather than a
+// challenged client.
+if (/just a moment|attention required|__cf_chl|challenge-platform/i.test(sitemap.slice(0, 4000))) {
+  console.error(
+    `${base}/sitemap.xml returned a bot-check page, not the sitemap. ` +
+      'Run this from an allowlisted network; the sitemap itself is fine.',
+  );
+  process.exit(1);
+}
 const urlList = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
 
 if (!urlList.length) {

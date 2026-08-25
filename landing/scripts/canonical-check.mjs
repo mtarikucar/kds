@@ -42,6 +42,24 @@ const LIMIT = Number(process.env.CANONICAL_CHECK_LIMIT || 0); // 0 = all
 const fail = [];
 const warn = [];
 
+
+/**
+ * A bot-check page answers 200 with HTML, so nothing above notices it.
+ *
+ * This is not hypothetical here: a sibling release workflow had Cloudflare
+ * serve "Just a moment..." to a GitHub runner probing the public API, and the
+ * check reported a broken release that was in fact fine. The same wall stands
+ * in front of these hosts. Detect it and say so, rather than reporting 64
+ * pages with no canonical or a sitemap with no URLs.
+ */
+function wafChallenge(body) {
+  return (
+    /just a moment|attention required|__cf_chl|cf-browser-verification|challenge-platform/i.test(
+      body.slice(0, 4000),
+    ) && !/<urlset|<link[^>]+rel="canonical"/i.test(body.slice(0, 4000))
+  );
+}
+
 async function text(url) {
   const res = await fetch(url, { redirect: 'follow' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -49,6 +67,15 @@ async function text(url) {
 }
 
 const sitemapXml = await text(`${base}/sitemap.xml`);
+if (wafChallenge(sitemapXml)) {
+  console.error(
+    `\n${base}/sitemap.xml returned a bot-check page, not the sitemap.\n` +
+      'Whatever sits in front of this host (Cloudflare, a WAF) is challenging this\n' +
+      'client. Nothing is wrong with the site — run the check from a browser-like\n' +
+      'client or an allowlisted network. Do NOT read this as a missing sitemap.\n',
+  );
+  process.exit(1);
+}
 let urls = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
 
 // The sitemap carries absolute URLs built from NEXT_PUBLIC_BASE_URL, which on a
@@ -81,6 +108,10 @@ async function worker() {
     const url = queue.shift();
     try {
       const html = await text(url);
+      if (wafChallenge(html)) {
+        fail.push(`${url}\n      bot-check page returned instead of the page (WAF, not a site defect)`);
+        continue;
+      }
       const canonical = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/i)?.[1];
       // Compare paths, not full URLs: the host in a canonical tag comes from
       // the build-time NEXT_PUBLIC_BASE_URL and will legitimately differ from
