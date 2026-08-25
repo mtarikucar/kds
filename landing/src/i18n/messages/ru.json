@@ -292,7 +292,8 @@
       "apiReference": "API справочник",
       "privacy": "Политика конфиденциальности",
       "terms": "Условия использования",
-      "eAdisyon": "Обязателен ли e-Adisyon?"
+      "eAdisyon": "Обязателен ли e-Adisyon?",
+      "pricingIndex": "Цены на ПО для ресторанов"
     },
     "copyright": "HummyTummy. Все права защищены."
   },

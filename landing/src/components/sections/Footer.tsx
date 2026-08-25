@@ -47,7 +47,10 @@ export default function Footer() {
     // Turkish-only page; linking it from other locales would send readers to a
     // 404 (its generateStaticParams returns 'tr' alone).
     ...(locale === 'tr'
-      ? [{ label: t('links.eAdisyon'), href: '/e-adisyon-zorunlu-mu' }]
+      ? [
+          { label: t('links.eAdisyon'), href: '/e-adisyon-zorunlu-mu' },
+          { label: t('links.pricingIndex'), href: '/restoran-yazilimi-fiyatlari' },
+        ]
       : []),
     { label: t('links.contact'), href: '/contact' },
   ];
