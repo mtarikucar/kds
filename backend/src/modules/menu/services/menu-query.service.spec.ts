@@ -61,6 +61,41 @@ describe("MenuQueryService", () => {
     expect(res.settings.showPrices).toBe(true);
   });
 
+  // The public QR menu is the one money-rendering surface a customer reaches
+  // without logging in, and it decides its currency purely from this payload:
+  // QRMenuLayout seeds the cart store with `menuData.tenant.currency`, and every
+  // price component falls back to "TRY" when that is undefined. The select used
+  // to omit the column entirely, so an Uzbek tenant's menu rendered in lira no
+  // matter what its country said. Both halves are pinned: the column has to be
+  // requested, and it has to reach the payload.
+  it("asks Prisma for the tenant currency", async () => {
+    const prisma = makePrisma();
+    prisma.tenant.findFirst.mockResolvedValueOnce({ id: "t1", name: "Acme" });
+    const svc = new MenuQueryService(prisma as any, posSettings as any, makeCache());
+
+    await svc.getPublicMenu("t1");
+
+    const select = prisma.tenant.findFirst.mock.calls[0][0].select;
+    expect(select.currency).toBe(true);
+    expect(select.countryCode).toBe(true);
+  });
+
+  it("serves the tenant's own currency, not the Turkish default", async () => {
+    const prisma = makePrisma();
+    prisma.tenant.findFirst.mockResolvedValueOnce({
+      id: "t1",
+      name: "Pamukkale",
+      currency: "UZS",
+      countryCode: "UZ",
+    });
+    const svc = new MenuQueryService(prisma as any, posSettings as any, makeCache());
+
+    const res = await svc.getPublicMenu("t1");
+
+    expect(res.tenant.currency).toBe("UZS");
+    expect(res.tenant.countryCode).toBe("UZ");
+  });
+
   it("coerces enableCustomerSelfPay (truthy number) to a boolean", async () => {
     const prisma = makePrisma();
     prisma.tenant.findFirst.mockResolvedValueOnce({ id: "t1", name: "Acme" });

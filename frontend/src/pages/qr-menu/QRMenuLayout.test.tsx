@@ -142,6 +142,24 @@ describe('QRMenuLayout — successful fetch', () => {
     expect(initializeSession).toHaveBeenCalledWith('t-1', null, 'TRY');
   });
 
+  // The existing assertion above uses a TRY fixture, so it also passes if the
+  // currency is hardcoded to 'TRY' — which is exactly what the whole public
+  // menu did while the backend omitted the column. A non-Turkish fixture is
+  // what makes this a real check: an Uzbek tenant must seed the cart with UZS,
+  // because every price component falls back to lira when this argument is
+  // wrong.
+  it('seeds the cart with a non-Turkish tenant currency', async () => {
+    get.mockResolvedValue({
+      data: { ...menuData, tenant: { ...menuData.tenant, currency: 'UZS' } },
+    });
+
+    renderLayout();
+
+    await waitFor(() =>
+      expect(initializeSession).toHaveBeenCalledWith('t-1', null, 'UZS'),
+    );
+  });
+
   it('mints a SERVER customer session once the menu is loaded (C1)', async () => {
     get.mockResolvedValue({ data: menuData });
     renderLayout();
