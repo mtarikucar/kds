@@ -51,6 +51,43 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
+  landing-quality:
+    name: Landing typecheck + content gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: landing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # These three run as `prebuild` too, but a prebuild only fires during the
+      # Docker build — i.e. after merge, at deploy time. A false claim or a
+      # missing translation should fail the PR that introduces it, not the
+      # release that ships it.
+      - name: Locale parity
+        run: npm run i18n-check
+
+      - name: Marketing claims
+        run: npm run claims-check
+
+      - name: Price index freshness
+        run: npm run pricing-freshness
+
   backend-e2e:
     name: Backend e2e (real Postgres)
     runs-on: ubuntu-latest
