@@ -164,12 +164,12 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       },
       {
         title: "Kasa güvenliği ve QR'dan PayTR self-pay",
-        body: "Para hareketinin izi kaybolmasın. Onaylı kasa çekmecesi hareketleriyle her giriş ve çıkış kayıt altına alınır; para üstü, avans ya da gider gibi hareketleri sisteme işler, gün sonu sayımını tahmine değil gerçek veriye dayandırırsınız. Dilerseniz PayTR self-pay özelliğini açar, müşterinin masadaki QR kodundan kendi hesabını çevrimiçi ödemesine izin verirsiniz — sıra kasada beklemez, garson tahsilat için masaya gitmek zorunda kalmaz. Bu özellik opt-in'dir: PayTR üye işyeri hesabınızın olması ve ilgili ayarın açık olması gerekir. Kapalıyken ödemeleri her zamanki gibi kasadan, nakit ya da kendi kart cihazınızla alırsınız.",
+        body: "Para hareketinin izi kaybolmasın. Onaylı kasa çekmecesi hareketleriyle her giriş ve çıkış kayıt altına alınır; para üstü, avans ya da gider gibi hareketleri sisteme işler, gün sonu sayımını tahmine değil gerçek veriye dayandırırsınız. Dilerseniz PayTR self-pay özelliğini açar, müşterinin masadaki QR kodundan kendi hesabını çevrimiçi ödemesine izin verirsiniz — sıra kasada beklemez, garson tahsilat için masaya gitmek zorunda kalmaz. Bu özellik opt-in'dir: ödeme HummyTummy’nin PayTR entegrasyonu üzerinden alınır ve ilgili ayarın açık olması gerekir. Kapalıyken ödemeleri her zamanki gibi kasadan, nakit ya da kendi kart cihazınızla alırsınız.",
         bullets: [
           "Onaylı kasa çekmecesi hareketleriyle her nakit giriş/çıkışının kaydı",
           "Para üstü, avans ve gideri işleyip gün sonu sayımını gerçek veriyle karşılaştırma",
           "PayTR self-pay: müşteri masadaki QR'dan kendi hesabını online öder (opt-in)",
-          "Self-pay için PayTR üye işyeri hesabı ve özelliğin etkinleştirilmesi gerekir",
+          "Self-pay, HummyTummy’nin ödeme entegrasyonu üzerinden çalışır; açmanız yeterlidir",
         ],
       },
     ],
@@ -217,7 +217,7 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       },
       {
         q: "Müşterinin kendi hesabını online ödemesi için ne gerekiyor?",
-        a: "PayTR üye işyeri hesabınızın olması ve self-pay özelliğinin açık olması gerekir. Etkinleştirdiğinizde müşteri masadaki QR'dan kendi hesabını çevrimiçi öder; kapalıyken ödemeleri her zamanki gibi kasadan alırsınız.",
+        a: "Self-pay, HummyTummy’nin PayTR entegrasyonu üzerinden çalışır; ayrı bir üye işyeri hesabı açmanız gerekmez, yalnızca özelliği etkinleştirirsiniz. Etkinleştirdiğinizde müşteri masadaki QR'dan kendi hesabını çevrimiçi öder; kapalıyken ödemeleri her zamanki gibi kasadan alırsınız.",
       },
       {
         q: "Nakit kasa hareketlerini takip edebilir miyim?",
@@ -1460,14 +1460,14 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       eyebrow: "Güvenlik & Uyum",
       title: "Müşteri verileriniz şifreli, işletmeniz KVKK'ya uyumlu",
       subtitle:
-        "Entegrasyon anahtarlarınız ve token'larınız AES-256-GCM ile şifreli saklanır, parolalar bcrypt ile korunur, tüm trafik TLS arkasından akar. KVKK metinleri ve rıza akışları hazır, doğrulanmış yedekleriniz her gün alınır. Güvenliği sonradan eklenen bir madde değil, sistemin temeli olarak kurduk.",
+        "Entegrasyon anahtarlarınız ve token'larınız AES-256-GCM ile şifreli saklanır, parolalar bcrypt ile korunur, tüm trafik TLS arkasından akar. KVKK metinleri hazır ve veritabanı yedeği her dağıtımdan önce alınıp doğrulanır. Güvenliği sonradan eklenen bir madde değil, sistemin temeli olarak kurduk.",
     },
     intro:
-      "Bir restoran yazılımı sadece sipariş almaz; müşterinizin telefonunu, adresini, ödeme sağlayıcısı token'larını, entegrasyon anahtarlarınızı ve günün sonundaki tüm ciro verinizi taşır. Bu verinin sızması veya KVKK'ya aykırı işlenmesi, bir kasa açığından çok daha pahalıya patlar. HummyTummy'de güvenlik, panelin bir köşesindeki \"ayarlar\" sekmesi değil; her isteğin, her kaydın ve her yedeğin içinden geçtiği bir zemin. Hassas alanları kiracı-bazlı türetilen anahtarlarla şifreliyor, oturumları tarayıcıya token bırakmadan yönetiyor, uygulama katmanını Helmet ve CORS kilitleriyle sınırlıyor ve KVKK/Mesafeli Satış/İade metinlerini rıza akışlarıyla birlikte kutudan çıkar çıkmaz sunuyoruz. Aşağıda bunların her birinin işletmeniz için ne anlama geldiğini, yaldızsız ve somut biçimde anlatıyoruz.",
+      "Bir restoran yazılımı sadece sipariş almaz; müşterinizin telefonunu, adresini, ödeme sağlayıcısı token'larını, entegrasyon anahtarlarınızı ve günün sonundaki tüm ciro verinizi taşır. Bu verinin sızması veya KVKK'ya aykırı işlenmesi, bir kasa açığından çok daha pahalıya patlar. HummyTummy'de güvenlik, panelin bir köşesindeki \"ayarlar\" sekmesi değil; her isteğin, her kaydın ve her yedeğin içinden geçtiği bir zemin. Hassas alanları AES-256-GCM ile şifreliyor, oturumları tarayıcıya token bırakmadan yönetiyor, uygulama katmanını Helmet ve CORS kilitleriyle sınırlıyor ve KVKK/Mesafeli Satış/İade metinlerini rıza akışlarıyla birlikte kutudan çıkar çıkmaz sunuyoruz. Aşağıda bunların her birinin işletmeniz için ne anlama geldiğini, yaldızsız ve somut biçimde anlatıyoruz.",
     blocks: [
       {
         title: "Hassas verileriniz bekleme halindeyken bile şifreli",
-        body: "Ödeme sağlayıcısı token'ları, entegrasyon API anahtarları ve webhook secret'ları gibi ele geçtiğinde en çok zarar verecek alanları, veritabanına düz metin olarak asla yazmıyoruz. Bu alanlar AES-256-GCM zarf şifrelemesiyle korunur ve şifreleme anahtarı her kiracı için ayrı türetilir; yani bir işletmenin verisini çözen anahtar, başka bir işletmenin verisini açamaz. GCM modu sayesinde şifreli veri hem gizli kalır hem de kurcalanırsa fark edilir. Veritabanı yedeği birinin eline geçse dahi, bu alanlar okunabilir metne dönüşmez.",
+        body: "Ödeme sağlayıcısı token'ları, entegrasyon API anahtarları ve webhook secret'ları gibi ele geçtiğinde en çok zarar verecek alanları, veritabanına düz metin olarak asla yazmıyoruz. Bu alanlar AES-256-GCM ile şifrelenir; şifre çözme anahtarı uygulama sunucusunda tutulur ve veritabanına hiç yazılmaz. İşletmeler arası ayrım şifreleme anahtarıyla değil, her isteği kullanıcının yetkili olduğu işletme ve şubelerle sınırlayan sunucu tarafı yetkilendirmesiyle sağlanır. GCM modu sayesinde şifreli veri hem gizli kalır hem de kurcalanırsa fark edilir. Veritabanı yedeği birinin eline geçse dahi, bu alanlar okunabilir metne dönüşmez.",
         bullets: [
           "Entegrasyon anahtarları, sağlayıcı token'ları ve webhook secret'ları bekleme halinde (at-rest) AES-256-GCM ile şifreli",
           "Kiracı-bazlı türetilen anahtar: her işletmenin verisi kendi anahtarına bağlı, yatay sızıntı kapalı",
@@ -1487,7 +1487,7 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       },
       {
         title: "KVKK uyumu ve doğrulanmış yedekler kutudan çıkar çıkmaz hazır",
-        body: "Bir müşterinin telefonunu veya adresini işliyorsanız KVKK sizi ilgilendirir; bunu sonraya bırakmak, denetimde ceza demektir. HummyTummy; KVKK Aydınlatma, Gizlilik Politikası, Mesafeli Satış Sözleşmesi ve İade/Cayma metinlerini hazır sunar ve bu rızayı kayıt ile ödeme adımlarında müşteriden açıkça alır. Böylece veriyi hangi hukuki dayanakla işlediğinizi gösterebilir hale gelirsiniz. Veri kaybına karşı ise doğrulanmış otomatik veritabanı yedeği devrededir: yedekler her gün alınır, 14 gün boyunca saklanır ve alınabilirliği kontrol edilir. Panelin tamamı tr/en/ru/uz ve sağdan-sola Arapça dahil 5 dilde çalışır, bu da çok uluslu ekipler için erişilebilirliği ve doğru anlaşılmayı artırır.",
+        body: "Bir müşterinin telefonunu veya adresini işliyorsanız KVKK sizi ilgilendirir; bunu sonraya bırakmak, denetimde ceza demektir. HummyTummy; KVKK Aydınlatma, Gizlilik Politikası, Mesafeli Satış Sözleşmesi ve İade/Cayma metinlerini hazır sunar ve bu rızayı kayıt ile ödeme adımlarında müşteriden açıkça alır. Böylece veriyi hangi hukuki dayanakla işlediğinizi gösterebilir hale gelirsiniz. Veri kaybına karşı ise doğrulanmış veritabanı yedeği devrededir: her dağıtımdan önce yedek alınır, alınabilirliği kontrol edilir ve 14 gün saklanır. Panelin tamamı tr/en/ru/uz ve sağdan-sola Arapça dahil 5 dilde çalışır, bu da çok uluslu ekipler için erişilebilirliği ve doğru anlaşılmayı artırır.",
         bullets: [
           "KVKK Aydınlatma, Gizlilik, Mesafeli Satış ve İade metinleri hazır; rıza kayıt ve ödemede alınır",
           "Doğrulanmış otomatik DB yedeği: günlük alınır, 14 gün saklanır, alınabilirliği kontrol edilir",
@@ -1528,7 +1528,7 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
     faq: [
       {
         q: "Verilerim tam olarak nasıl şifreleniyor?",
-        a: "Entegrasyon anahtarları, ödeme sağlayıcısı token'ları ve webhook secret'ları gibi hassas alanlar, veritabanına yazılmadan önce AES-256-GCM zarf şifrelemesiyle korunur. Şifreleme anahtarı her işletme için ayrı türetilir, yani bir kiracının anahtarı başka bir kiracının verisini açamaz. GCM modu ayrıca veride oynama olup olmadığını tespit eder.",
+        a: "Entegrasyon anahtarları, ödeme sağlayıcısı token'ları ve webhook secret'ları gibi hassas alanlar, veritabanına yazılmadan önce AES-256-GCM zarf şifrelemesiyle korunur. Şifre çözme anahtarı uygulama sunucusunda tutulur, veritabanına yazılmaz. GCM modu ayrıca veride oynama olup olmadığını tespit eder.",
       },
       {
         q: "Parolam ve oturumum güvende mi?",

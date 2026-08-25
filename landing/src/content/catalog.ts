@@ -8,8 +8,27 @@
  * are listed on the index and link to the homepage section instead.
  */
 
+/**
+ * Whether a module is part of the free core or a paid annual add-on.
+ *
+ * Derived from backend/src/modules/entitlements/free-baseline.const.ts (which
+ * grants posAccess, kdsIntegration, customBranding and multiLocation forever)
+ * and backend/src/modules/marketplace/alacarte-catalog.const.ts. Deep-dive
+ * pages sold several paid modules without saying so — the reports page is the
+ * clearest case: every /reports/* route carries
+ * `@RequiresFeature(ADVANCED_REPORTS)`, and that entitlement costs ₺1.290/yr on
+ * top of the ₺4.900 licence.
+ *
+ * Keep this in step with the catalogue. A module that becomes free should be
+ * changed here in the same commit.
+ */
+export type Pricing =
+  | { kind: 'free' }
+  | { kind: 'paid'; priceLabel: string };
+
 export interface ModuleMeta {
   slug: string;
+  pricing: Pricing;
   /** Excluded from the index and from the sitemap; see the entry's comment. */
   hidden?: boolean;
   title: string;
@@ -22,6 +41,7 @@ export interface ModuleMeta {
 export const MODULES: ModuleMeta[] = [
   {
     slug: 'qr-menu',
+    pricing: { kind: 'free' },
     title: 'QR Menü',
     tagline: 'Kağıt menü masrafına elveda.',
     hasDeepDive: true,
@@ -29,42 +49,49 @@ export const MODULES: ModuleMeta[] = [
   },
   {
     slug: 'pos-odeme',
+    pricing: { kind: 'free' },
     title: 'POS & Ödeme',
     tagline: 'Saniyeler içinde satış, hesap ve ödeme.',
     hasDeepDive: true,
   },
   {
     slug: 'masa-siparis',
+    pricing: { kind: 'free' },
     title: 'Masa & Sipariş',
     tagline: 'Kat planında canlı masa yönetimi.',
     hasDeepDive: true,
   },
   {
     slug: 'rezervasyon',
+    pricing: { kind: 'paid', priceLabel: '₺990/yıl' },
     title: 'Rezervasyon',
     tagline: 'Boş masa kalmasın, çifte rezervasyon olmasın.',
     hasDeepDive: true,
   },
   {
     slug: 'garson-cagri',
+    pricing: { kind: 'free' },
     title: 'Garson Çağrı & Self-Pay',
     tagline: 'Masadan çağır, masadan öde.',
     hasDeepDive: true,
   },
   {
     slug: 'mutfak-ekrani-kds',
+    pricing: { kind: 'free' },
     title: 'Mutfak Ekranı (KDS)',
     tagline: 'Mutfakta sipariş kaosuna son.',
     hasDeepDive: true,
   },
   {
     slug: 'stok-envanter',
+    pricing: { kind: 'paid', priceLabel: '₺3.900/yıl' },
     title: 'Stok & Envanter',
     tagline: 'Reçeteyle otomatik stok düşümü.',
     hasDeepDive: true,
   },
   {
     slug: 'raporlar',
+    pricing: { kind: 'paid', priceLabel: '₺1.290/yıl' },
     title: 'Raporlar & Analiz',
     tagline: 'Rakamları gör, kararı hızlı ver.',
     hasDeepDive: true,
@@ -81,48 +108,56 @@ export const MODULES: ModuleMeta[] = [
   // flag — never earlier to fill a gap on the index page.
   {
     slug: 'personel',
+    pricing: { kind: 'paid', priceLabel: '₺990/yıl' },
     title: 'Personel Yönetimi',
     tagline: 'Vardiya, mesai ve performans tek yerde.',
     hasDeepDive: true,
   },
   {
     slug: 'musteri-sadakat',
+    pricing: { kind: 'free' },
     title: 'Müşteri & Sadakat',
     tagline: 'Gelen müşteri geri gelsin.',
     hasDeepDive: true,
   },
   {
     slug: 'coklu-sube',
+    pricing: { kind: 'free' },
     title: 'Çoklu Şube',
     tagline: 'Tüm şubeler, tek hesap.',
     hasDeepDive: true,
   },
   {
     slug: 'entegrasyonlar',
+    pricing: { kind: 'paid', priceLabel: '₺2.499/yıl' },
     title: 'Entegrasyonlar',
     tagline: 'Tüm sipariş kanalları tek panelde.',
     hasDeepDive: true,
   },
   {
     slug: 'e-fatura',
+    pricing: { kind: 'paid', priceLabel: 'sağlayıcı hesabınıza bağlıdır' },
     title: 'e-Fatura & e-Dönüşüm',
     tagline: 'Ödemeden faturaya kesintisiz.',
     hasDeepDive: true,
   },
   {
     slug: 'donanim',
+    pricing: { kind: 'paid', priceLabel: 'donanıma göre' },
     title: 'Donanım & Cihaz Ağı',
     tagline: 'Yazıcı, tablet ve cihazlar tek ağda.',
     hasDeepDive: true,
   },
   {
     slug: 'marketplace',
+    pricing: { kind: 'paid', priceLabel: 'kaleme göre' },
     title: 'Marketplace & Eklentiler',
     tagline: 'İhtiyacın kadar özellik, tek tıkla.',
     hasDeepDive: true,
   },
   {
     slug: 'guvenlik',
+    pricing: { kind: 'free' },
     title: 'Güvenlik & Uyum',
     tagline: 'Verileriniz şifreli, süreçleriniz KVKK uyumlu.',
     hasDeepDive: true,

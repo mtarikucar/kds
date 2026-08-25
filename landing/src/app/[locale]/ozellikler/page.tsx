@@ -98,6 +98,17 @@ export default async function ModulesIndexPage({ params }: Props) {
                     <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">
                       {m.tagline}
                     </p>
+                    <span
+                      className={`mt-3 inline-block rounded-md border px-2 py-0.5 text-xs ${
+                        m.pricing.kind === 'free'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-slate-200 bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      {m.pricing.kind === 'free'
+                        ? 'Ücretsiz'
+                        : `Yıllık modül · ${m.pricing.priceLabel}`}
+                    </span>
                   </Link>
                 </li>
               ) : (
@@ -109,6 +120,11 @@ export default async function ModulesIndexPage({ params }: Props) {
                   <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">
                     {m.tagline}
                   </p>
+                  <span className="mt-3 inline-block rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-500">
+                    {m.pricing.kind === 'free'
+                      ? 'Ücretsiz'
+                      : `Yıllık modül · ${m.pricing.priceLabel}`}
+                  </span>
                 </li>
               ),
             )}

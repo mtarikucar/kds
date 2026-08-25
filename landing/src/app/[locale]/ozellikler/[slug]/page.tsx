@@ -124,6 +124,29 @@ export default async function ModulePage({ params }: Props) {
           </h1>
           <p className="mt-4 text-lg text-slate-600 leading-relaxed">{copy.hero.subtitle}</p>
 
+          {/* Free core or paid add-on, stated before the sales copy rather than
+              left to be discovered at checkout. Several of these pages read as
+              though the module were included; the reports one is the sharpest
+              case, since every /reports/* route is @RequiresFeature-gated. */}
+          <p className="mt-5 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
+            {meta.pricing.kind === 'free' ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-slate-700">
+                  <strong className="text-slate-900">Ücretsiz çekirdeğe dahil.</strong>{' '}
+                  Lisans gerekmez, kullanım sınırı yoktur.
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-700">
+                <strong className="text-slate-900">Yıllık modül — {meta.pricing.priceLabel}.</strong>{' '}
+                Ücretli modülleri kullanabilmek için yıllık Bakım, Destek ve
+                Güncelleme lisansı da gerekir. Çekirdek sistem bu modül olmadan
+                da tam çalışır.
+              </span>
+            )}
+          </p>
+
           <p className="mt-8 text-slate-600 leading-relaxed">{copy.intro}</p>
 
           {copy.blocks.map((block) => (
