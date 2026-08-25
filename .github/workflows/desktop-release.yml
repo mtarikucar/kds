@@ -760,10 +760,19 @@ jobs:
     name: Verify Release
     needs: [prepare, get-asset-urls, sync-backend]
     runs-on: ubuntu-latest
+    env:
+      SERVER_HOST: '38.242.233.166'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
 
       - name: Verify GitHub release
         run: |
@@ -805,34 +814,69 @@ jobs:
           fi
 
       - name: Verify auto-update is actually offered
+        env:
+          VERSION: ${{ needs.prepare.outputs.version_number }}
         run: |
-          # The end-to-end assertion this workflow never made. Every release since
-          # the Tauri v2 upgrade published installers with no signature and stayed
-          # green, because each job only warned when it failed to find one. Ask the
-          # endpoint the desktop client itself calls, from a version old enough that
-          # an update must be offered, and require a non-empty signature: a manifest
-          # without one is a manifest the client refuses to install.
-          ENDPOINT="https://hummytummy.com/api/desktop/updates/windows-x86_64/0.0.1"
-          BODY=""
+          set -euo pipefail
 
-          for attempt in 1 2 3 4 5 6; do
-            BODY=$(curl -s --max-time 20 "$ENDPOINT" || true)
-            SIG=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].signature // empty' 2>/dev/null || true)
-            URL=$(printf '%s' "$BODY" | jq -r '.platforms["windows-x86_64"].url // empty' 2>/dev/null || true)
+          # The end-to-end assertion this workflow never made. Every job here only
+          # warned when it failed to find a signature, so every release since the
+          # Tauri v2 upgrade shipped an unusable updater and still reported success.
+          #
+          # Queried over SSH against the production loopback for the same reason
+          # the sync job is: Cloudflare answers this endpoint with an HTML
+          # interstitial when the caller is a GitHub runner, so a public curl from
+          # here measures the WAF rather than the release. The trade-off is
+          # explicit — this proves the backend serves a signed, correctly-versioned
+          # manifest, not that the public hostname is reachable. "Verify backend
+          # API" above covers reachability.
+          #
+          # jq runs on the runner, not the server: the sync job already avoids
+          # assuming jq exists on the box (it parses ids with grep), so the remote
+          # side only fetches and the parsing happens here.
+          FAILED=0
 
-            if [ -n "$SIG" ] && [ -n "$URL" ]; then
-              echo "Update offered: $URL"
-              echo "Signature present (${#SIG} chars)"
-              exit 0
+          for target in windows-x86_64 linux-x86_64; do
+            BODY=$(ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+              root@"${SERVER_HOST}" bash -s -- "$target" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          TARGET="$1"
+
+          # Blue/green aware port resolution — same state file and default as the
+          # sync job. Do not hardcode 3000: the active backend may be on green.
+          active=blue
+          if [ -f /var/lib/kds-deploy/active-color-prod ]; then
+            active="$(. /var/lib/kds-deploy/active-color-prod 2>/dev/null; echo "${ACTIVE_COLOR:-blue}")"
+          fi
+          if [ "$active" = green ]; then port=3010; else port=3000; fi
+
+          # Diagnostics to stderr so stdout carries the response body alone.
+          echo "Resolved active color: ${active} (port ${port})" >&2
+
+          curl -s --max-time 20 "http://localhost:${port}/api/desktop/updates/${TARGET}/0.0.1"
+          REMOTE_SCRIPT
+            ) || true
+
+            SIG=$(printf '%s' "$BODY" | jq -r --arg t "$target" '.platforms[$t].signature // empty' 2>/dev/null || true)
+            URL=$(printf '%s' "$BODY" | jq -r --arg t "$target" '.platforms[$t].url // empty' 2>/dev/null || true)
+            OFFERED=$(printf '%s' "$BODY" | jq -r '.version // empty' 2>/dev/null || true)
+
+            if [ -z "$SIG" ] || [ -z "$URL" ]; then
+              echo "::error title=Auto-update not offered::$target has no signed update in the manifest, so installed clients cannot update. Body: $(printf '%s' "$BODY" | head -c 400)"
+              FAILED=1
+              continue
             fi
 
-            echo "Attempt $attempt: no signed update offered yet, retrying in 20s"
-            sleep 20
+            if [ "$OFFERED" != "$VERSION" ]; then
+              echo "::error title=Wrong version offered::$target manifest offers '$OFFERED', expected '$VERSION'."
+              FAILED=1
+              continue
+            fi
+
+            echo "$target: offers $OFFERED -> $URL (signature ${#SIG} chars)"
           done
 
-          echo "::error title=Auto-update not offered::$ENDPOINT served no signed windows-x86_64 update, so installed clients cannot update."
-          echo "Last response: $BODY"
-          exit 1
+          exit "$FAILED"
 
       - name: Test download URLs
         continue-on-error: true  # Don't fail workflow if URLs aren't immediately accessible
