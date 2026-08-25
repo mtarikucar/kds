@@ -56,7 +56,7 @@
       },
       "global": {
         "title": "Her Yerde Çalışır",
-        "description": "Arayüz beş dilde. Bulut tabanlı — kurulum yok, 81 ilde aynı gün."
+        "description": "Arayüz beş dilde. Bulut tabanlı — kurulum yok, Türkiye ve Özbekistan’da aynı gün."
       }
     },
     "panels": {
@@ -215,7 +215,7 @@
         "title": "Beş dilde arayüz",
         "metric": "5",
         "metricLabel": "dil: TR, EN, RU, UZ, AR",
-        "description": "Panel ve mutfak ekranı Türkçe, İngilizce, Rusça, Özbekçe ve Arapça çalışır — karma ekipler herkes kendi dilinde kullanır."
+        "description": "Panel ve mutfak ekranı Türkçe, İngilizce, Rusça, Özbekçe ve Arapça çalışır — karma ekipler herkes kendi dilinde kullanır. Türkiye’de TL ve KDV, Özbekistan’da so‘m ve QQS ile açılır."
       }
     }
   },
@@ -632,9 +632,9 @@
       "body2": "Biz gelirimizi isteğe bağlı modüllerden kazanırız: paket servis platform entegrasyonları, yapay zekâ araçları ve donanım gibi. QR menünüz için hiçbir zaman ücret ödemezsiniz."
     },
     "coverage": {
-      "title": "Türkiye'nin her yerinde",
-      "body": "HummyTummy bulut tabanlıdır: kurulum gerektirmez, 81 ilin tamamında aynı gün kullanmaya başlarsınız. Restoran, kafe, pastane, bar, otel, kantin ve plaj işletmeleri — her ölçekte işletme için.",
-      "cities": "İstanbul, Ankara, İzmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Eskişehir, Samsun, Trabzon, Diyarbakır, Muğla, Aydın…"
+      "title": "Türkiye ve Özbekistan’da",
+      "body": "HummyTummy bulut tabanlıdır: kurulum gerektirmez, Türkiye’nin 81 ilinde ve Özbekistan’da aynı gün kullanmaya başlarsınız. Özbekistan’da sistem so‘m ve QQS ile, Özbekçe arayüzle ve Kiril fiş baskısıyla çalışır. Restoran, kafe, pastane, bar, otel, kantin ve plaj işletmeleri — her ölçekte işletme için.",
+      "cities": "İstanbul, Ankara, İzmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Trabzon, Diyarbakır, Muğla — ve Taşkent, Semerkant, Buhara, Andican, Nemengan…"
     },
     "faq": {
       "title": "QR menü hakkında sık sorulan sorular",
@@ -672,8 +672,8 @@
           "a": "Evet. Panelden ürünün üzerine sürükleyip bırakarak fotoğraf yükleyebilirsiniz; görsel menüde ürünün yanında görünür. Fotoğraf sayısında ücret farkı yoktur."
         },
         {
-          "q": "Hangi şehirlerde kullanabilirim?",
-          "a": "Türkiye'nin 81 ilinin tamamında — İstanbul'dan Hakkâri'ye — aynı gün başlayabilirsiniz. Sistem bulut tabanlıdır; internet bağlantısı olan her işletmede çalışır."
+          "q": "Hangi ülkelerde ve şehirlerde kullanabilirim?",
+          "a": "HummyTummy şu anda Türkiye ve Özbekistan’da aktiftir. Türkiye’nin 81 ilinin tamamında — İstanbul’dan Hakkâri’ye — aynı gün başlayabilirsiniz. Özbekistan’da hesabınız so‘m para birimi, QQS vergi oranları ve Özbekçe arayüzle açılır; fişler Kiril alfabesiyle basılır. Sistem bulut tabanlıdır; internet bağlantısı olan her işletmede çalışır."
         }
       ]
     },

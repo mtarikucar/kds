@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { locales } from '@/i18n/config';
+import { locales, defaultLocale } from '@/i18n/config';
 
 // v2.8.98 — pull catalog SKUs at build/revalidate time so /store/[sku]
 // pages land in the sitemap. The store/[sku] page already revalidates
@@ -62,18 +62,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const entries: MetadataRoute.Sitemap = [];
   const now = new Date();
+
+  // Per-URL hreflang includes x-default pointing at the Turkish page. This is
+  // a Türkiye-first product and a crawler sends no Accept-Language, so the
+  // unlocalised entry point has to resolve to the market the site is written
+  // for. The same map is emitted in the HTML head by src/lib/seo.ts; the two
+  // must agree or a crawler sees the sitemap and the page disagreeing.
+  const languagesFor = (path: string) => ({
+    ...Object.fromEntries(locales.map((l) => [l, `${baseUrl}/${l}${path}`])),
+    'x-default': `${baseUrl}/${defaultLocale}${path}`,
+  });
+
   for (const route of routes) {
     for (const locale of locales) {
       entries.push({
         url: `${baseUrl}/${locale}${route.path}`,
         lastModified: now,
         changeFrequency: route.changeFrequency,
-        priority: route.priority,
-        alternates: {
-          languages: Object.fromEntries(
-            locales.map((l) => [l, `${baseUrl}/${l}${route.path}`])
-          ),
-        },
+        // The Turkish page of each route outranks its siblings: Türkiye is the
+        // primary market, so /tr is the URL we want crawled first and served
+        // as the canonical representative of the route.
+        priority: locale === defaultLocale ? route.priority : Math.max(0.1, route.priority - 0.1),
+        alternates: { languages: languagesFor(route.path) },
       });
     }
   }
@@ -90,11 +100,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
         changeFrequency: 'weekly',
         priority: 0.6,
-        alternates: {
-          languages: Object.fromEntries(
-            locales.map((l) => [l, `${baseUrl}/${l}/store/${encodeURIComponent(sku)}`])
-          ),
-        },
+        alternates: { languages: languagesFor(`/store/${encodeURIComponent(sku)}`) },
       });
     }
   }

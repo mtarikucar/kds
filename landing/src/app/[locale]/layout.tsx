@@ -97,12 +97,20 @@ export default async function LocaleLayout({ children, params }: Props) {
       addressRegion: 'Ankara',
       addressCountry: 'TR',
     },
+    // areaServed names both countries the platform actually serves; the
+    // supported set is SUPPORTED_COUNTRY_CODES = ['TR', 'UZ'] and each has a
+    // real profile in backend country-profile.const.ts (currency, tax rates,
+    // locale, timezone, receipt codepage).
+    areaServed: [
+      { '@type': 'Country', name: 'Türkiye' },
+      { '@type': 'Country', name: 'Uzbekistan' },
+    ],
     contactPoint: [
       {
         '@type': 'ContactPoint',
         telephone: '+90-850-840-73-03',
         contactType: 'customer support',
-        areaServed: 'TR',
+        areaServed: ['TR', 'UZ'],
         availableLanguage: ['Turkish', 'English', 'Russian', 'Uzbek', 'Arabic'],
       },
     ],

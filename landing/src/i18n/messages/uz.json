@@ -56,7 +56,7 @@
       },
       "global": {
         "title": "Hamma joyda ishlaydi",
-        "description": "Interfeys besh tilda. Bulutli — o‘rnatishsiz, o‘sha kuni ishga tushadi."
+        "description": "Interfeys besh tilda. Bulutli — o‘rnatishsiz, Turkiya va O‘zbekistonda o‘sha kuni ishga tushadi."
       }
     },
     "panels": {
@@ -215,7 +215,7 @@
         "title": "Besh tilda interfeys",
         "metric": "5",
         "metricLabel": "til: TR, EN, RU, UZ, AR",
-        "description": "Panel va oshxona ekrani turk, ingliz, rus, o‘zbek va arab tillarida ishlaydi — aralash jamoalar har biri o‘z tilida ishlaydi."
+        "description": "Panel va oshxona ekrani turk, ingliz, rus, o‘zbek va arab tillarida ishlaydi — aralash jamoalar har biri o‘z tilida ishlaydi. Hisoblar Turkiyada TL va KDV bilan, O‘zbekistonda so‘m va QQS bilan ochiladi."
       }
     }
   },
@@ -632,9 +632,9 @@
       "body2": "Biz ixtiyoriy modullardan daromad qilamiz: yetkazib berish platformalari integratsiyalari, sun'iy intellekt vositalari va uskunalar. QR menyu uchun hech qachon to'lamaysiz."
     },
     "coverage": {
-      "title": "Turkiyaning har yerida",
-      "body": "HummyTummy bulutli tizim: o'rnatish shart emas, barcha 81 viloyatda o'sha kuniyoq boshlaysiz. Restoran, kafe, qandolatxona, bar, mehmonxona, oshxona va plyaj klublari — har qanday hajmdagi muassasa uchun.",
-      "cities": "Istanbul, Anqara, Izmir, Bursa, Antaliya, Adana, Konya, G'aziantep, Mersin, Kayseri, Eskishehir, Samsun, Trabzon, Diyarbakir, Mug'la, Aydin…"
+      "title": "Turkiya va O‘zbekistonda",
+      "body": "HummyTummy bulutda ishlaydi: o‘rnatish talab qilinmaydi, Turkiyaning 81 viloyatida va O‘zbekistonda o‘sha kuni boshlashingiz mumkin. O‘zbekistonda tizim so‘m va QQS bilan, o‘zbekcha interfeys va kirill chek chop etish bilan ishlaydi. Restoran, kafe, qandolatxona, bar, mehmonxona, oshxona va plyaj muassasalari — har qanday o‘lchamdagi biznes uchun.",
+      "cities": "Istanbul, Anqara, Izmir, Bursa, Antalya, Adana, Ko‘nya, G‘aziantep, Mersin, Kayseri, Trabzon, Diyarbakir, Mug‘la — va Toshkent, Samarqand, Buxoro, Andijon, Namangan…"
     },
     "faq": {
       "title": "QR menyu haqida ko'p so'raladigan savollar",
@@ -672,8 +672,8 @@
           "a": "Ha. Panelda mahsulot ustiga rasmni sudrab tashlang — u menyuda mahsulot yonida ko‘rinadi. Rasmlar soni narxga ta’sir qilmaydi."
         },
         {
-          "q": "Qayerda ishlata olaman?",
-          "a": "Turkiyaning barcha 81 viloyatida — tizim bulutli bo'lib, interneti bor har qanday muassasada ishlaydi."
+          "q": "Qaysi mamlakat va shaharlarda foydalana olaman?",
+          "a": "HummyTummy hozirda Turkiya va O‘zbekistonda faol. Turkiyada 81 viloyatning barchasida o‘sha kuni boshlashingiz mumkin. O‘zbekistonda hisobingiz so‘m valyutasi, QQS soliq stavkalari va o‘zbekcha interfeys bilan ochiladi; cheklar kirill alifbosida chop etiladi. Tizim bulutli bo‘lib, internet ulanishi bo‘lgan har qanday muassasada ishlaydi."
         }
       ]
     },

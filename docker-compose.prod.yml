@@ -86,6 +86,14 @@ services:
       # local. Pin TZ here so the cron's wall-clock matches its intent
       # and our SLA "we charge at 02:00 TR time" stays honest.
       TZ: ${TZ:-Europe/Istanbul}
+      # Which countries THIS deployment serves — read at boot, before Prisma
+      # connects, by env-validation (which providers need credentials) and by
+      # SmsService (whether "no SMS provider anywhere" is a misconfiguration or
+      # simply a country that has none). Defaults to "TR" in code; we also
+      # serve Uzbekistan, whose profile deliberately names no payment or SMS
+      # provider, so naming it here keeps the declared truth and the deployed
+      # truth in step.
+      DEPLOYMENT_COUNTRIES: ${DEPLOYMENT_COUNTRIES:-TR,UZ}
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
@@ -193,6 +201,12 @@ services:
       # request (not at build), so they read the container env. Must match
       # the vhost that actually serves this container — see Dockerfile note.
       NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_LANDING_BASE_URL:-https://landing.hummytummy.com}
+      # Google Search Console verification token. layout.tsx already reads it
+      # (`verification.google`) but nothing ever set it, so there was no
+      # verified property for the host serving every marketing page — meaning
+      # the sitemap has never been submitted and no query data is collected.
+      # Set GOOGLE_SITE_VERIFICATION in the prod .env after adding the property.
+      GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
       # Server-side catalog fetch goes over the shared docker network. Reaching
       # the public host from inside the container means leaving the box,
       # crossing Cloudflare and hairpinning back — which can fail while the

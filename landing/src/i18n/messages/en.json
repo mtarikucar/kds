@@ -56,7 +56,7 @@
       },
       "global": {
         "title": "Works Anywhere",
-        "description": "Interface in five languages. Cloud-based — no install, live the same day."
+        "description": "Interface in five languages. Cloud-based — no install, live the same day in Türkiye and Uzbekistan."
       }
     },
     "panels": {
@@ -215,7 +215,7 @@
         "title": "Interface in five languages",
         "metric": "5",
         "metricLabel": "languages: TR, EN, RU, UZ, AR",
-        "description": "The panel and kitchen display run in Turkish, English, Russian, Uzbek and Arabic — mixed teams each work in their own language."
+        "description": "The panel and kitchen display run in Turkish, English, Russian, Uzbek and Arabic — mixed teams each work in their own language. Accounts open in TRY with KDV in Türkiye and in so‘m with QQS in Uzbekistan."
       }
     }
   },
@@ -632,9 +632,9 @@
       "body2": "We earn from optional modules instead: delivery platform integrations, AI tools and hardware. You will never pay for your QR menu."
     },
     "coverage": {
-      "title": "Everywhere in Türkiye",
-      "body": "HummyTummy is cloud-based: no installation, and you can start the same day in all 81 provinces. Restaurants, cafés, patisseries, bars, hotels, canteens and beach clubs — businesses of every size.",
-      "cities": "Istanbul, Ankara, Izmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Eskişehir, Samsun, Trabzon, Diyarbakır, Muğla, Aydın…"
+      "title": "In Türkiye and Uzbekistan",
+      "body": "HummyTummy is cloud-based: no installation, and you can start the same day in all 81 provinces of Türkiye and in Uzbekistan. In Uzbekistan it runs in so‘m with QQS, an Uzbek interface and Cyrillic receipt printing. Restaurants, cafés, patisseries, bars, hotels, canteens and beach clubs — businesses of every size.",
+      "cities": "İstanbul, Ankara, İzmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Trabzon, Diyarbakır, Muğla — and Tashkent, Samarkand, Bukhara, Andijan, Namangan…"
     },
     "faq": {
       "title": "Frequently asked questions about QR menus",
@@ -672,8 +672,8 @@
           "a": "Yes. Drag and drop a photo onto the item in the panel and it appears next to the item on the menu. The number of photos does not change the price."
         },
         {
-          "q": "Where can I use it?",
-          "a": "In all 81 provinces of Türkiye — the system is cloud-based and works in any business with an internet connection."
+          "q": "Which countries and cities can I use it in?",
+          "a": "HummyTummy is currently active in Türkiye and Uzbekistan. In Türkiye you can start the same day in all 81 provinces. In Uzbekistan your account opens in so‘m with QQS tax rates and an Uzbek interface, and receipts print in Cyrillic. The system is cloud-based and works in any business with an internet connection."
         }
       ]
     },
