@@ -180,21 +180,16 @@ export const MODULES: Module[] = [
       "Gerçek zamanlı panel",
     ],
   },
-  {
-    slug: "analitik",
-    anchor: "analitik",
-    title: "Analitik & Isı Haritası",
-    tagline: "Salonun nabzını ısı haritasında gör.",
-    icon: Activity,
-    imageKey: "analytics",
-    category: "Yönetim & Analiz",
-    bullets: [
-      "Masa doluluk ısı haritası (saat / gün)",
-      "Masa bazlı analiz",
-      "Kural-tabanlı otomatik içgörüler",
-      "Gerçek zamanlı panel",
-    ],
-  },
+  // `analitik` ("Analitik & Isı Haritası") is deliberately absent.
+  //
+  // Its copy is entirely about a table-occupancy heat map fed by edge camera
+  // devices, and that suite ships inert: CAMERA_ANALYTICS_ENABLED is set in no
+  // environment file and camera-analytics.gate.ts makes its endpoints answer
+  // 404. Leaving the entry here kept the claim on the apex homepage, where
+  // BentoShowcase and MarketingFooter render every module's tagline.
+  //
+  // The deep-dive copy remains in moduleContent.generated.ts. Restore this
+  // entry in the same change that enables the flag, never earlier.
   {
     slug: "personel",
     anchor: "personel",

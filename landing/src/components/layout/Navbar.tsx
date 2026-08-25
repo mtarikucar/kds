@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Menu, X, Phone } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import LanguageSwitcher from './LanguageSwitcher';
 
 export default function Navbar() {
@@ -16,7 +16,6 @@ export default function Navbar() {
   // Reuse the already-translated footer privacy label (all 5 locales) so the
   // homepage carries a prominent, top-level link to the privacy policy — a
   // Google OAuth "homepage requirements" item, in addition to the footer link.
-  const tf = useTranslations('footer');
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -27,14 +26,25 @@ export default function Navbar() {
   // `kind` controls renderer: anchor links use plain <a> (in-page hash jump),
   // page links use the locale-aware <Link> so we keep the /en/, /tr/ prefix
   // across navigation without an extra middleware redirect.
+  const locale = useLocale();
+
   const navLinks: ReadonlyArray<{ href: string; label: string; kind: 'anchor' | 'page' }> = [
     { href: '#product', label: t('product'), kind: 'anchor' },
     { href: '#features', label: t('features'), kind: 'anchor' },
     { href: '#pricing', label: t('pricing'), kind: 'anchor' },
     { href: '#security', label: t('security'), kind: 'anchor' },
     { href: '/qr-menu', label: t('qrMenu'), kind: 'page' },
+    // The ported module and sector pages are the largest body of content on the
+    // site and were reachable only from the footer and the sitemap — the same
+    // "invisible for want of a link" problem the port existed to solve. Turkish
+    // only, because that is the only locale they exist in.
+    ...(locale === 'tr'
+      ? ([
+          { href: '/ozellikler', label: t('modules'), kind: 'page' },
+          { href: '/cozumler', label: t('sectors'), kind: 'page' },
+        ] as const)
+      : []),
     { href: '/store', label: t('store'), kind: 'page' },
-    { href: '/privacy', label: tf('links.privacy'), kind: 'page' },
   ];
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;

@@ -39,34 +39,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: meta.description,
     keywords: meta.keywords,
     metadataBase: new URL(baseUrl),
-    alternates: {
-      canonical: `/${locale}`,
-      languages: Object.fromEntries(
-        locales.map((l) => [localeConfig[l].hreflang, `/${l}`])
-      ),
-    },
-    openGraph: {
-      type: 'website',
-      locale: localeConfig[locale as Locale]?.hreflang || 'en',
-      url: baseUrl,
-      siteName: 'HummyTummy',
-      title: meta.title,
-      description: meta.description,
-      images: [
-        {
-          url: '/og-image.jpg',
-          width: 1200,
-          height: 630,
-          alt: 'HummyTummy - Restaurant Management System',
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: meta.title,
-      description: meta.description,
-      images: ['/og-image.jpg'],
-    },
+    // No `alternates` and no `openGraph` here on purpose. Next merges metadata
+    // by shallow override, so anything declared at this level is inherited by
+    // every page that does not restate it — which is how 95 of 110 sitemap
+    // URLs ended up canonicalising to the locale homepage. Pages build their
+    // own via buildPageMetadata(); the layout only carries what is genuinely
+    // site-wide.
     robots: {
       index: true,
       follow: true,
@@ -119,12 +97,20 @@ export default async function LocaleLayout({ children, params }: Props) {
       addressRegion: 'Ankara',
       addressCountry: 'TR',
     },
+    // areaServed names both countries the platform actually serves; the
+    // supported set is SUPPORTED_COUNTRY_CODES = ['TR', 'UZ'] and each has a
+    // real profile in backend country-profile.const.ts (currency, tax rates,
+    // locale, timezone, receipt codepage).
+    areaServed: [
+      { '@type': 'Country', name: 'Türkiye' },
+      { '@type': 'Country', name: 'Uzbekistan' },
+    ],
     contactPoint: [
       {
         '@type': 'ContactPoint',
         telephone: '+90-850-840-73-03',
         contactType: 'customer support',
-        areaServed: 'TR',
+        areaServed: ['TR', 'UZ'],
         availableLanguage: ['Turkish', 'English', 'Russian', 'Uzbek', 'Arabic'],
       },
     ],

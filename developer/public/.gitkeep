@@ -1,0 +1,9 @@
+Keeps public/ in git.
+
+Next's standalone server serves this directory from the working directory, and
+the Dockerfile copies it unconditionally. It held exactly one tracked file —
+robots.txt — which was deleted when /robots.txt became a runtime route, and a
+directory with no tracked files does not exist in a fresh checkout. The image
+build then fails on `COPY --from=builder /app/public ./public`, which breaks the
+whole release: both docs images are steps of the single build job that the
+deploy job depends on.

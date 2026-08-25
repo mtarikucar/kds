@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
 import { appHref } from '@/lib/urls';
-import { locales, localeConfig } from '@/i18n/config';
 import {
   Inbox,
   ChefHat,
@@ -31,21 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
   const meta = messages.cloudKitchenPage.meta;
 
-  return {
-    title: meta.title,
-    description: meta.description,
-    keywords: meta.keywords,
-    alternates: {
-      canonical: `/${locale}/bulut-mutfak`,
-      languages: Object.fromEntries(
-        locales.map((l) => [localeConfig[l].hreflang, `/${l}/bulut-mutfak`])
-      ),
-    },
-    openGraph: {
-      title: meta.title,
-      description: meta.description,
-    },
-  };
+  return buildPageMetadata({ locale, path: '/bulut-mutfak', meta });
 }
 
 const FEATURE_ICONS = [Inbox, ChefHat, Store, PhoneCall, BarChart3, ReceiptText];

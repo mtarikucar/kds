@@ -1,0 +1,23 @@
+# hummytummy.com — the apex serves the application shell.
+#
+# Marketing content lives on landing.hummytummy.com, the help centre on
+# help.hummytummy.com and the API docs on developer.hummytummy.com; each
+# publishes its own sitemap. This host previously answered 404 here, so no
+# crawler was ever told where any of that is.
+#
+# /app/** is the signed-in application: nothing there is public, all of it
+# requires auth, and it renders client-side — crawling it yields nothing but
+# the same empty shell for every URL.
+
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://hummytummy.com/sitemap.xml
+Sitemap: https://landing.hummytummy.com/sitemap.xml
+Sitemap: https://help.hummytummy.com/sitemap.xml
+Sitemap: https://developer.hummytummy.com/sitemap.xml

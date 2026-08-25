@@ -4,12 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "fetch-stats": "node scripts/fetch-stats.js",
     "i18n-check": "node scripts/i18n-check.mjs",
-    "prebuild": "node scripts/fetch-stats.js && node scripts/i18n-check.mjs",
+    "prebuild": "node scripts/i18n-check.mjs && node scripts/claims-check.mjs && node scripts/pricing-freshness.mjs --warn",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "claims-check": "node scripts/claims-check.mjs",
+    "canonical-check": "node scripts/canonical-check.mjs",
+    "pricing-freshness": "node scripts/pricing-freshness.mjs",
+    "indexnow": "node scripts/indexnow-submit.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.37.0",

@@ -65,24 +65,23 @@ export default function TrustSecurity() {
                   {t('visual.subtitle')}
                 </p>
 
-                {/* Trust indicators */}
+                {/* Trust indicators.
+                    These were hardcoded English literals — 99.9% Uptime,
+                    24/7 Monitoring, 256-bit Encryption — sitting outside the
+                    message catalogs, which is how they survived the claim
+                    removal that took the same "%99.9 SLA" wording out of all
+                    five locales: the gate only scanned the catalogs. There is
+                    no uptime measurement, no status page and no 24/7 rota, and
+                    AES-256 covers specific credential columns rather than
+                    everything. Each tile now states something enforced in code
+                    and is translated like the rest of the section. */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <div className="text-3xl font-bold text-slate-900">256-bit</div>
-                    <div className="text-sm text-slate-500">Encryption</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <div className="text-3xl font-bold text-slate-900">99.9%</div>
-                    <div className="text-sm text-slate-500">Uptime</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <div className="text-3xl font-bold text-slate-900">24/7</div>
-                    <div className="text-sm text-slate-500">Monitoring</div>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-4">
-                    <div className="text-3xl font-bold text-slate-900">GDPR</div>
-                    <div className="text-sm text-slate-500">Compliant</div>
-                  </div>
+                  {(t.raw('visual.tiles') as { value: string; label: string }[]).map((tile) => (
+                    <div key={tile.label} className="bg-slate-50 rounded-xl p-4">
+                      <div className="text-3xl font-bold text-slate-900">{tile.value}</div>
+                      <div className="text-sm text-slate-500">{tile.label}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

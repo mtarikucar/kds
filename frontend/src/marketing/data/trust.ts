@@ -19,7 +19,7 @@ export interface TrustItem {
 export const TRUST: TrustItem[] = [
   { icon: Languages, label: "5 dilde arayüz (RTL dahil)" },
   { icon: Cloud, label: "7/24 bulut erişim" },
-  { icon: Lock, label: "AES-256 şifreleme" },
+  { icon: Lock, label: "TLS + şifreli anahtar saklama" },
   { icon: ShieldCheck, label: "KVKK uyumlu" },
   { icon: Truck, label: "4 teslimat platformu" },
   { icon: Headphones, label: "Türkçe destek" },

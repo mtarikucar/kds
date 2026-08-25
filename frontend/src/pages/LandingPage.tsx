@@ -383,11 +383,10 @@ export default function LandingPage() {
         id="raporlar"
         eyebrow="Raporlar & Analiz"
         title="Rakamları gör, kararı hızlı ver"
-        desc="Ciro, ürün, personel ve saat bazlı raporlar; gün sonu Z-raporu ve masa doluluk ısı haritası tek panelde."
+        desc="Ciro, ürün, personel ve saat bazlı raporlar; gün sonu Z-raporu ve dışa aktarım tek panelde."
         bullets={[
           "Ciro, ürün, personel ve saat raporları",
           "Z-raporu ve gün sonu özeti",
-          "Masa doluluk ısı haritası",
           "Gerçek zamanlı panel ve dışa aktarım",
         ]}
         image="screenDashboard"

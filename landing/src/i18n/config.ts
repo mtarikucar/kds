@@ -1,7 +1,9 @@
 export const locales = ['en', 'tr', 'ru', 'uz', 'ar'] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = 'en';
+// Türkiye-first: a crawler sends no Accept-Language, so the unprefixed
+// entry point has to resolve to the market this site is written for.
+export const defaultLocale: Locale = 'tr';
 
 export const localeConfig: Record<
   Locale,

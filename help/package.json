@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev -p 3201",
     "build": "next build",
-    "start": "next start -p 3201"
+    "start": "next start -p 3201",
+    "gen-sitemap-routes": "node scripts/gen-sitemap-routes.mjs",
+    "prebuild": "node scripts/gen-sitemap-routes.mjs"
   },
   "dependencies": {
     "next": "^14.2.15",

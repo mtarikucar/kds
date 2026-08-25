@@ -23,6 +23,11 @@ ARG NEXT_PUBLIC_SITE_URL
 # SPA shell, and search engines see canonicals pointing at pages whose
 # content does not exist there.
 ARG NEXT_PUBLIC_BASE_URL
+# Search Console verification token. layout.tsx reads it in generateMetadata,
+# which runs at BUILD time for statically generated pages — a runtime-only env
+# entry never reaches the rendered <meta>. Rotating the token needs a rebuild.
+ARG GOOGLE_SITE_VERIFICATION
+
 # Sentry build args for source map upload
 ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
@@ -31,6 +36,7 @@ ARG SENTRY_PROJECT
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
+ENV GOOGLE_SITE_VERIFICATION=$GOOGLE_SITE_VERIFICATION
 ENV NEXT_TELEMETRY_DISABLED=1
 # Sentry environment variables for source map upload during build
 ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN

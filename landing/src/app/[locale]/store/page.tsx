@@ -1,4 +1,6 @@
-import { getTranslations } from 'next-intl/server';
+import type { Metadata } from 'next';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { buildPageMetadata } from '@/lib/seo';
 import { appHref } from '@/lib/urls';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
@@ -143,7 +145,20 @@ function durationHours(p: HardwareProduct): number | null {
   return typeof meta?.durationHours === 'number' ? meta.durationHours : null;
 }
 
-export default async function StorePage() {
+type Props = { params: Promise<{ locale: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
+  return buildPageMetadata({ locale, path: '/store', meta: messages.store.meta });
+}
+
+export default async function StorePage({ params }: Props) {
+  // Without setRequestLocale this page opts out of static rendering entirely,
+  // which made the `revalidate = 300` above dead code — every request rebuilt
+  // it server-side.
+  const { locale } = await params;
+  setRequestLocale(locale);
   const t = await getTranslations('store');
   const products = await fetchProducts();
 

@@ -28,6 +28,57 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
     <title>HummyTummy — Bulut Tabanlı Restoran Yönetim Sistemi</title>
+
+    <!--
+      Organization entity, declared on the apex.
+
+      It used to be declared only on landing.hummytummy.com, a subdomain
+      nothing linked to, while this host — the one people type, the one links
+      point at, the one llms.txt names as the brand URL — emitted no structured
+      data at all. sameAs ties the four hosts together so they read as one
+      organisation rather than four unrelated sites.
+
+      Deliberately NOT here: a <link rel="canonical">. Every SPA route is served
+      this same file, so a fixed canonical would make hundreds of URLs claim to
+      be the same page — the exact defect just removed from the marketing site.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "HummyTummy",
+        "url": "https://hummytummy.com",
+        "logo": "https://hummytummy.com/logo.png",
+        "email": "contact@hummytummy.com",
+        "telephone": "+90-850-840-73-03",
+        "description": "Bulut tabanlı restoran yönetim sistemi: POS/adisyon, mutfak ekranı (KDS), menü yönetimi, masa planı ve QR menü. Çekirdek ücretsiz ve sınırsız.",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32",
+          "addressLocality": "Etimesgut",
+          "addressRegion": "Ankara",
+          "addressCountry": "TR"
+        },
+        "areaServed": [
+          { "@type": "Country", "name": "Türkiye" },
+          { "@type": "Country", "name": "Uzbekistan" }
+        ],
+        "sameAs": [
+          "https://landing.hummytummy.com",
+          "https://help.hummytummy.com",
+          "https://developer.hummytummy.com"
+        ],
+        "contactPoint": [
+          {
+            "@type": "ContactPoint",
+            "telephone": "+90-850-840-73-03",
+            "contactType": "customer support",
+            "areaServed": ["TR", "UZ"],
+            "availableLanguage": ["Turkish", "English", "Russian", "Uzbek", "Arabic"]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <!-- Pre-render splash INSIDE #root. This is the literal HTML served for

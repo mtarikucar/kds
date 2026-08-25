@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "HummyTummy - Restaurant Management System",
+    "title": "Restaurant POS & Order Management — Free Core",
     "description": "Modern POS system for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
     "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management, qr code menu, digital menu, cloud kitchen, delivery software"
   },
@@ -14,7 +14,9 @@
     "signIn": "Sign in",
     "startFree": "Start free",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "modules": "Features",
+    "sectors": "Solutions"
   },
   "hero": {
     "badge": "Now serving {count} restaurants",
@@ -47,8 +49,8 @@
         "description": "Process orders in seconds, not minutes. Optimized for speed."
       },
       "secure": {
-        "title": "Secure & Reliable",
-        "description": "99.9% uptime with enterprise-grade security."
+        "title": "Controlled Access",
+        "description": "Role-based permissions, branch-scoped data and an encrypted connection."
       },
       "insights": {
         "title": "Actionable Insights",
@@ -56,7 +58,7 @@
       },
       "global": {
         "title": "Works Anywhere",
-        "description": "Multi-language, multi-currency support."
+        "description": "Interface in five languages. Cloud-based — no install, live the same day in Türkiye and Uzbekistan."
       }
     },
     "panels": {
@@ -67,14 +69,12 @@
       "preparing": "Preparing",
       "ready": "Ready",
       "new": "New",
-      "platformPerformance": "Platform Performance",
-      "allTime": "all time",
-      "total": "Total",
-      "revenue": "Revenue",
-      "processed": "Processed",
-      "orders": "Orders",
-      "active": "Active",
-      "restaurants": "Restaurants"
+      "included": "Included in the core",
+      "free": "Free",
+      "itemsTables": "Unlimited items, categories and tables",
+      "users": "Unlimited users and roles",
+      "noMonthly": "No setup or monthly fee",
+      "languages": "Interface in five languages"
     }
   },
   "features": {
@@ -86,8 +86,8 @@
       "description": "Create beautiful digital menus that customers can scan and browse instantly. Update prices and items in real-time without reprinting.",
       "bullets": [
         "Instant menu updates, zero printing costs",
-        "Multi-language support for international guests",
-        "Allergen and dietary information display"
+        "Guest interface opens in five languages",
+        "Works with no app install — the phone camera is enough"
       ],
       "metrics": {
         "printingCosts": "Printing costs",
@@ -100,13 +100,14 @@
       "description": "Get a real-time bird's eye view of your entire floor. Track table status, manage reservations, and optimize seating.",
       "bullets": [
         "Visual floor plan with live table status",
-        "Smart reservation management",
+        "Reservation management (annual module)",
         "Table merge and split functionality"
       ],
       "metrics": {
-        "orderProcessing": "Order processing",
-        "faster": "40% faster",
-        "tableTurnover": "Table turnover"
+        "orderProcessing": "Tables",
+        "faster": "Unlimited",
+        "tableTurnover": "Floor plan",
+        "dragDrop": "Drag & drop"
       }
     },
     "posPayments": {
@@ -115,11 +116,13 @@
       "bullets": [
         "Accept cards, cash, and mobile payments",
         "Easy bill splitting and item transfers",
-        "Automatic tip calculation and distribution"
+        "Tip capture and period tip reporting"
       ],
       "metrics": {
-        "paymentSuccess": "Payment success",
-        "checkoutTime": "Checkout time"
+        "paymentSuccess": "Bill splitting",
+        "checkoutTime": "Payment methods",
+        "paymentSuccessValue": "By item or amount",
+        "checkoutTimeValue": "Cash, card, mixed"
       }
     },
     "kitchenFlow": {
@@ -131,21 +134,23 @@
         "Role-based staff task management"
       ],
       "metrics": {
-        "orderErrors": "Order errors",
-        "avgPrepTime": "Avg prep time"
+        "orderErrors": "Kitchen display",
+        "avgPrepTime": "Paper tickets",
+        "orderErrorsValue": "Real time",
+        "avgPrepTimeValue": "Not needed"
       }
     },
     "multiBranch": {
       "title": "Multi-Branch Control",
-      "description": "Manage all your locations from a single dashboard. Standardize menus, monitor performance, and scale your business.",
+      "description": "Manage your locations from one panel. Standardise menus, compare performance. The first branch is free; each additional branch is added with an annual licence.",
       "bullets": [
         "Centralized menu and pricing control",
         "Cross-location analytics and reporting",
         "Branch-specific customization options"
       ],
       "metrics": {
-        "branches": "Branches",
-        "unlimited": "Unlimited",
+        "branches": "First branch",
+        "unlimited": "Free",
         "syncTime": "Sync time",
         "realTime": "Real-time"
       }
@@ -176,7 +181,7 @@
         "Team and roles",
         "Customers",
         "Device and branch hub",
-        "Custom branding and domain"
+        "Custom branding and subdomain"
       ]
     },
     "licence": {
@@ -192,27 +197,27 @@
     "prorationNote": "Anything bought mid-year is charged day-by-day up to your anniversary — one invoice, one renewal date."
   },
   "business": {
-    "badge": "Results That Matter",
-    "title": "Real impact on your bottom line",
-    "subtitle": "HummyTummy customers see measurable improvements from day one.",
+    "badge": "Why HummyTummy",
+    "title": "The core that runs a restaurant is free",
+    "subtitle": "No tiers, no per-user fees, no trial clock. Heavier modules are bought annually, only when you need them.",
     "values": {
       "time": {
-        "title": "Save Time",
-        "metric": "40%",
-        "metricLabel": "faster order processing",
-        "description": "Automate repetitive tasks and streamline your workflow. Spend less time on admin and more time with customers."
+        "title": "No setup or monthly fee",
+        "metric": "₺0",
+        "metricLabel": "for the core system",
+        "description": "POS, kitchen display, menu management, floor plan, QR menu and team management are free indefinitely. You start without a credit card."
       },
       "errors": {
-        "title": "Reduce Errors",
-        "metric": "85%",
-        "metricLabel": "fewer order mistakes",
-        "description": "Digital order flow eliminates miscommunication. Orders go directly from table to kitchen with zero confusion."
+        "title": "No count limits",
+        "metric": "Unlimited",
+        "metricLabel": "items, categories, tables and users",
+        "description": "How many items are on your menu, tables on your floor or people on your team does not change the price. There is no monthly order ceiling either."
       },
       "revenue": {
-        "title": "Increase Revenue",
-        "metric": "25%",
-        "metricLabel": "higher table turnover",
-        "description": "Faster service means more customers served. Real-time insights help you optimize for maximum profitability."
+        "title": "Interface in five languages",
+        "metric": "5",
+        "metricLabel": "languages: TR, EN, RU, UZ, AR",
+        "description": "The panel and kitchen display run in Turkish, English, Russian, Uzbek and Arabic — mixed teams each work in their own language. Accounts open in TRY with KDV in Türkiye and in so‘m with QQS in Uzbekistan."
       }
     }
   },
@@ -222,34 +227,52 @@
     "subtitle": "Your data is your business. We take security seriously so you can focus on what matters most—serving your customers.",
     "points": {
       "encryption": {
-        "title": "End-to-End Encryption",
-        "description": "All data is encrypted in transit and at rest using industry-standard AES-256 encryption."
+        "title": "Encrypted Connection & Key Storage",
+        "description": "All traffic is encrypted with TLS. Sensitive fields such as integration keys and provider passwords are additionally encrypted in the database with AES-256-GCM."
       },
       "rbac": {
         "title": "Role-Based Access Control",
         "description": "Fine-grained permissions let you control exactly what each team member can see and do."
       },
       "uptime": {
-        "title": "99.9% Uptime SLA",
-        "description": "Enterprise-grade infrastructure with redundancy across multiple data centers."
+        "title": "Branch-Scoped Data",
+        "description": "Every request is constrained server-side to the branches the user is authorised for; one branch’s data never leaks into another."
       },
       "compliance": {
         "title": "GDPR & KVKK Compliant",
-        "description": "Full compliance with European and Turkish data protection regulations."
+        "description": "We act on data-subject rights under KVKK and GDPR (access, rectification, erasure, objection); how we process data is set out in the Privacy Policy."
       }
     },
     "visual": {
       "title": "Your Data is Protected",
-      "subtitle": "Industry-leading security measures keep your business safe.",
+      "subtitle": "Authorisation, branch scoping and encryption are enforced server-side.",
       "encryption": "Encryption",
-      "uptime": "Uptime",
-      "monitoring": "Monitoring",
-      "compliant": "Compliant"
+      "uptime": "Branch scope",
+      "monitoring": "Role-based access",
+      "compliant": "Compliant",
+      "tiles": [
+        {
+          "value": "TLS",
+          "label": "Encrypted connection"
+        },
+        {
+          "value": "Roles",
+          "label": "Permission control"
+        },
+        {
+          "value": "Branch",
+          "label": "Scoped data"
+        },
+        {
+          "value": "KVKK",
+          "label": "Data-subject rights"
+        }
+      ]
     }
   },
   "cta": {
     "title": "Ready to transform your restaurant?",
-    "subtitle": "Join {count} restaurants already using HummyTummy to streamline operations and grow their business.",
+    "subtitle": "Sign up, add your menu, take your first order. No credit card required.",
     "primaryBtn": "Start free",
     "secondaryBtn": "Talk to sales",
     "trustBadge1": "No credit card required",
@@ -283,17 +306,15 @@
       "integrations": "Integrations",
       "qrMenu": "QR Menu",
       "cloudKitchen": "Cloud Kitchen",
-      "about": "About",
-      "blog": "Blog",
-      "careers": "Careers",
       "contact": "Contact",
       "helpCenter": "Help Center",
       "documentation": "Documentation",
       "apiReference": "API Reference",
-      "status": "Status",
       "privacy": "Privacy Policy",
       "terms": "Terms of Service",
-      "cookies": "Cookie Policy"
+      "eAdisyon": "Is e-Adisyon mandatory?",
+      "pricingIndex": "Restaurant software prices",
+      "karekodGuide": "QR code guide"
     },
     "copyright": "HummyTummy. All rights reserved."
   },
@@ -301,7 +322,7 @@
     "title": "Privacy Policy",
     "backToHome": "Back to Home",
     "lastUpdated": "Last Updated",
-    "lastUpdatedDate": "January 2025",
+    "lastUpdatedDate": "August 2026",
     "sections": {
       "introduction": {
         "title": "Introduction",
@@ -330,7 +351,7 @@
       },
       "dataSecurity": {
         "title": "Data Security",
-        "content": "We implement appropriate technical and organizational security measures to protect your personal data against unauthorized access, alteration, disclosure, or destruction. All data is encrypted in transit and at rest using industry-standard AES-256 encryption."
+        "content": "We apply appropriate technical and organisational measures to protect your personal data against unauthorised access, alteration, disclosure or destruction. All traffic between you and our servers is encrypted with TLS. Sensitive fields such as integration keys and provider passwords are additionally encrypted in the database with AES-256-GCM. Access is constrained server-side by role-based authorisation and branch scope."
       },
       "cookies": {
         "title": "Cookies and Tracking",
@@ -355,13 +376,17 @@
         "title": "Contact Us",
         "content": "If you have any questions about this Privacy Policy, please contact us:"
       }
+    },
+    "meta": {
+      "title": "Privacy Policy",
+      "description": "What personal data HummyTummy processes and why, how long it is kept, and what security measures apply. How to exercise your data-subject rights under KVKK and GDPR."
     }
   },
   "terms": {
     "title": "Terms of Service",
     "backToHome": "Back to Home",
     "lastUpdated": "Last Updated",
-    "lastUpdatedDate": "January 2025",
+    "lastUpdatedDate": "August 2026",
     "sections": {
       "acceptance": {
         "title": "Acceptance of Terms",
@@ -415,6 +440,10 @@
         "title": "Contact Us",
         "content": "If you have any questions about these Terms of Service, please contact us:"
       }
+    },
+    "meta": {
+      "title": "Terms of Service",
+      "description": "Terms for using HummyTummy: account responsibility, payment and annual licence terms, scope of service, and intellectual-property provisions."
     }
   },
   "store": {
@@ -482,6 +511,10 @@
         "includes": "What's included",
         "steps": "Process"
       }
+    },
+    "meta": {
+      "title": "Restaurant Hardware Store — Fiscal POS, Thermal Printers, KDS Screens",
+      "description": "Hardware for restaurants: GİB-listed new-generation fiscal POS registers, thermal receipt printers, kitchen display (KDS) monitors, barcode scanners and installation services. Prices published, VAT included."
     }
   },
   "contact": {
@@ -540,24 +573,28 @@
         "network": "Connection problem — please retry.",
         "generic": "Could not send the message. Please try again."
       }
+    },
+    "meta": {
+      "title": "Contact — Sales and Support",
+      "description": "HummyTummy sales and support contact details: phone +90 850 840 73 03, e-mail contact@hummytummy.com. Addresses for KVKK requests and legal documents."
     }
   },
   "qrMenuPage": {
     "meta": {
       "title": "Free QR Menu for Restaurants — Unlimited",
-      "description": "Create a free QR menu for your restaurant: unlimited items, instant price updates, multi-language menus, allergen labels and order-from-table. Ready in 5 minutes, no credit card required.",
+      "description": "Create a free QR menu for your restaurant: unlimited items and categories, instant price updates, a guest interface in five languages and order-from-table. Ready in 5 minutes, no credit card required.",
       "keywords": "qr menu, qr code menu, digital menu, free qr menu, restaurant qr menu, contactless menu, online menu, create qr menu"
     },
     "hero": {
       "badge": "Free & unlimited",
       "title": "Your QR menu,",
       "titleHighlight": "live in 5 minutes",
-      "subtitle": "Guests scan the code on the table and your menu opens instantly — no app download. Price changes go live in seconds and printing costs drop to zero. QR menus on HummyTummy are completely free: no item, category, table or branch limits.",
+      "subtitle": "Your guest scans the code on the table and your menu opens instantly — with no app to install. A price change is live in seconds and printing costs drop to zero. The QR menu on HummyTummy is entirely free: no item, category, table or user limits.",
       "ctaPrimary": "Create your free QR menu",
       "ctaSecondary": "Contact us",
       "trust1": "No credit card",
       "trust2": "No app download",
-      "trust3": "Unlimited items & tables"
+      "trust3": "Unlimited items and tables"
     },
     "how": {
       "title": "How to create a QR menu in 3 steps",
@@ -590,16 +627,16 @@
           "description": "Guests don't just browse — they can order right from the table, and orders land on the kitchen display and the register instantly."
         },
         {
-          "title": "Multi-language menus",
-          "description": "Your menu can be shown in Turkish, English, Russian, Arabic and Uzbek — international guests don't need to wait for a waiter."
+          "title": "Guest interface in five languages",
+          "description": "The menu interface opens in Turkish, English, Russian, Arabic and Uzbek; category and button text appears in the guest’s language. Item names stay in whatever language you type them."
         },
         {
-          "title": "Allergen & dietary info",
-          "description": "Add labels like gluten, lactose or vegan to items so guests can choose with confidence."
+          "title": "Item photos",
+          "description": "Add photos to your items so guests can see what they are ordering. Images upload by drag and drop from the panel."
         },
         {
           "title": "Your brand, your menu",
-          "description": "Logo, cover image and colors make the menu yours — you can even connect a custom domain."
+          "description": "Your logo, cover image and colours make the menu yours; it is published on a subdomain of your own."
         },
         {
           "title": "Integrated with POS & kitchen",
@@ -613,9 +650,9 @@
       "body2": "We earn from optional modules instead: delivery platform integrations, AI tools and hardware. You will never pay for your QR menu."
     },
     "coverage": {
-      "title": "Everywhere in Türkiye",
-      "body": "HummyTummy is cloud-based: no installation, and you can start the same day in all 81 provinces. Restaurants, cafés, patisseries, bars, hotels, canteens and beach clubs — businesses of every size.",
-      "cities": "Istanbul, Ankara, Izmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Eskişehir, Samsun, Trabzon, Diyarbakır, Muğla, Aydın…"
+      "title": "In Türkiye and Uzbekistan",
+      "body": "HummyTummy is cloud-based: no installation, and you can start the same day in all 81 provinces of Türkiye and in Uzbekistan. In Uzbekistan it runs in so‘m with QQS, an Uzbek interface and Cyrillic receipt printing. Restaurants, cafés, patisseries, bars, hotels, canteens and beach clubs — businesses of every size.",
+      "cities": "İstanbul, Ankara, İzmir, Bursa, Antalya, Adana, Konya, Gaziantep, Mersin, Kayseri, Trabzon, Diyarbakır, Muğla — and Tashkent, Samarkand, Bukhara, Andijan, Namangan…"
     },
     "faq": {
       "title": "Frequently asked questions about QR menus",
@@ -645,16 +682,16 @@
           "a": "Open the item in the admin panel and type the new price; the change is live on every table within seconds. No reprinting, no new QR code."
         },
         {
-          "q": "Can the menu be shown in multiple languages?",
-          "a": "Yes. You can offer your menu in Turkish, English, Russian, Arabic and Uzbek; guests switch languages with one tap."
+          "q": "Can the menu be shown in more than one language?",
+          "a": "The menu interface opens in five languages: Turkish, English, Russian, Arabic and Uzbek. The guest switches language with one tap and category headings and button text follow. Item names and descriptions appear in whatever language you entered them — per-item translation does not exist yet."
         },
         {
-          "q": "Can I add allergen information?",
-          "a": "Yes. You can add allergen and dietary labels (gluten, lactose, vegan, etc.) to items; they appear next to the item on the menu."
+          "q": "Can I add photos to items?",
+          "a": "Yes. Drag and drop a photo onto the item in the panel and it appears next to the item on the menu. The number of photos does not change the price."
         },
         {
-          "q": "Where can I use it?",
-          "a": "In all 81 provinces of Türkiye — the system is cloud-based and works in any business with an internet connection."
+          "q": "Which countries and cities can I use it in?",
+          "a": "HummyTummy is currently active in Türkiye and Uzbekistan. In Türkiye you can start the same day in all 81 provinces. In Uzbekistan your account opens in so‘m with QQS tax rates and an Uzbek interface, and receipts print in Cyrillic. The system is cloud-based and works in any business with an internet connection."
         }
       ]
     },
@@ -669,7 +706,7 @@
   "cloudKitchenPage": {
     "meta": {
       "title": "Cloud Kitchen Software — Every Platform on One Screen",
-      "description": "Order management for cloud kitchens and delivery restaurants: Yemeksepeti, Getir, Trendyol and Migros Yemek orders in a single feed, sent automatically to the kitchen display. Unlimited menus and branches for multi-brand kitchens.",
+      "description": "Order management for cloud kitchens and delivery restaurants: Yemeksepeti, Getir, Trendyol and Migros Yemek orders in a single feed, sent automatically to the kitchen display. Unlimited menus and categories for multi-brand kitchens.",
       "keywords": "cloud kitchen, ghost kitchen, virtual kitchen, delivery software, yemeksepeti integration, getir integration, trendyol yemek integration, delivery pos"
     },
     "hero": {
@@ -681,7 +718,7 @@
       "ctaSecondary": "Contact us",
       "trust1": "4 platform integrations",
       "trust2": "Kitchen display included",
-      "trust3": "Unlimited brands & branches"
+      "trust3": "Unlimited brand menus"
     },
     "pain": {
       "title": "End the tablet chaos",
@@ -728,7 +765,7 @@
         },
         {
           "title": "Multi-brand kitchen",
-          "description": "Running several virtual brands from one kitchen? Define a separate menu and branch for each brand — unlimited."
+          "description": "Running several virtual brands from one kitchen? Define a separate menu and categories for each brand — there is no limit on menus. If you want to split brands across separate branches, an extra branch is added with an annual licence."
         },
         {
           "title": "Phone orders & delivery tracking",
@@ -761,7 +798,7 @@
         },
         {
           "q": "Can I manage several brands from one kitchen?",
-          "a": "Yes. You define a separate menu and branch for each virtual brand; there is no limit on brands or branches."
+          "a": "Yes. You define a separate menu and categories for each virtual brand; there is no limit on menus. If you want to run brands as separate branches, the first branch is free and each additional branch is added with an annual licence."
         },
         {
           "q": "How is it priced?",

@@ -5,11 +5,9 @@ import { appHref } from '@/lib/urls';
 import { Container } from '@/components/ui/Container';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { getStats } from '@/lib/api';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 export default function FinalCTA() {
-  const stats = getStats();
   const t = useTranslations('cta');
   const sectionRef = useScrollReveal<HTMLElement>();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -111,7 +109,7 @@ export default function FinalCTA() {
               style={{ '--delay': '0.3s' } as React.CSSProperties}
               className="text-xl text-slate-400 mb-10"
             >
-              {t('subtitle', { count: stats.restaurantCount })}
+              {t('subtitle')}
             </p>
 
             <div

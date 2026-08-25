@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { appHref } from '@/lib/urls';
 import { getTranslations } from 'next-intl/server';
 import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
@@ -100,20 +101,21 @@ export async function generateStaticParams() {
 export async function generateMetadata(
   { params }: { params: Promise<{ locale: string; sku: string }> },
 ): Promise<Metadata> {
-  const { sku } = await params;
+  const { locale, sku } = await params;
   const product = await fetchProduct(sku);
   if (!product) return { title: 'HummyTummy' };
   const description = product.description?.slice(0, 160) ?? '';
   const image = product.images?.[0];
-  return {
-    title: `${product.name} — HummyTummy`,
-    description,
-    openGraph: {
-      title: product.name,
-      description,
-      images: image ? [{ url: image }] : undefined,
-    },
-  };
+  // The layout appends ` | HummyTummy`, so the brand must not be in the title
+  // string as well — these SKU pages were rendering `… — HummyTummy | HummyTummy`.
+  const base = buildPageMetadata({
+    locale,
+    path: `/store/${encodeURIComponent(sku)}`,
+    meta: { title: product.name, description },
+  });
+  return image
+    ? { ...base, openGraph: { ...base.openGraph, images: [{ url: image }] } }
+    : base;
 }
 
 function formatPrice(cents: number, currency: string): string {

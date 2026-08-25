@@ -3,6 +3,7 @@
 import { useLocale } from 'next-intl';
 import { useRouter, usePathname } from '@/i18n/routing';
 import { locales, localeConfig, type Locale } from '@/i18n/config';
+import { switchTarget } from '@/lib/tr-only-routes';
 import { Globe } from 'lucide-react';
 
 export default function LanguageSwitcher() {
@@ -11,7 +12,10 @@ export default function LanguageSwitcher() {
   const pathname = usePathname();
 
   const handleChange = (newLocale: Locale) => {
-    router.replace(pathname, { locale: newLocale });
+    // Some routes exist in Turkish only. Keeping the path while swapping the
+    // locale would send the visitor to a page that deliberately 404s, so those
+    // fall back to the target locale's homepage.
+    router.replace(switchTarget(pathname, newLocale), { locale: newLocale });
   };
 
   return (

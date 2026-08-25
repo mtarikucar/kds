@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "HummyTummy - Restoran boshqaruv tizimi",
+    "title": "Restoran POS va buyurtma boshqaruvi — asosiy qismi bepul",
     "description": "Restoranlar uchun zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
     "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish, qr menyu, raqamli menyu, bulutli oshxona, yetkazib berish dasturi"
   },
@@ -14,7 +14,9 @@
     "signIn": "Kirish",
     "startFree": "Bepul boshlash",
     "openMenu": "Menyuni ochish",
-    "closeMenu": "Menyuni yopish"
+    "closeMenu": "Menyuni yopish",
+    "modules": "Imkoniyatlar",
+    "sectors": "Yechimlar"
   },
   "hero": {
     "badge": "Hozirda {count} ta restoranlarnga xizmat ko'rsatmoqdamiz",
@@ -47,8 +49,8 @@
         "description": "Buyurtmalarni daqiqalar emas, soniyalar ichida qayta ishlang. Tezlik uchun optimallashtirilgan."
       },
       "secure": {
-        "title": "Xavfsiz va ishonchli",
-        "description": "Korporativ darajadagi xavfsizlik bilan 99.9% ish vaqti."
+        "title": "Nazorat qilinadigan kirish",
+        "description": "Rolga asoslangan ruxsatlar, filial bo‘yicha ma’lumot ajratish va shifrlangan ulanish."
       },
       "insights": {
         "title": "Foydali tahlillar",
@@ -56,7 +58,7 @@
       },
       "global": {
         "title": "Hamma joyda ishlaydi",
-        "description": "Ko'p tillar va valyutalarni qo'llab-quvvatlash."
+        "description": "Interfeys besh tilda. Bulutli — o‘rnatishsiz, Turkiya va O‘zbekistonda o‘sha kuni ishga tushadi."
       }
     },
     "panels": {
@@ -67,14 +69,12 @@
       "preparing": "Tayyorlanmoqda",
       "ready": "Tayyor",
       "new": "Yangi",
-      "platformPerformance": "Platforma ko'rsatkichlari",
-      "allTime": "barcha vaqt",
-      "total": "Jami",
-      "revenue": "Daromad",
-      "processed": "Qayta ishlangan",
-      "orders": "Buyurtmalar",
-      "active": "Faol",
-      "restaurants": "Restoranlar"
+      "included": "Asosiy qismga kiritilgan",
+      "free": "Bepul",
+      "itemsTables": "Cheksiz mahsulot, kategoriya va stol",
+      "users": "Cheksiz foydalanuvchi va rol",
+      "noMonthly": "O‘rnatish va oylik to‘lov yo‘q",
+      "languages": "Besh tilda interfeys"
     }
   },
   "features": {
@@ -86,8 +86,8 @@
       "description": "Mijozlar darhol skanerlashi va ko'rishi mumkin bo'lgan chiroyli raqamli menyular yarating. Narxlar va mahsulotlarni qayta chop etmasdan real vaqtda yangilang.",
       "bullets": [
         "Darhol menyu yangilanishlari, nol bosma xarajatlar",
-        "Xalqaro mehmonlar uchun ko'p tillarni qo'llab-quvvatlash",
-        "Allergen va dieta ma'lumotlarini ko'rsatish"
+        "Mehmon interfeysi besh tilda ochiladi",
+        "Ilova o‘rnatmasdan ishlaydi — telefon kamerasi yetarli"
       ],
       "metrics": {
         "printingCosts": "Bosma xarajatlar",
@@ -100,13 +100,14 @@
       "description": "Butun zalingizni real vaqtda qush ko'zi bilan ko'ring. Stol holatini kuzating, bronlarni boshqaring va o'tirish joylarini optimallashtiring.",
       "bullets": [
         "Jonli stol holati bilan vizual zal rejasi",
-        "Aqlli bron boshqaruvi",
+        "Bron boshqaruvi (yillik modul)",
         "Stol birlashtirish va ajratish funksiyasi"
       ],
       "metrics": {
-        "orderProcessing": "Buyurtmalarni qayta ishlash",
-        "faster": "40% tezroq",
-        "tableTurnover": "Stol aylanmasi"
+        "orderProcessing": "Stollar",
+        "faster": "Cheksiz",
+        "tableTurnover": "Zal rejasi",
+        "dragDrop": "Sudrab tashlash"
       }
     },
     "posPayments": {
@@ -115,11 +116,13 @@
       "bullets": [
         "Kartalar, naqd pul va mobil to'lovlarni qabul qiling",
         "Oson hisob bo'lish va mahsulot o'tkazish",
-        "Avtomatik tip hisoblash va taqsimlash"
+        "Choyxona haqi qaydi va davriy hisobot"
       ],
       "metrics": {
-        "paymentSuccess": "To'lov muvaffaqiyati",
-        "checkoutTime": "To'lov vaqti"
+        "paymentSuccess": "Hisobni bo‘lish",
+        "checkoutTime": "To‘lov usullari",
+        "paymentSuccessValue": "Mahsulot yoki summa bo‘yicha",
+        "checkoutTimeValue": "Naqd, karta, aralash"
       }
     },
     "kitchenFlow": {
@@ -131,21 +134,23 @@
         "Rolga asoslangan xodimlar vazifalarini boshqarish"
       ],
       "metrics": {
-        "orderErrors": "Buyurtma xatolari",
-        "avgPrepTime": "O'rtacha tayyorlash vaqti"
+        "orderErrors": "Oshxona ekrani",
+        "avgPrepTime": "Qog‘oz cheklar",
+        "orderErrorsValue": "Real vaqtda",
+        "avgPrepTimeValue": "Kerak emas"
       }
     },
     "multiBranch": {
       "title": "Ko'p filial nazorati",
-      "description": "Barcha joylaringizni bitta boshqaruv panelidan boshqaring. Menyularni standartlashtiring, ko'rsatkichlarni kuzating va biznesingizni kengaytiring.",
+      "description": "Lokatsiyalaringizni bitta paneldan boshqaring. Menyularni standartlashtiring, samaradorlikni solishtiring. Birinchi filial bepul; har bir qo‘shimcha filial yillik litsenziya bilan qo‘shiladi.",
       "bullets": [
         "Markazlashtirilgan menyu va narxlarni boshqarish",
         "Joylar bo'yicha tahlil va hisobot",
         "Filialga xos sozlash imkoniyatlari"
       ],
       "metrics": {
-        "branches": "Filiallar",
-        "unlimited": "Cheksiz",
+        "branches": "Birinchi filial",
+        "unlimited": "Bepul",
         "syncTime": "Sinxronizatsiya",
         "realTime": "Real vaqt"
       }
@@ -176,7 +181,7 @@
         "Jamoa va rollar",
         "Mijozlar",
         "Qurilma va filiallar",
-        "Shaxsiy brend va domen"
+        "O‘z brendingiz va subdomen"
       ]
     },
     "licence": {
@@ -192,27 +197,27 @@
     "prorationNote": "Yil davomida sotib olingan har bir narsa yillik sanaga qadar kunlab hisoblanadi — bitta hisob-faktura, bitta yangilash sanasi."
   },
   "business": {
-    "badge": "Muhim natijalar",
-    "title": "Foyda chizig'ingizga haqiqiy ta'sir",
-    "subtitle": "HummyTummy mijozlari birinchi kundan boshlab o'lchanadigan yaxshilanishlarni ko'rmoqdalar.",
+    "badge": "Nega HummyTummy",
+    "title": "Restoranni yurituvchi asosiy qism bepul",
+    "subtitle": "Tarif yo‘q, foydalanuvchi uchun to‘lov yo‘q, sinov muddati yo‘q. Og‘ir modullarni kerak bo‘lganda yillik sotib olasiz.",
     "values": {
       "time": {
-        "title": "Vaqtni tejash",
-        "metric": "40%",
-        "metricLabel": "tezroq buyurtma qayta ishlash",
-        "description": "Takrorlanuvchi vazifalarni avtomatlashtiring va ish oqimingizni soddalashtiring. Boshqaruvga kamroq, mijozlarga ko'proq vaqt sarflang."
+        "title": "O‘rnatish va oylik to‘lov yo‘q",
+        "metric": "₺0",
+        "metricLabel": "asosiy tizim uchun",
+        "description": "POS, oshxona ekrani, menyu boshqaruvi, zal rejasi, QR menyu va jamoa boshqaruvi muddatsiz bepul. Karta so‘ralmasdan boshlaysiz."
       },
       "errors": {
-        "title": "Xatolarni kamaytirish",
-        "metric": "85%",
-        "metricLabel": "kamroq buyurtma xatolari",
-        "description": "Raqamli buyurtma oqimi noto'g'ri aloqani yo'q qiladi. Buyurtmalar to'g'ridan-to'g'ri stoldan oshxonaga hech qanday chalkashliksiz boradi."
+        "title": "Miqdor cheklovi yo‘q",
+        "metric": "Cheksiz",
+        "metricLabel": "mahsulot, kategoriya, stol va foydalanuvchi",
+        "description": "Menyudagi mahsulot, zaldagi stol yoki jamoadagi odam soni narxni o‘zgartirmaydi. Oylik buyurtma soni uchun ham yuqori chegara yo‘q."
       },
       "revenue": {
-        "title": "Daromadni oshirish",
-        "metric": "25%",
-        "metricLabel": "yuqoriroq stol aylanmasi",
-        "description": "Tezroq xizmat ko'proq mijozlar demak. Real vaqt tahlili maksimal foyda uchun optimallashtirish yordam beradi."
+        "title": "Besh tilda interfeys",
+        "metric": "5",
+        "metricLabel": "til: TR, EN, RU, UZ, AR",
+        "description": "Panel va oshxona ekrani turk, ingliz, rus, o‘zbek va arab tillarida ishlaydi — aralash jamoalar har biri o‘z tilida ishlaydi. Hisoblar Turkiyada TL va KDV bilan, O‘zbekistonda so‘m va QQS bilan ochiladi."
       }
     }
   },
@@ -222,34 +227,52 @@
     "subtitle": "Ma'lumotlaringiz sizning biznesingiz. Biz xavfsizlikni jiddiy qabul qilamiz, shunda siz eng muhim narsaga e'tibor qaratishingiz mumkin — mijozlaringizga xizmat ko'rsatish.",
     "points": {
       "encryption": {
-        "title": "Uchidan-uchiga shifrlash",
-        "description": "Barcha ma'lumotlar sanoat standarti AES-256 shifrlash yordamida uzatishda va saqlashda shifrlanadi."
+        "title": "Shifrlangan ulanish va kalit saqlash",
+        "description": "Barcha trafik TLS bilan shifrlanadi. Integratsiya kalitlari va provayder parollari kabi maxfiy maydonlar ma’lumotlar bazasida qo‘shimcha ravishda AES-256-GCM bilan shifrlanadi."
       },
       "rbac": {
         "title": "Rolga asoslangan kirish nazorati",
         "description": "Nozik sozlangan ruxsatlar har bir jamoa a'zosi aynan nimani ko'rishi va qilishi mumkinligini nazorat qilish imkonini beradi."
       },
       "uptime": {
-        "title": "99.9% ish vaqti SLA",
-        "description": "Bir nechta ma'lumotlar markazlarida zaxira bilan korporativ darajadagi infratuzilma."
+        "title": "Filial bo‘yicha ma’lumot ajratish",
+        "description": "Har bir so‘rov server tomonida foydalanuvchi vakolatli bo‘lgan filiallar bilan cheklanadi; bir filialning ma’lumoti boshqasiga o‘tmaydi."
       },
       "compliance": {
         "title": "GDPR va KVKK muvofiq",
-        "description": "Yevropa va Turkiya ma'lumotlarni himoya qilish qoidalariga to'liq muvofiqlik."
+        "description": "KVKK va GDPR doirasidagi ma’lumot subyekti huquqlariga (kirish, tuzatish, o‘chirish, e’tiroz) javob beramiz; ma’lumotlarni qayta ishlash tartibi Maxfiylik siyosatida bayon etilgan."
       }
     },
     "visual": {
       "title": "Ma'lumotlaringiz himoyalangan",
-      "subtitle": "Sanoatda yetakchi xavfsizlik choralari biznesingizni xavfsiz saqlaydi.",
+      "subtitle": "Avtorizatsiya, filial ajratish va shifrlash server tomonida qo‘llanadi.",
       "encryption": "Shifrlash",
-      "uptime": "Ish vaqti",
-      "monitoring": "Monitoring",
-      "compliant": "Muvofiq"
+      "uptime": "Filial doirasi",
+      "monitoring": "Rolga asoslangan kirish",
+      "compliant": "Muvofiq",
+      "tiles": [
+        {
+          "value": "TLS",
+          "label": "Shifrlangan ulanish"
+        },
+        {
+          "value": "Rol",
+          "label": "Ruxsat nazorati"
+        },
+        {
+          "value": "Filial",
+          "label": "Ma’lumot ajratish"
+        },
+        {
+          "value": "KVKK",
+          "label": "Ma’lumot subyekti huquqlari"
+        }
+      ]
     }
   },
   "cta": {
     "title": "Restoraningizni o'zgartirishga tayyormisiz?",
-    "subtitle": "Operatsiyalarni soddalashtirish va biznesini rivojlantirish uchun HummyTummy'dan foydalanayotgan {count} ta restoraniga qo'shiling.",
+    "subtitle": "Ro‘yxatdan o‘ting, menyuni qo‘shing, birinchi buyurtmangizni qabul qiling. Karta kerak emas.",
     "primaryBtn": "Bepul boshlash",
     "secondaryBtn": "Sotuvlar bilan gaplashing",
     "trustBadge1": "Kredit karta talab qilinmaydi",
@@ -283,17 +306,15 @@
       "integrations": "Integratsiyalar",
       "qrMenu": "QR menyu",
       "cloudKitchen": "Bulutli oshxona",
-      "about": "Haqida",
-      "blog": "Blog",
-      "careers": "Karyera",
       "contact": "Aloqa",
       "helpCenter": "Yordam markazi",
       "documentation": "Hujjatlar",
       "apiReference": "API ma'lumotlar",
-      "status": "Holat",
       "privacy": "Maxfiylik siyosati",
       "terms": "Xizmat shartlari",
-      "cookies": "Cookie siyosati"
+      "eAdisyon": "e-Adisyon majburiymi?",
+      "pricingIndex": "Restoran dasturi narxlari",
+      "karekodGuide": "QR kod qo‘llanmasi"
     },
     "copyright": "HummyTummy. Barcha huquqlar himoyalangan."
   },
@@ -301,7 +322,7 @@
     "title": "Maxfiylik siyosati",
     "backToHome": "Bosh sahifaga qaytish",
     "lastUpdated": "Oxirgi yangilanish",
-    "lastUpdatedDate": "2025-yil yanvar",
+    "lastUpdatedDate": "Avgust 2026",
     "sections": {
       "introduction": {
         "title": "Kirish",
@@ -330,7 +351,7 @@
       },
       "dataSecurity": {
         "title": "Ma'lumotlar xavfsizligi",
-        "content": "Biz shaxsiy ma'lumotlaringizni ruxsatsiz kirish, o'zgartirish, oshkor qilish yoki yo'q qilishdan himoya qilish uchun tegishli texnik va tashkiliy xavfsizlik choralarini qo'llaymiz. Barcha ma'lumotlar uzatish va saqlash paytida sanoat standartidagi AES-256 shifrlash yordamida shifrlanadi."
+        "content": "Shaxsiy ma’lumotlaringizni ruxsatsiz kirish, o‘zgartirish, oshkor qilish yoki yo‘q qilishdan himoya qilish uchun tegishli texnik va tashkiliy choralarni qo‘llaymiz. Siz bilan serverlarimiz o‘rtasidagi barcha trafik TLS bilan shifrlanadi. Integratsiya kalitlari va provayder parollari kabi maxfiy maydonlar ma’lumotlar bazasida qo‘shimcha ravishda AES-256-GCM bilan shifrlanadi. Kirish server tomonida rolga asoslangan avtorizatsiya va filial doirasi bilan cheklanadi."
       },
       "cookies": {
         "title": "Cookie va kuzatish",
@@ -355,13 +376,17 @@
         "title": "Biz bilan bog'laning",
         "content": "Ushbu Maxfiylik siyosati bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
       }
+    },
+    "meta": {
+      "title": "Maxfiylik siyosati",
+      "description": "HummyTummy qanday shaxsiy ma’lumotlarni va nima maqsadda qayta ishlaydi, qancha saqlaydi va qanday xavfsizlik choralarini qo‘llaydi. KVKK va GDPR bo‘yicha huquqlaringizdan qanday foydalanish mumkin."
     }
   },
   "terms": {
     "title": "Xizmat shartlari",
     "backToHome": "Bosh sahifaga qaytish",
     "lastUpdated": "Oxirgi yangilanish",
-    "lastUpdatedDate": "2025-yil yanvar",
+    "lastUpdatedDate": "Avgust 2026",
     "sections": {
       "acceptance": {
         "title": "Shartlarni qabul qilish",
@@ -415,6 +440,10 @@
         "title": "Biz bilan bog'laning",
         "content": "Ushbu Xizmat shartlari bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
       }
+    },
+    "meta": {
+      "title": "Foydalanish shartlari",
+      "description": "HummyTummy’dan foydalanish shartlari: hisob uchun javobgarlik, to‘lov va yillik litsenziya shartlari, xizmat doirasi va intellektual mulk qoidalari."
     }
   },
   "store": {
@@ -482,6 +511,10 @@
         "includes": "Kiritilgan",
         "steps": "Jarayon"
       }
+    },
+    "meta": {
+      "title": "Restoran uskunalari do‘koni — fiskal POS, termal printer, KDS ekran",
+      "description": "Restoranlar uchun uskunalar: GİB ro‘yxatidagi yangi avlod fiskal POS kassalari, termal chek printerlari, oshxona ekrani (KDS) monitorlari, shtrix-kod skanerlari va o‘rnatish xizmatlari. Narxlar ochiq, QQS ichida."
     }
   },
   "contact": {
@@ -540,24 +573,28 @@
         "network": "Ulanish muammosi — qaytadan urinib ko‘ring.",
         "generic": "Xabar yuborilmadi. Iltimos, qaytadan urinib ko‘ring."
       }
+    },
+    "meta": {
+      "title": "Aloqa — savdo va qo‘llab-quvvatlash",
+      "description": "HummyTummy savdo va qo‘llab-quvvatlash aloqa ma’lumotlari: telefon +90 850 840 73 03, e-pochta contact@hummytummy.com. KVKK murojaatlari va huquqiy hujjatlar uchun manzillar."
     }
   },
   "qrMenuPage": {
     "meta": {
       "title": "Restoran uchun bepul QR menyu — cheksiz",
-      "description": "Restoraningiz uchun bepul QR menyu yarating: cheksiz taomlar, narxlarni bir zumda yangilash, ko'p tilli menyu, allergen belgilari va stoldan buyurtma. 5 daqiqada tayyor, bank kartasi shart emas.",
+      "description": "Restoraningiz uchun bepul QR menyu yarating: cheksiz mahsulot va kategoriya, narxni bir zumda yangilash, besh tilda mehmon interfeysi va stoldan buyurtma. 5 daqiqada tayyor, karta kerak emas.",
       "keywords": "qr menyu, qr kod menyu, elektron menyu, bepul qr menyu, raqamli menyu, restoran qr menyu, kontaktsiz menyu"
     },
     "hero": {
       "badge": "Bepul va cheksiz",
       "title": "QR menyuingiz",
       "titleHighlight": "5 daqiqada tayyor",
-      "subtitle": "Mehmon stoldagi kodni telefoniga skanerlaydi va menyu bir zumda ochiladi — ilova yuklab olish shart emas. Narx o'zgarishi soniyalarda e'lon qilinadi, chop etish xarajati nol. HummyTummy'da QR menyu butunlay bepul: taom, kategoriya, stol va filial cheklovi yo'q.",
+      "subtitle": "Mehmoningiz stoldagi kodni skanerlaydi va menyu bir zumda ochiladi — ilova o‘rnatmasdan. Narx o‘zgarishi soniyalarda efirda, bosib chiqarish xarajati nol. HummyTummy’da QR menyu butunlay bepul: mahsulot, kategoriya, stol va foydalanuvchi cheklovi yo‘q.",
       "ctaPrimary": "Bepul QR menyu yarating",
       "ctaSecondary": "Biz bilan bog'laning",
       "trust1": "Bank kartasi shart emas",
       "trust2": "Ilova yuklab olinmaydi",
-      "trust3": "Cheksiz taom va stol"
+      "trust3": "Cheksiz mahsulot va stol"
     },
     "how": {
       "title": "3 qadamda QR menyu qanday yaratiladi",
@@ -590,16 +627,16 @@
           "description": "Mehmon menyuni ko'rish bilan cheklanmaydi — stoldan buyurtma bera oladi; buyurtma oshxona ekrani va kassaga darhol tushadi."
         },
         {
-          "title": "Ko'p tilli menyu",
-          "description": "Menyu turk, ingliz, rus, arab va o'zbek tillarida ko'rsatiladi — xorijiy mehmonlar ofitsiant kutmaydi."
+          "title": "Besh tilda mehmon interfeysi",
+          "description": "Menyu interfeysi turk, ingliz, rus, arab va o‘zbek tillarida ochiladi; kategoriya va tugma matnlari mehmon tilida ko‘rinadi. Mahsulot nomlari siz yozgan tilda qoladi."
         },
         {
-          "title": "Allergen va parhez ma'lumoti",
-          "description": "Taomlarga gluten, laktoza, vegan kabi belgilar qo'shing; mehmonlar ishonch bilan tanlaydi."
+          "title": "Mahsulot rasmlari",
+          "description": "Mahsulotlaringizga rasm qo‘shing — mehmon nima buyurtma qilayotganini ko‘rib tanlaydi. Rasmlar paneldan sudrab tashlab yuklanadi."
         },
         {
           "title": "Brendingizga mos",
-          "description": "Logotip, muqova rasmi va ranglar menyuni sizniki qiladi; hatto shaxsiy domen ham ulash mumkin."
+          "description": "Logotip, muqova rasmi va ranglar menyuni sizniki qiladi; menyu o‘zingizga xos subdomenda chiqadi."
         },
         {
           "title": "POS va oshxona bilan birlashgan",
@@ -613,9 +650,9 @@
       "body2": "Biz ixtiyoriy modullardan daromad qilamiz: yetkazib berish platformalari integratsiyalari, sun'iy intellekt vositalari va uskunalar. QR menyu uchun hech qachon to'lamaysiz."
     },
     "coverage": {
-      "title": "Turkiyaning har yerida",
-      "body": "HummyTummy bulutli tizim: o'rnatish shart emas, barcha 81 viloyatda o'sha kuniyoq boshlaysiz. Restoran, kafe, qandolatxona, bar, mehmonxona, oshxona va plyaj klublari — har qanday hajmdagi muassasa uchun.",
-      "cities": "Istanbul, Anqara, Izmir, Bursa, Antaliya, Adana, Konya, G'aziantep, Mersin, Kayseri, Eskishehir, Samsun, Trabzon, Diyarbakir, Mug'la, Aydin…"
+      "title": "Turkiya va O‘zbekistonda",
+      "body": "HummyTummy bulutda ishlaydi: o‘rnatish talab qilinmaydi, Turkiyaning 81 viloyatida va O‘zbekistonda o‘sha kuni boshlashingiz mumkin. O‘zbekistonda tizim so‘m va QQS bilan, o‘zbekcha interfeys va kirill chek chop etish bilan ishlaydi. Restoran, kafe, qandolatxona, bar, mehmonxona, oshxona va plyaj muassasalari — har qanday o‘lchamdagi biznes uchun.",
+      "cities": "Istanbul, Anqara, Izmir, Bursa, Antalya, Adana, Ko‘nya, G‘aziantep, Mersin, Kayseri, Trabzon, Diyarbakir, Mug‘la — va Toshkent, Samarqand, Buxoro, Andijon, Namangan…"
     },
     "faq": {
       "title": "QR menyu haqida ko'p so'raladigan savollar",
@@ -645,16 +682,16 @@
           "a": "Boshqaruv panelida taomni oching va yangi narxni yozing — o'zgarish soniyalarda barcha stollarda ko'rinadi. Qayta chop etish yoki yangi QR kod kerak emas."
         },
         {
-          "q": "Menyu bir nechta tilda ko'rsatilishi mumkinmi?",
-          "a": "Ha. Menyuni turk, ingliz, rus, arab va o'zbek tillarida taqdim eta olasiz; mehmon tilni bir tegishda almashtiradi."
+          "q": "Menyuni bir nechta tilda ko‘rsatish mumkinmi?",
+          "a": "Menyu interfeysi besh tilda ochiladi: turk, ingliz, rus, arab va o‘zbek. Mehmon tilni bir teginish bilan almashtiradi, kategoriya sarlavhalari va tugma matnlari o‘sha tilga o‘tadi. Mahsulot nomlari va tavsiflari siz kiritgan tilda ko‘rinadi — mahsulot darajasidagi tarjima hozircha yo‘q."
         },
         {
-          "q": "Allergen ma'lumotini qo'sha olamanmi?",
-          "a": "Ha. Taomlarga allergen va parhez belgilari (gluten, laktoza, vegan va hokazo) qo'shiladi; ular menyuda taom yonida ko'rinadi."
+          "q": "Mahsulotlarga rasm qo‘sha olamanmi?",
+          "a": "Ha. Panelda mahsulot ustiga rasmni sudrab tashlang — u menyuda mahsulot yonida ko‘rinadi. Rasmlar soni narxga ta’sir qilmaydi."
         },
         {
-          "q": "Qayerda ishlata olaman?",
-          "a": "Turkiyaning barcha 81 viloyatida — tizim bulutli bo'lib, interneti bor har qanday muassasada ishlaydi."
+          "q": "Qaysi mamlakat va shaharlarda foydalana olaman?",
+          "a": "HummyTummy hozirda Turkiya va O‘zbekistonda faol. Turkiyada 81 viloyatning barchasida o‘sha kuni boshlashingiz mumkin. O‘zbekistonda hisobingiz so‘m valyutasi, QQS soliq stavkalari va o‘zbekcha interfeys bilan ochiladi; cheklar kirill alifbosida chop etiladi. Tizim bulutli bo‘lib, internet ulanishi bo‘lgan har qanday muassasada ishlaydi."
         }
       ]
     },
@@ -669,7 +706,7 @@
   "cloudKitchenPage": {
     "meta": {
       "title": "Bulutli oshxona dasturi — barcha platformalar bitta ekranda",
-      "description": "Bulutli oshxona va yetkazib beruvchi restoranlar uchun buyurtma boshqaruvi: Yemeksepeti, Getir, Trendyol va Migros Yemek buyurtmalari yagona oqimda, oshxona ekraniga avtomatik tushadi. Ko'p brendli oshxonalar uchun cheksiz menyu va filial.",
+      "description": "Bulutli oshxona va yetkazib berish uchun buyurtma boshqaruvi: Yemeksepeti, Getir, Trendyol va Migros Yemek buyurtmalari bitta oqimda, oshxona ekraniga avtomatik tushadi. Ko‘p brendli oshxonalar uchun cheksiz menyu va kategoriya.",
       "keywords": "bulutli oshxona, cloud kitchen, virtual oshxona, yetkazib berish dasturi, yemeksepeti integratsiyasi, getir integratsiyasi"
     },
     "hero": {
@@ -681,7 +718,7 @@
       "ctaSecondary": "Biz bilan bog'laning",
       "trust1": "4 ta platforma integratsiyasi",
       "trust2": "Oshxona ekrani ichida",
-      "trust3": "Cheksiz brend va filial"
+      "trust3": "Cheksiz brend menyulari"
     },
     "pain": {
       "title": "Planshet tartibsizligiga chek",
@@ -728,7 +765,7 @@
         },
         {
           "title": "Ko'p brendli oshxona",
-          "description": "Bitta oshxonadan bir nechta virtual brend yuritasizmi? Har brend uchun alohida menyu va filial belgilang — cheksiz."
+          "description": "Bitta oshxonadan bir nechta virtual brend yuritayapsizmi? Har bir brend uchun alohida menyu va kategoriya belgilang — menyular soni cheklanmagan. Brendlarni alohida filiallarga ajratmoqchi bo‘lsangiz, qo‘shimcha filial yillik litsenziya bilan qo‘shiladi."
         },
         {
           "title": "Telefon buyurtmasi va yetkazish nazorati",
@@ -761,7 +798,7 @@
         },
         {
           "q": "Bitta oshxonadan bir nechta brendni boshqara olamanmi?",
-          "a": "Ha. Har virtual brend uchun alohida menyu va filial belgilaysiz; brend va filial soni cheklanmagan."
+          "a": "Ha. Har bir virtual brend uchun alohida menyu va kategoriya belgilaysiz; menyular soni cheklanmagan. Brendlarni alohida filial sifatida yuritmoqchi bo‘lsangiz, birinchi filial bepul, har bir qo‘shimcha filial yillik litsenziya bilan qo‘shiladi."
         },
         {
           "q": "Narxi qanday?",

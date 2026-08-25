@@ -79,18 +79,12 @@ const SubdomainLoyaltyPage = lazyWithReload(
   () => import("./pages/qr-menu/SubdomainLoyaltyPage"),
 );
 
+import PortedRouteRedirect from "./marketing/PortedRouteRedirect";
+
 const LandingPage = lazyWithReload(() => import("./pages/LandingPage"));
 const PricingPage = lazyWithReload(
   () => import("./pages/marketing/PricingPage"),
 );
-const ModulesIndexPage = lazyWithReload(
-  () => import("./pages/marketing/ModulesIndexPage"),
-);
-const ModulePage = lazyWithReload(() => import("./pages/marketing/ModulePage"));
-const SectorsIndexPage = lazyWithReload(
-  () => import("./pages/marketing/SectorsIndexPage"),
-);
-const SectorPage = lazyWithReload(() => import("./pages/marketing/SectorPage"));
 const IntegrationsPage = lazyWithReload(
   () => import("./pages/marketing/IntegrationsPage"),
 );
@@ -326,10 +320,15 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/fiyatlandirma" element={<PricingPage />} />
-          <Route path="/ozellikler" element={<ModulesIndexPage />} />
-          <Route path="/ozellikler/:slug" element={<ModulePage />} />
-          <Route path="/cozumler" element={<SectorsIndexPage />} />
-          <Route path="/cozumler/:slug" element={<SectorPage />} />
+          {/* Ported to landing.hummytummy.com, where they are statically
+              rendered and therefore readable by crawlers. nginx 301s these
+              paths, but only for requests that actually leave the browser —
+              react-router would otherwise keep an in-session visitor on the old
+              client-rendered copies. See PortedRouteRedirect. */}
+          <Route path="/ozellikler" element={<PortedRouteRedirect />} />
+          <Route path="/ozellikler/:slug" element={<PortedRouteRedirect />} />
+          <Route path="/cozumler" element={<PortedRouteRedirect />} />
+          <Route path="/cozumler/:slug" element={<PortedRouteRedirect />} />
           <Route path="/entegrasyonlar" element={<IntegrationsPage />} />
           <Route path="/kurumsal" element={<CorporatePage />} />
           <Route path="/login" element={<LoginPage />} />
