@@ -12,6 +12,13 @@
  * Each rule carries the evidence that retired it. If a rule ever becomes wrong
  * because the product gained the capability, delete the rule in the same commit
  * that ships the capability — never to make a build pass.
+ *
+ * This file is deliberately the ONLY place in the repo that spells a retired
+ * claim out in full: the `retired` fixtures have to be verbatim for the
+ * self-test to mean anything. Everywhere else — comments included — describes
+ * the claim rather than quoting it, so that someone auditing the repo with
+ * `grep -r "99.9"` gets this file and nothing else. A comment that repeats the
+ * claim it removed reads as a live claim to every tool that is not a human.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
