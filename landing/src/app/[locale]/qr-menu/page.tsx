@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
+import { buildPageMetadata } from '@/lib/seo';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
 import { QRMenuMockup } from '@/components/mockups/QRMenuMockup';
 import { appHref } from '@/lib/urls';
-import { locales, localeConfig } from '@/i18n/config';
 import {
   Zap,
   ClipboardList,
@@ -33,21 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
   const meta = messages.qrMenuPage.meta;
 
-  return {
-    title: meta.title,
-    description: meta.description,
-    keywords: meta.keywords,
-    alternates: {
-      canonical: `/${locale}/qr-menu`,
-      languages: Object.fromEntries(
-        locales.map((l) => [localeConfig[l].hreflang, `/${l}/qr-menu`])
-      ),
-    },
-    openGraph: {
-      title: meta.title,
-      description: meta.description,
-    },
-  };
+  return buildPageMetadata({ locale, path: '/qr-menu', meta });
 }
 
 const FEATURE_ICONS = [Zap, ClipboardList, Languages, Wheat, Palette, LayoutGrid];

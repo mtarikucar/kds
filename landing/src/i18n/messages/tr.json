@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "HummyTummy - Restoran Yönetim Sistemi",
+    "title": "Restoran POS ve Adisyon Programı — Çekirdek Ücretsiz",
     "description": "Restoranlar için modern POS sistemi. Siparişleri, mutfak ekranını, masaları ve ödemeleri tek bir yerden yönetin.",
     "keywords": "restoran pos, mutfak ekran sistemi, restoran yönetimi, qr menü, masa yönetimi, karekod menü, dijital menü, qr menü oluşturma, bulut mutfak, paket servis yazılımı, adisyon programı"
   },
@@ -358,6 +358,10 @@
         "title": "Bize Ulaşın",
         "content": "Bu Gizlilik Politikası hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
       }
+    },
+    "meta": {
+      "title": "Gizlilik Politikası",
+      "description": "HummyTummy hangi kişisel verileri hangi amaçla işler, ne kadar saklar ve hangi güvenlik önlemlerini uygular. KVKK ve GDPR kapsamındaki veri sahibi haklarınızı nasıl kullanacağınız."
     }
   },
   "terms": {
@@ -418,6 +422,10 @@
         "title": "Bize Ulaşın",
         "content": "Bu Kullanım Şartları hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
       }
+    },
+    "meta": {
+      "title": "Kullanım Koşulları",
+      "description": "HummyTummy hizmetinin kullanım şartları: hesap sorumluluğu, ödeme ve yıllık lisans koşulları, hizmet kapsamı ve fikri mülkiyet hükümleri."
     }
   },
   "store": {
@@ -485,6 +493,10 @@
         "includes": "Neler dahil",
         "steps": "Süreç"
       }
+    },
+    "meta": {
+      "title": "Restoran Donanım Mağazası — Yazarkasa POS, Termal Yazıcı, KDS Ekranı",
+      "description": "Restoranlar için donanım: GİB listesindeki Yeni Nesil Yazarkasa POS cihazları, termal fiş yazıcıları, mutfak ekranı (KDS) monitörleri, barkod okuyucular ve kurulum hizmetleri. Fiyatlar açık, KDV dahil."
     }
   },
   "contact": {
@@ -543,6 +555,10 @@
         "network": "Bağlantı sorunu — tekrar deneyin.",
         "generic": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
       }
+    },
+    "meta": {
+      "title": "İletişim — Satış ve Destek",
+      "description": "HummyTummy satış ve destek iletişim bilgileri: telefon +90 850 840 73 03, e-posta contact@hummytummy.com. KVKK başvuruları ve yasal metinler için başvuru adresleri."
     }
   },
   "qrMenuPage": {

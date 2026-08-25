@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import { setRequestLocale } from 'next-intl/server';
+import { buildPageMetadata } from '@/lib/seo';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
 import Hero from '@/components/sections/Hero';
@@ -13,6 +15,12 @@ import { getCatalog } from '@/lib/api';
 type Props = {
   params: Promise<{ locale: string }>;
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
+  return buildPageMetadata({ locale, path: '', meta: messages.metadata });
+}
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;

@@ -1,14 +1,24 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
+import type { Metadata } from 'next';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { buildPageMetadata } from '@/lib/seo';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
 import ContactForm from '@/components/contact/ContactForm';
 import { Phone, Mail } from 'lucide-react';
 
-export default function ContactPage() {
-  const t = useTranslations('contact');
+type Props = { params: Promise<{ locale: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
+  return buildPageMetadata({ locale, path: '/contact', meta: messages.contact.meta });
+}
+
+export default async function ContactPage({ params }: Props) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations('contact');
 
   return (
     <>

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "HummyTummy - Restaurant Management System",
+    "title": "Restaurant POS & Order Management — Free Core",
     "description": "Modern POS system for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
     "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management, qr code menu, digital menu, cloud kitchen, delivery software"
   },
@@ -358,6 +358,10 @@
         "title": "Contact Us",
         "content": "If you have any questions about this Privacy Policy, please contact us:"
       }
+    },
+    "meta": {
+      "title": "Privacy Policy",
+      "description": "What personal data HummyTummy processes and why, how long it is kept, and what security measures apply. How to exercise your data-subject rights under KVKK and GDPR."
     }
   },
   "terms": {
@@ -418,6 +422,10 @@
         "title": "Contact Us",
         "content": "If you have any questions about these Terms of Service, please contact us:"
       }
+    },
+    "meta": {
+      "title": "Terms of Service",
+      "description": "Terms for using HummyTummy: account responsibility, payment and annual licence terms, scope of service, and intellectual-property provisions."
     }
   },
   "store": {
@@ -485,6 +493,10 @@
         "includes": "What's included",
         "steps": "Process"
       }
+    },
+    "meta": {
+      "title": "Restaurant Hardware Store — Fiscal POS, Thermal Printers, KDS Screens",
+      "description": "Hardware for restaurants: GİB-listed new-generation fiscal POS registers, thermal receipt printers, kitchen display (KDS) monitors, barcode scanners and installation services. Prices published, VAT included."
     }
   },
   "contact": {
@@ -543,6 +555,10 @@
         "network": "Connection problem — please retry.",
         "generic": "Could not send the message. Please try again."
       }
+    },
+    "meta": {
+      "title": "Contact — Sales and Support",
+      "description": "HummyTummy sales and support contact details: phone +90 850 840 73 03, e-mail contact@hummytummy.com. Addresses for KVKK requests and legal documents."
     }
   },
   "qrMenuPage": {

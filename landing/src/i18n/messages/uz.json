@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "HummyTummy - Restoran boshqaruv tizimi",
+    "title": "Restoran POS va buyurtma boshqaruvi — asosiy qismi bepul",
     "description": "Restoranlar uchun zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
     "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish, qr menyu, raqamli menyu, bulutli oshxona, yetkazib berish dasturi"
   },
@@ -358,6 +358,10 @@
         "title": "Biz bilan bog'laning",
         "content": "Ushbu Maxfiylik siyosati bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
       }
+    },
+    "meta": {
+      "title": "Maxfiylik siyosati",
+      "description": "HummyTummy qanday shaxsiy ma’lumotlarni va nima maqsadda qayta ishlaydi, qancha saqlaydi va qanday xavfsizlik choralarini qo‘llaydi. KVKK va GDPR bo‘yicha huquqlaringizdan qanday foydalanish mumkin."
     }
   },
   "terms": {
@@ -418,6 +422,10 @@
         "title": "Biz bilan bog'laning",
         "content": "Ushbu Xizmat shartlari bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
       }
+    },
+    "meta": {
+      "title": "Foydalanish shartlari",
+      "description": "HummyTummy’dan foydalanish shartlari: hisob uchun javobgarlik, to‘lov va yillik litsenziya shartlari, xizmat doirasi va intellektual mulk qoidalari."
     }
   },
   "store": {
@@ -485,6 +493,10 @@
         "includes": "Kiritilgan",
         "steps": "Jarayon"
       }
+    },
+    "meta": {
+      "title": "Restoran uskunalari do‘koni — fiskal POS, termal printer, KDS ekran",
+      "description": "Restoranlar uchun uskunalar: GİB ro‘yxatidagi yangi avlod fiskal POS kassalari, termal chek printerlari, oshxona ekrani (KDS) monitorlari, shtrix-kod skanerlari va o‘rnatish xizmatlari. Narxlar ochiq, QQS ichida."
     }
   },
   "contact": {
@@ -543,6 +555,10 @@
         "network": "Ulanish muammosi — qaytadan urinib ko‘ring.",
         "generic": "Xabar yuborilmadi. Iltimos, qaytadan urinib ko‘ring."
       }
+    },
+    "meta": {
+      "title": "Aloqa — savdo va qo‘llab-quvvatlash",
+      "description": "HummyTummy savdo va qo‘llab-quvvatlash aloqa ma’lumotlari: telefon +90 850 840 73 03, e-pochta contact@hummytummy.com. KVKK murojaatlari va huquqiy hujjatlar uchun manzillar."
     }
   },
   "qrMenuPage": {
