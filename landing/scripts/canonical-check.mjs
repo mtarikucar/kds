@@ -32,6 +32,21 @@ async function text(url) {
 
 const sitemapXml = await text(`${base}/sitemap.xml`);
 let urls = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+
+// The sitemap carries absolute URLs built from NEXT_PUBLIC_BASE_URL, which on a
+// local server still points at the production host. Fetching those would test
+// the deployed site instead of the build in front of you, so the origin is
+// rewritten onto whatever base was asked for. The canonical comparison below
+// then runs against that same base, which is the point: it tells you the build
+// is correct BEFORE it ships, not after.
+urls = urls.map((u) => {
+  try {
+    const parsed = new URL(u);
+    return `${base}${parsed.pathname}`;
+  } catch {
+    return u;
+  }
+});
 if (!urls.length) {
   console.error(`No <loc> entries at ${base}/sitemap.xml`);
   process.exit(1);
@@ -49,9 +64,19 @@ async function worker() {
     try {
       const html = await text(url);
       const canonical = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/i)?.[1];
+      // Compare paths, not full URLs: the host in a canonical tag comes from
+      // the build-time NEXT_PUBLIC_BASE_URL and will legitimately differ from
+      // the origin being probed when checking a local build.
+      const path = (u) => {
+        try {
+          return new URL(u).pathname.replace(/\/+$/, '');
+        } catch {
+          return u.replace(/\/+$/, '');
+        }
+      };
       if (!canonical) {
         fail.push(`${url}\n      no <link rel="canonical"> at all`);
-      } else if (canonical.replace(/\/+$/, '') !== url.replace(/\/+$/, '')) {
+      } else if (path(canonical) !== path(url)) {
         fail.push(`${url}\n      canonicalises to ${canonical}`);
       }
       if (!/hreflang="x-default"/i.test(html)) {

@@ -77,6 +77,12 @@ const RULES = [
     pattern: /tüm veriler[^.\n]{0,90}depolamada[^.\n]{0,30}şifrelen|all data[^.\n]{0,90}(at rest|in storage)[^.\n]{0,25}encrypted/i,
   },
   {
+    id: 'camera-heatmap',
+    why: 'The camera/CV analytics suite ships inert behind CAMERA_ANALYTICS_ENABLED, which is set in no environment file; camera-analytics.gate.ts makes the endpoints answer 404.',
+    retired: 'Masa doluluk ısı haritası: kenar kamera cihazlarıyla salonun yoğun bölgelerini görselleştirin',
+    pattern: /ısı haritas|kenar kamera|heat ?map|тепловая карта/i,
+  },
+  {
     id: 'tip-distribution',
     retired: "Otomatik bahşiş hesaplama ve dağıtımı",
     why: 'Payment.tipAmount is captured and aggregated in reports; no tip pool, split or payout exists.',
@@ -111,6 +117,25 @@ function selfTest() {
 
 selfTest();
 
+/**
+ * Drop comment lines from a source file before scanning it.
+ *
+ * The rules below match copy that ships to a reader. A comment recording why a
+ * claim was removed contains that claim by necessity, and tripping on it would
+ * push maintainers toward deleting the explanation — the opposite of what this
+ * file is for. Only whole-line comments are stripped, so a claim smuggled onto
+ * the end of a line of real copy is still caught.
+ */
+function stripComments(source) {
+  return source
+    .split('\n')
+    .filter((line) => {
+      const t = line.trim();
+      return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*'));
+    })
+    .join('\n');
+}
+
 function walk(value, path, out) {
   if (typeof value === 'string') out.push([path, value]);
   else if (Array.isArray(value)) value.forEach((v, i) => walk(v, `${path}[${i}]`, out));
@@ -133,7 +158,7 @@ targets.push(['public/llms.txt', readFileSync(join(root, 'public/llms.txt'), 'ut
 const contentDir = join(root, 'src/content');
 if (existsSync(contentDir)) {
   for (const file of readdirSync(contentDir).filter((f) => f.endsWith('.ts'))) {
-    targets.push([`content/${file}`, readFileSync(join(contentDir, file), 'utf8')]);
+    targets.push([`content/${file}`, stripComments(readFileSync(join(contentDir, file), 'utf8'))]);
   }
 }
 

@@ -1,5 +1,8 @@
 import { MetadataRoute } from 'next';
 import { locales, defaultLocale } from '@/i18n/config';
+import { MODULES, SECTORS } from '@/content/catalog';
+import { MODULE_CONTENT } from '@/content/modules';
+import { SECTOR_CONTENT } from '@/content/sectors';
 
 // v2.8.98 — pull catalog SKUs at build/revalidate time so /store/[sku]
 // pages land in the sitemap. The store/[sku] page already revalidates
@@ -66,6 +69,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // would submit four 404s per route.
   const trOnlyRoutes: Array<{ path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }> = [
     { path: '/e-adisyon-zorunlu-mu', priority: 0.9, changeFrequency: 'monthly' },
+    { path: '/ozellikler', priority: 0.85, changeFrequency: 'weekly' },
+    { path: '/cozumler', priority: 0.85, changeFrequency: 'weekly' },
+    // Deep-dive pages. Only slugs that actually render are submitted: a module
+    // that is hidden, that has no copy, or that redirects to a richer page
+    // would be a sitemap URL answering 404 or 308, which erodes crawl trust.
+    ...MODULES.filter(
+      (m) => !m.hidden && !m.redirectTo && MODULE_CONTENT[m.slug],
+    ).map((m) => ({
+      path: `/ozellikler/${m.slug}`,
+      priority: 0.75,
+      changeFrequency: 'monthly' as const,
+    })),
+    ...SECTORS.filter((s) => SECTOR_CONTENT[s.slug]).map((s) => ({
+      path: `/cozumler/${s.slug}`,
+      priority: 0.75,
+      changeFrequency: 'monthly' as const,
+    })),
   ];
 
   const entries: MetadataRoute.Sitemap = [];
