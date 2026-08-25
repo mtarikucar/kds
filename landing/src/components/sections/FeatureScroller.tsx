@@ -51,7 +51,7 @@ export default function FeatureScroller() {
       bullets: t.raw('orderManagement.bullets') as string[],
       metrics: [
         { label: t('orderManagement.metrics.orderProcessing'), value: t('orderManagement.metrics.faster'), isText: true },
-        { label: t('orderManagement.metrics.tableTurnover'), value: 25, prefix: '+', suffix: '%' },
+        { label: t('orderManagement.metrics.tableTurnover'), value: t('orderManagement.metrics.dragDrop'), isText: true },
       ],
       mockup: 'orders',
       color: 'blue',
@@ -63,8 +63,8 @@ export default function FeatureScroller() {
       description: t('posPayments.description'),
       bullets: t.raw('posPayments.bullets') as string[],
       metrics: [
-        { label: t('posPayments.metrics.paymentSuccess'), value: 99.9, suffix: '%' },
-        { label: t('posPayments.metrics.checkoutTime'), value: 30, prefix: '<', suffix: 's' },
+        { label: t('posPayments.metrics.paymentSuccess'), value: t('posPayments.metrics.paymentSuccessValue'), isText: true },
+        { label: t('posPayments.metrics.checkoutTime'), value: t('posPayments.metrics.checkoutTimeValue'), isText: true },
       ],
       mockup: 'pos',
       color: 'green',
@@ -76,8 +76,8 @@ export default function FeatureScroller() {
       description: t('kitchenFlow.description'),
       bullets: t.raw('kitchenFlow.bullets') as string[],
       metrics: [
-        { label: t('kitchenFlow.metrics.orderErrors'), value: 85, prefix: '-', suffix: '%' },
-        { label: t('kitchenFlow.metrics.avgPrepTime'), value: 12, suffix: ' min' },
+        { label: t('kitchenFlow.metrics.orderErrors'), value: t('kitchenFlow.metrics.orderErrorsValue'), isText: true },
+        { label: t('kitchenFlow.metrics.avgPrepTime'), value: t('kitchenFlow.metrics.avgPrepTimeValue'), isText: true },
       ],
       mockup: 'kitchen',
       color: 'red',

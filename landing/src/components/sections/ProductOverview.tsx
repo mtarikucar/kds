@@ -1,13 +1,11 @@
 'use client';
 
 import { Container } from '@/components/ui/Container';
-import { Zap, Shield, TrendingUp, Globe } from 'lucide-react';
+import { Zap, Shield, TrendingUp, Globe, Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { getStats } from '@/lib/api';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 export default function ProductOverview() {
-  const stats = getStats();
   const t = useTranslations('product');
   const sectionRef = useScrollReveal<HTMLElement>();
 
@@ -86,29 +84,33 @@ export default function ProductOverview() {
                 </div>
               </div>
 
-              {/* Panel 2 - Analytics */}
+              {/* Panel 2 - What the free core includes.
+                  This panel used to render platform-wide totals (revenue,
+                  orders, active restaurants) sourced from a stats file whose
+                  formatter turned a real zero into "500+". Those numbers were
+                  never measured. It now states what the free baseline grants,
+                  each line of which is enforced in
+                  backend/src/modules/entitlements/free-baseline.const.ts. */}
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-slate-900">Platform Performance</h4>
-                  <span className="text-xs text-slate-500">all time</span>
+                  <h4 className="font-semibold text-slate-900">{t('panels.included')}</h4>
+                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                    {t('panels.free')}
+                  </span>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{stats.totalRevenue}</div>
-                    <div className="text-xs text-green-600">Total</div>
-                    <div className="text-xs text-slate-500 mt-1">Revenue</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{stats.orderCount}</div>
-                    <div className="text-xs text-green-600">Processed</div>
-                    <div className="text-xs text-slate-500 mt-1">Orders</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-slate-900">{stats.restaurantCount}</div>
-                    <div className="text-xs text-green-600">Active</div>
-                    <div className="text-xs text-slate-500 mt-1">Restaurants</div>
-                  </div>
-                </div>
+                <ul className="space-y-2.5">
+                  {[
+                    t('panels.itemsTables'),
+                    t('panels.users'),
+                    t('panels.noMonthly'),
+                    t('panels.languages'),
+                  ].map((line) => (
+                    <li key={line} className="flex items-start gap-2.5 text-sm text-slate-700">
+                      <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
 

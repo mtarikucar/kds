@@ -47,8 +47,8 @@
         "description": "Siparişleri dakikalar değil, saniyeler içinde işleyin. Hız için optimize edildi."
       },
       "secure": {
-        "title": "Güvenli ve Güvenilir",
-        "description": "Kurumsal düzeyde güvenlikle %99.9 çalışma süresi."
+        "title": "Yetkili Erişim",
+        "description": "Rol bazlı yetkilendirme, şube bazlı veri ayrımı ve şifreli bağlantı."
       },
       "insights": {
         "title": "Eyleme Dönüştürülebilir Bilgiler",
@@ -56,7 +56,7 @@
       },
       "global": {
         "title": "Her Yerde Çalışır",
-        "description": "Çoklu dil, çoklu para birimi desteği."
+        "description": "Arayüz beş dilde. Bulut tabanlı — kurulum yok, 81 ilde aynı gün."
       }
     },
     "panels": {
@@ -67,14 +67,12 @@
       "preparing": "Hazırlanıyor",
       "ready": "Hazır",
       "new": "Yeni",
-      "platformPerformance": "Platform Performansı",
-      "allTime": "tüm zamanlar",
-      "total": "Toplam",
-      "revenue": "Gelir",
-      "processed": "İşlenen",
-      "orders": "Siparişler",
-      "active": "Aktif",
-      "restaurants": "Restoranlar"
+      "included": "Çekirdekte dahil",
+      "free": "Ücretsiz",
+      "itemsTables": "Sınırsız ürün, kategori ve masa",
+      "users": "Sınırsız kullanıcı ve rol",
+      "noMonthly": "Kurulum ve aylık ücret yok",
+      "languages": "Beş dilde arayüz"
     }
   },
   "features": {
@@ -86,8 +84,8 @@
       "description": "Müşterilerin anında tarayıp göz atabileceği güzel dijital menüler oluşturun. Fiyatları ve ürünleri yeniden basmadan gerçek zamanlı güncelleyin.",
       "bullets": [
         "Anında menü güncellemeleri, sıfır baskı maliyeti",
-        "Uluslararası misafirler için çoklu dil desteği",
-        "Alerjen ve diyet bilgisi gösterimi"
+        "Misafir arayüzü beş dilde açılır",
+        "Uygulama indirmeden çalışır — telefon kamerası yeterli"
       ],
       "metrics": {
         "printingCosts": "Baskı maliyetleri",
@@ -100,13 +98,14 @@
       "description": "Tüm salonunuzu gerçek zamanlı kuş bakışı görün. Masa durumunu takip edin, rezervasyonları yönetin ve oturmayı optimize edin.",
       "bullets": [
         "Canlı masa durumlu görsel salon planı",
-        "Akıllı rezervasyon yönetimi",
+        "Rezervasyon yönetimi (yıllık modül)",
         "Masa birleştirme ve ayırma işlevselliği"
       ],
       "metrics": {
-        "orderProcessing": "Sipariş işleme",
-        "faster": "%40 daha hızlı",
-        "tableTurnover": "Masa devir hızı"
+        "orderProcessing": "Masa sayısı",
+        "faster": "Sınırsız",
+        "tableTurnover": "Kat planı",
+        "dragDrop": "Sürükle-bırak"
       }
     },
     "posPayments": {
@@ -115,11 +114,13 @@
       "bullets": [
         "Kart, nakit ve mobil ödemeleri kabul edin",
         "Kolay fatura bölme ve ürün transferi",
-        "Otomatik bahşiş hesaplama ve dağıtımı"
+        "Bahşiş kaydı ve dönemsel bahşiş raporu"
       ],
       "metrics": {
-        "paymentSuccess": "Ödeme başarısı",
-        "checkoutTime": "Ödeme süresi"
+        "paymentSuccess": "Hesap bölme",
+        "checkoutTime": "Ödeme yöntemi",
+        "paymentSuccessValue": "Ürün ve tutar bazlı",
+        "checkoutTimeValue": "Nakit, kart, karma"
       }
     },
     "kitchenFlow": {
@@ -131,21 +132,23 @@
         "Role dayalı personel görev yönetimi"
       ],
       "metrics": {
-        "orderErrors": "Sipariş hataları",
-        "avgPrepTime": "Ort. hazırlık süresi"
+        "orderErrors": "Mutfak ekranı",
+        "avgPrepTime": "Kağıt fiş",
+        "orderErrorsValue": "Gerçek zamanlı",
+        "avgPrepTimeValue": "Gerekmez"
       }
     },
     "multiBranch": {
       "title": "Çoklu Şube Kontrolü",
-      "description": "Tüm lokasyonlarınızı tek bir panelden yönetin. Menüleri standartlaştırın, performansı izleyin ve işinizi ölçeklendirin.",
+      "description": "Lokasyonlarınızı tek panelden yönetin. Menüleri standartlaştırın, performansı karşılaştırın. İlk şube ücretsiz; ek her şube yıllık lisansla eklenir.",
       "bullets": [
         "Merkezi menü ve fiyatlandırma kontrolü",
         "Lokasyonlar arası analitik ve raporlama",
         "Şubeye özel özelleştirme seçenekleri"
       ],
       "metrics": {
-        "branches": "Şubeler",
-        "unlimited": "Sınırsız",
+        "branches": "İlk şube",
+        "unlimited": "Ücretsiz",
         "syncTime": "Senkronizasyon",
         "realTime": "Gerçek zamanlı"
       }
@@ -176,7 +179,7 @@
         "Ekip ve rol yönetimi",
         "Müşteriler",
         "Cihaz ve şube paneli",
-        "Özel marka ve alan adı"
+        "Özel marka ve alt alan adı"
       ]
     },
     "licence": {
@@ -192,27 +195,27 @@
     "prorationNote": "Yıl içinde aldığınız her modül, hesabınızın yıl dönümüne kadar gün bazlı orantılı ücretlendirilir — hepsi tek faturada, tek tarihte yenilenir."
   },
   "business": {
-    "badge": "Önemli Sonuçlar",
-    "title": "Kârlılığınız üzerinde gerçek etki",
-    "subtitle": "HummyTummy müşterileri ilk günden itibaren ölçülebilir iyileşmeler görüyor.",
+    "badge": "Neden HummyTummy",
+    "title": "Restoranı çalıştıran çekirdek ücretsiz",
+    "subtitle": "Paket yok, kullanıcı başına ücret yok, deneme süresi yok. Ağır modülleri ihtiyaç duydukça yıllık alırsınız.",
     "values": {
       "time": {
-        "title": "Zaman Kazanın",
-        "metric": "%40",
-        "metricLabel": "daha hızlı sipariş işleme",
-        "description": "Tekrarlayan görevleri otomatikleştirin ve iş akışınızı kolaylaştırın. Yönetimle daha az, müşterilerle daha fazla zaman geçirin."
+        "title": "Kurulum ve aylık ücret yok",
+        "metric": "₺0",
+        "metricLabel": "çekirdek sistem için",
+        "description": "POS/adisyon, mutfak ekranı, menü yönetimi, masa planı, QR menü ve ekip yönetimi süresiz ücretsizdir. Kredi kartı istemeden başlarsınız."
       },
       "errors": {
-        "title": "Hataları Azaltın",
-        "metric": "%85",
-        "metricLabel": "daha az sipariş hatası",
-        "description": "Dijital sipariş akışı yanlış iletişimi ortadan kaldırır. Siparişler doğrudan masadan mutfağa sıfır karışıklıkla gider."
+        "title": "Sayı sınırı yok",
+        "metric": "Sınırsız",
+        "metricLabel": "ürün, kategori, masa ve kullanıcı",
+        "description": "Menünüzde kaç ürün, salonunuzda kaç masa, ekibinizde kaç kişi olduğu ücreti değiştirmez. Aylık sipariş sayısında da tavan yoktur."
       },
       "revenue": {
-        "title": "Geliri Artırın",
-        "metric": "%25",
-        "metricLabel": "daha yüksek masa devir hızı",
-        "description": "Daha hızlı hizmet, daha fazla müşteri demek. Gerçek zamanlı bilgiler maksimum kârlılık için optimize etmenize yardımcı olur."
+        "title": "Beş dilde arayüz",
+        "metric": "5",
+        "metricLabel": "dil: TR, EN, RU, UZ, AR",
+        "description": "Panel ve mutfak ekranı Türkçe, İngilizce, Rusça, Özbekçe ve Arapça çalışır — karma ekipler herkes kendi dilinde kullanır."
       }
     }
   },
@@ -222,34 +225,34 @@
     "subtitle": "Verileriniz işinizdir. Güvenliği ciddiye alıyoruz, böylece en önemli şeye odaklanabilirsiniz—müşterilerinize hizmet etmek.",
     "points": {
       "encryption": {
-        "title": "Uçtan Uca Şifreleme",
-        "description": "Tüm veriler endüstri standardı AES-256 şifreleme kullanılarak aktarımda ve depolamada şifrelenir."
+        "title": "Şifreli Bağlantı ve Anahtar Saklama",
+        "description": "Tüm trafik TLS ile şifrelenir. Entegrasyon anahtarları ve sağlayıcı parolaları gibi hassas alanlar veritabanında AES-256-GCM ile ayrıca şifrelenir."
       },
       "rbac": {
         "title": "Role Dayalı Erişim Kontrolü",
         "description": "İnce ayarlı izinler, her ekip üyesinin tam olarak neyi görebileceğini ve yapabileceğini kontrol etmenizi sağlar."
       },
       "uptime": {
-        "title": "%99.9 Çalışma Süresi SLA",
-        "description": "Birden fazla veri merkezinde yedeklilik ile kurumsal düzeyde altyapı."
+        "title": "Şube Bazlı Veri Ayrımı",
+        "description": "Her istek, kullanıcının yetkili olduğu şubelere göre sunucu tarafında sınırlandırılır; bir şubenin verisi diğerine sızmaz."
       },
       "compliance": {
         "title": "GDPR ve KVKK Uyumlu",
-        "description": "Avrupa ve Türk veri koruma düzenlemelerine tam uyumluluk."
+        "description": "KVKK ve GDPR kapsamındaki veri sahibi haklarına (erişim, düzeltme, silme, itiraz) yanıt veriyoruz; veri işleme esasları Gizlilik Politikası’nda yazılıdır."
       }
     },
     "visual": {
       "title": "Verileriniz Korunuyor",
-      "subtitle": "Sektör lideri güvenlik önlemleri işinizi güvende tutar.",
+      "subtitle": "Yetkilendirme, şube ayrımı ve şifreleme sunucu tarafında uygulanır.",
       "encryption": "Şifreleme",
-      "uptime": "Çalışma Süresi",
-      "monitoring": "İzleme",
+      "uptime": "Şube ayrımı",
+      "monitoring": "Rol bazlı erişim",
       "compliant": "Uyumlu"
     }
   },
   "cta": {
     "title": "Restoranınızı dönüştürmeye hazır mısınız?",
-    "subtitle": "Operasyonları kolaylaştırmak ve işlerini büyütmek için HummyTummy kullanan {count} restorana katılın.",
+    "subtitle": "Kaydolun, menünüzü ekleyin, ilk siparişinizi alın. Kredi kartı gerekmez.",
     "primaryBtn": "Ücretsiz başla",
     "secondaryBtn": "Satışla konuş",
     "trustBadge1": "Kredi kartı gerekmez",
@@ -301,7 +304,7 @@
     "title": "Gizlilik Politikası",
     "backToHome": "Ana Sayfaya Dön",
     "lastUpdated": "Son Güncelleme",
-    "lastUpdatedDate": "Ocak 2025",
+    "lastUpdatedDate": "Ağustos 2026",
     "sections": {
       "introduction": {
         "title": "Giriş",
@@ -330,7 +333,7 @@
       },
       "dataSecurity": {
         "title": "Veri Güvenliği",
-        "content": "Kişisel verilerinizi yetkisiz erişim, değiştirme, ifşa veya imhaya karşı korumak için uygun teknik ve organizasyonel güvenlik önlemleri uyguluyoruz. Tüm veriler, endüstri standardı AES-256 şifreleme kullanılarak aktarımda ve depolamada şifrelenir."
+        "content": "Kişisel verilerinizi yetkisiz erişim, değiştirme, ifşa veya imhaya karşı korumak için uygun teknik ve organizasyonel güvenlik önlemleri uyguluyoruz. Sunucularımızla aranızdaki tüm trafik TLS ile şifrelenir. Entegrasyon anahtarları ve sağlayıcı parolaları gibi hassas alanlar veritabanında AES-256-GCM ile ayrıca şifrelenir. Erişim, rol bazlı yetkilendirme ve şube kapsamı ile sunucu tarafında sınırlandırılır."
       },
       "cookies": {
         "title": "Çerezler ve İzleme",
@@ -361,7 +364,7 @@
     "title": "Kullanım Şartları",
     "backToHome": "Ana Sayfaya Dön",
     "lastUpdated": "Son Güncelleme",
-    "lastUpdatedDate": "Ocak 2025",
+    "lastUpdatedDate": "Ağustos 2026",
     "sections": {
       "acceptance": {
         "title": "Şartların Kabulü",
@@ -545,14 +548,14 @@
   "qrMenuPage": {
     "meta": {
       "title": "QR Menü Oluştur — Ücretsiz Karekod Menü",
-      "description": "Restoranınız için ücretsiz QR menü (karekod menü) oluşturun: sınırsız ürün, anında fiyat güncelleme, çok dilli menü, alerjen bilgisi ve masadan sipariş. 5 dakikada kurulur, kredi kartı gerekmez.",
+      "description": "Restoranınız için ücretsiz QR menü (karekod menü) oluşturun: sınırsız ürün ve kategori, anında fiyat güncelleme, beş dilde misafir arayüzü ve masadan sipariş. 5 dakikada kurulur, kredi kartı gerekmez.",
       "keywords": "qr menü, karekod menü, qr kod menü, qr menü oluşturma, ücretsiz qr menü, dijital menü, temassız menü, restoran qr menü, kafe qr menü, online menü"
     },
     "hero": {
       "badge": "Ücretsiz ve sınırsız",
       "title": "Karekod menünüz",
       "titleHighlight": "5 dakikada yayında",
-      "subtitle": "Müşteriniz masadaki karekodu telefonuna okutur, menünüz anında açılır — uygulama indirmeden. Fiyat değişikliği saniyeler içinde yayında, baskı maliyeti sıfır. HummyTummy'de QR menü tamamen ücretsizdir: ürün, kategori, masa ve şube sınırı yoktur.",
+      "subtitle": "Müşteriniz masadaki karekodu telefonuna okutur, menünüz anında açılır — uygulama indirmeden. Fiyat değişikliği saniyeler içinde yayında, baskı maliyeti sıfır. HummyTummy’de QR menü tamamen ücretsizdir: ürün, kategori, masa ve kullanıcı sınırı yoktur.",
       "ctaPrimary": "Ücretsiz QR menü oluştur",
       "ctaSecondary": "Bize ulaşın",
       "trust1": "Kredi kartı gerekmez",
@@ -590,16 +593,16 @@
           "description": "Müşteri menüye bakmakla kalmaz, dilerse siparişini masadan verir; sipariş mutfak ekranına ve kasaya anında düşer."
         },
         {
-          "title": "Çok dilli menü",
-          "description": "Menünüz Türkçe, İngilizce, Rusça, Arapça ve Özbekçe görüntülenebilir — turist misafirleriniz için garson beklemeye gerek yok."
+          "title": "Beş dilde misafir arayüzü",
+          "description": "Menü arayüzü Türkçe, İngilizce, Rusça, Arapça ve Özbekçe açılır; kategori ve buton metinleri misafirin dilinde görünür. Ürün adlarını siz hangi dilde yazarsanız o dilde kalır."
         },
         {
-          "title": "Alerjen ve diyet bilgisi",
-          "description": "Gluten, laktoz, vegan gibi etiketleri ürünlere ekleyin; misafirleriniz güvenle seçim yapsın."
+          "title": "Ürün görselleri",
+          "description": "Ürünlerinize fotoğraf ekleyin; misafir ne sipariş ettiğini görerek seçer. Görseller panelden sürükle-bırak yüklenir."
         },
         {
           "title": "Markanıza özel",
-          "description": "Logo, kapak görseli ve renkleriyle menü size ait görünür; özel alan adı bile bağlayabilirsiniz."
+          "description": "Logo, kapak görseli ve renkleriyle menü size ait görünür; menünüz size özel bir alt alan adında yayınlanır."
         },
         {
           "title": "POS ve mutfakla entegre",
@@ -646,11 +649,11 @@
         },
         {
           "q": "Menü birden fazla dilde gösterilebilir mi?",
-          "a": "Evet. Menünüzü Türkçe, İngilizce, Rusça, Arapça ve Özbekçe sunabilirsiniz; müşteri dili tek dokunuşla değiştirir."
+          "a": "Menü arayüzü beş dilde açılır: Türkçe, İngilizce, Rusça, Arapça ve Özbekçe. Misafir dili tek dokunuşla değiştirir; kategori başlıkları ve buton metinleri o dile geçer. Ürün adlarını ve açıklamalarını siz hangi dilde girdiyseniz o dilde görünür — ürün bazlı çeviri henüz yoktur."
         },
         {
-          "q": "Alerjen bilgisi ekleyebilir miyim?",
-          "a": "Evet. Ürünlere alerjen ve diyet etiketleri (gluten, laktoz, vegan vb.) ekleyebilirsiniz; etiketler menüde ürünün yanında görünür."
+          "q": "Ürünlere fotoğraf ekleyebilir miyim?",
+          "a": "Evet. Panelden ürünün üzerine sürükleyip bırakarak fotoğraf yükleyebilirsiniz; görsel menüde ürünün yanında görünür. Fotoğraf sayısında ücret farkı yoktur."
         },
         {
           "q": "Hangi şehirlerde kullanabilirim?",
@@ -669,7 +672,7 @@
   "cloudKitchenPage": {
     "meta": {
       "title": "Bulut Mutfak Yazılımı — Tüm Platformlar Tek Ekranda",
-      "description": "Bulut mutfak ve paket servis işletmeleri için sipariş yönetimi: Yemeksepeti, Getir, Trendyol ve Migros Yemek siparişleri tek ekranda toplanır, mutfak ekranına otomatik düşer. Çok markalı sanal mutfaklar için sınırsız menü ve şube.",
+      "description": "Bulut mutfak ve paket servis işletmeleri için sipariş yönetimi: Yemeksepeti, Getir, Trendyol ve Migros Yemek siparişleri tek ekranda toplanır, mutfak ekranına otomatik düşer. Çok markalı sanal mutfaklar için sınırsız menü ve kategori.",
       "keywords": "bulut mutfak, cloud kitchen, sanal mutfak, hayalet mutfak, paket servis yazılımı, yemeksepeti entegrasyonu, getir entegrasyonu, trendyol yemek entegrasyonu, paket servis pos"
     },
     "hero": {
@@ -681,7 +684,7 @@
       "ctaSecondary": "Bize ulaşın",
       "trust1": "4 platform entegrasyonu",
       "trust2": "Mutfak ekranı dahil",
-      "trust3": "Sınırsız marka ve şube"
+      "trust3": "Sınırsız marka menüsü"
     },
     "pain": {
       "title": "Tablet kaosuna son",
@@ -728,7 +731,7 @@
         },
         {
           "title": "Çok markalı mutfak",
-          "description": "Tek mutfaktan birden fazla sanal marka mı işletiyorsunuz? Her marka için ayrı menü ve şube tanımlayın — sınırsız."
+          "description": "Tek mutfaktan birden fazla sanal marka mı işletiyorsunuz? Her marka için ayrı menü ve kategori tanımlayın — menü sayısında sınır yoktur. Markaları ayrı şubelere bölmek isterseniz ek şube yıllık lisansla eklenir."
         },
         {
           "title": "Telefon siparişi ve paket takibi",
@@ -761,7 +764,7 @@
         },
         {
           "q": "Tek mutfaktan birden fazla markayı yönetebilir miyim?",
-          "a": "Evet. Her sanal markanız için ayrı menü ve şube tanımlarsınız; marka ve şube sayısında sınır yoktur."
+          "a": "Evet. Her sanal markanız için ayrı menü ve kategori tanımlarsınız; menü sayısında sınır yoktur. Markaları ayrı şube olarak yönetmek isterseniz ilk şube ücretsizdir, ek her şube yıllık lisansla eklenir."
         },
         {
           "q": "Fiyatlandırma nasıl?",
