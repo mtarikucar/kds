@@ -66,6 +66,13 @@ export class MenuQueryService {
       select: {
         id: true,
         name: true,
+        // The public menu is the only money-rendering surface a customer
+        // reaches without logging in, and it has no other source for these:
+        // the frontend seeds its cart store from `tenant.currency` and falls
+        // back to "TRY" when it is absent. Omitting the column made every
+        // menu render in lira regardless of the tenant's country.
+        currency: true,
+        countryCode: true,
         wifiSsid: true,
         socialInstagram: true,
         socialFacebook: true,
@@ -313,6 +320,8 @@ export class MenuQueryService {
       tenant: {
         id: tenant.id,
         name: tenant.name,
+        currency: tenant.currency,
+        countryCode: tenant.countryCode,
         wifi: tenant.wifiSsid
           ? {
               ssid: tenant.wifiSsid,
