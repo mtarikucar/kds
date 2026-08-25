@@ -14,7 +14,9 @@
     "signIn": "Kirish",
     "startFree": "Bepul boshlash",
     "openMenu": "Menyuni ochish",
-    "closeMenu": "Menyuni yopish"
+    "closeMenu": "Menyuni yopish",
+    "modules": "Imkoniyatlar",
+    "sectors": "Yechimlar"
   },
   "hero": {
     "badge": "Hozirda {count} ta restoranlarnga xizmat ko'rsatmoqdamiz",
@@ -247,7 +249,25 @@
       "encryption": "Shifrlash",
       "uptime": "Filial doirasi",
       "monitoring": "Rolga asoslangan kirish",
-      "compliant": "Muvofiq"
+      "compliant": "Muvofiq",
+      "tiles": [
+        {
+          "value": "TLS",
+          "label": "Shifrlangan ulanish"
+        },
+        {
+          "value": "Rol",
+          "label": "Ruxsat nazorati"
+        },
+        {
+          "value": "Filial",
+          "label": "Ma’lumot ajratish"
+        },
+        {
+          "value": "KVKK",
+          "label": "Ma’lumot subyekti huquqlari"
+        }
+      ]
     }
   },
   "cta": {

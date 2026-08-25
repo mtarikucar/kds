@@ -14,7 +14,9 @@
     "signIn": "Giriş yap",
     "startFree": "Ücretsiz başla",
     "openMenu": "Menüyü aç",
-    "closeMenu": "Menüyü kapat"
+    "closeMenu": "Menüyü kapat",
+    "modules": "Özellikler",
+    "sectors": "Çözümler"
   },
   "hero": {
     "badge": "Şu anda {count} restorana hizmet veriyoruz",
@@ -247,7 +249,25 @@
       "encryption": "Şifreleme",
       "uptime": "Şube ayrımı",
       "monitoring": "Rol bazlı erişim",
-      "compliant": "Uyumlu"
+      "compliant": "Uyumlu",
+      "tiles": [
+        {
+          "value": "TLS",
+          "label": "Şifreli bağlantı"
+        },
+        {
+          "value": "Rol",
+          "label": "Bazlı yetkilendirme"
+        },
+        {
+          "value": "Şube",
+          "label": "Bazlı veri ayrımı"
+        },
+        {
+          "value": "KVKK",
+          "label": "Veri sahibi hakları"
+        }
+      ]
     }
   },
   "cta": {

@@ -3,44 +3,45 @@
 import { Container } from '@/components/ui/Container';
 import { Clock, CheckCircle, TrendingUp } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { AnimatedCounter } from '@/components/animations/AnimatedCounter';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 export default function BusinessValue() {
   const t = useTranslations('business');
   const sectionRef = useScrollReveal<HTMLElement>();
 
+  // The metric was a hardcoded number (50 / 85 / 25) with a '%' suffix, counted
+  // up by AnimatedCounter. Those were unmeasured outcome claims presented as
+  // customer results, and removing them from the message catalogs did nothing
+  // because this component never read `values.*.metric` — it only read the
+  // labels. The number now comes from the catalog like everything else, and is
+  // rendered as text: '₺0' and 'Sınırsız' are not things a counter can count.
   const values = [
     {
       key: 'time',
       icon: Clock,
       title: t('values.time.title'),
-      metric: 50,
+      metric: t('values.time.metric'),
       metricLabel: t('values.time.metricLabel'),
       description: t('values.time.description'),
       color: 'blue',
-      suffix: '%',
     },
     {
       key: 'errors',
       icon: CheckCircle,
       title: t('values.errors.title'),
-      metric: 85,
+      metric: t('values.errors.metric'),
       metricLabel: t('values.errors.metricLabel'),
       description: t('values.errors.description'),
       color: 'green',
-      suffix: '%',
     },
     {
       key: 'revenue',
       icon: TrendingUp,
       title: t('values.revenue.title'),
-      metric: 25,
+      metric: t('values.revenue.metric'),
       metricLabel: t('values.revenue.metricLabel'),
       description: t('values.revenue.description'),
       color: 'orange',
-      prefix: '+',
-      suffix: '%',
     },
   ];
 
@@ -147,13 +148,7 @@ export default function BusinessValue() {
                       {/* Animated metric */}
                       <div className="mb-4">
                         <span className="text-6xl font-bold text-white">
-                          <AnimatedCounter
-                            value={value.metric}
-                            prefix={value.prefix}
-                            suffix={value.suffix}
-                            duration={2}
-                            delay={0.5 + index * 0.2}
-                          />
+                          {value.metric}
                         </span>
                         <span className="text-slate-400 ml-2 text-lg">{value.metricLabel}</span>
                       </div>

@@ -8,14 +8,24 @@
  * as more trustworthy than an undated one, so the date has to mean something.
  *
  * Every row carries `capturedAt`, the day that vendor's page was actually read.
- * When any row passes MAX_AGE_DAYS the build stops until someone re-reads the
- * source. There is no "warn and continue" mode on purpose: a warning in a CI
- * log is a warning nobody sees.
+ * When any row passes MAX_AGE_DAYS this fails, until someone re-reads the source.
+ *
+ * `--warn` downgrades that to a loud message with exit 0, and exists for one
+ * specific reason. quality-gates.yml is `workflow_call`ed by release-deploy.yml
+ * with `build: needs: quality` and `deploy: needs: build`, and landing's
+ * prebuild runs inside the Docker build. Strict everywhere would mean that on
+ * the day the oldest row turns 121, an unrelated backend hotfix cannot reach
+ * production because a competitor's price is stale. Staleness on a marketing
+ * page is not a reason to wedge a deploy.
+ *
+ * So: strict on pull requests, where a person is present and can act; warn on
+ * the release path, where they are not.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const warnOnly = process.argv.includes('--warn');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const file = join(root, 'src/content/pricing-index.ts');
 const source = readFileSync(file, 'utf8');
@@ -33,8 +43,19 @@ const re = /sourceUrl:\s*'([^']+)'[\s\S]{0,200}?capturedAt:\s*'(\d{4}-\d{2}-\d{2
 let m;
 while ((m = re.exec(source))) entries.push({ url: m[1], captured: m[2] });
 
-if (!entries.length) {
-  console.error('pricing-freshness: no capturedAt entries found — did the file shape change?');
+// Reconcile against a direct count of the dates. The pairing regex needs
+// sourceUrl to sit within 200 characters before capturedAt, so reordering the
+// fields, inserting one between them, or double-quoting a URL would drop that
+// row from the check silently — a row could then carry any date at all and the
+// script would still report OK. Failing open is the one behaviour a freshness
+// gate must not have.
+const declared = (source.match(/capturedAt:\s*'\d{4}-\d{2}-\d{2}'/g) ?? []).length;
+if (!entries.length || entries.length !== declared) {
+  console.error(
+    `pricing-freshness: paired ${entries.length} row(s) but the file declares ${declared} ` +
+      'capturedAt value(s). Every row must keep sourceUrl immediately before capturedAt, ' +
+      'single-quoted, or this check silently stops covering it.',
+  );
   process.exit(1);
 }
 
@@ -58,7 +79,8 @@ if (stale.length) {
   console.error(
     '\nDo not bump capturedAt without re-reading the page. The date is the claim.\n',
   );
-  process.exit(1);
+  if (!warnOnly) process.exit(1);
+  console.error('(--warn: continuing anyway so this cannot block an unrelated deploy)\n');
 }
 
 const oldest = Math.max(

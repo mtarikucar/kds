@@ -14,7 +14,9 @@
     "signIn": "Sign in",
     "startFree": "Start free",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "modules": "Features",
+    "sectors": "Solutions"
   },
   "hero": {
     "badge": "Now serving {count} restaurants",
@@ -247,7 +249,25 @@
       "encryption": "Encryption",
       "uptime": "Branch scope",
       "monitoring": "Role-based access",
-      "compliant": "Compliant"
+      "compliant": "Compliant",
+      "tiles": [
+        {
+          "value": "TLS",
+          "label": "Encrypted connection"
+        },
+        {
+          "value": "Roles",
+          "label": "Permission control"
+        },
+        {
+          "value": "Branch",
+          "label": "Scoped data"
+        },
+        {
+          "value": "KVKK",
+          "label": "Data-subject rights"
+        }
+      ]
     }
   },
   "cta": {

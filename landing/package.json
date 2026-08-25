@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "next dev",
     "i18n-check": "node scripts/i18n-check.mjs",
-    "prebuild": "node scripts/i18n-check.mjs && node scripts/claims-check.mjs && node scripts/pricing-freshness.mjs",
+    "prebuild": "node scripts/i18n-check.mjs && node scripts/claims-check.mjs && node scripts/pricing-freshness.mjs --warn",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "claims-check": "node scripts/claims-check.mjs",
     "canonical-check": "node scripts/canonical-check.mjs",
-    "pricing-freshness": "node scripts/pricing-freshness.mjs"
+    "pricing-freshness": "node scripts/pricing-freshness.mjs",
+    "indexnow": "node scripts/indexnow-submit.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.37.0",

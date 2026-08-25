@@ -85,7 +85,14 @@ jobs:
       - name: Marketing claims
         run: npm run claims-check
 
+      # Strict on pull requests only. This workflow is `workflow_call`ed by
+      # release-deploy.yml with `build: needs: quality` and `deploy: needs:
+      # build`, so a hard failure here would stop an unrelated backend hotfix
+      # reaching production because a competitor's published price is 121 days
+      # old. On a PR a person is present and can re-read the pages; on the
+      # release path they are not, and landing's prebuild warns instead.
       - name: Price index freshness
+        if: github.event_name == 'pull_request'
         run: npm run pricing-freshness
 
   backend-e2e:

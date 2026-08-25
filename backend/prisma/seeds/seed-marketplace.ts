@@ -683,7 +683,11 @@ export const SERVICES = [
     category: "service",
     name: "Eski POS'tan menü migrasyonu (şube başı)",
     description:
-      "Eski POS sisteminizdeki menüyü Excel/CSV/API üzerinden alır, HummyTummy formatına dönüştürür, kategorileri + modifiyeleri + alerjenleri eşleriz. Şube başına fiyatlandırılır.",
+      // No allergen mapping: there is no allergen field in the schema, so this
+      // service cannot map one. The claim was removed from the marketing site as
+      // food-safety exposure; it shipped on here through this description, which
+      // the landing pricing section and /store render verbatim from the API.
+      "Eski POS sisteminizdeki menüyü Excel/CSV/API üzerinden alır, HummyTummy formatına dönüştürür, kategorileri ve modifiyeleri eşleriz. Şube başına fiyatlandırılır.",
     priceCents: 200_000,
     images: ["/products/_fallback-service.svg"],
     serviceMeta: { serviceType: "remote", requiresBranch: true },
@@ -691,7 +695,7 @@ export const SERVICES = [
       includes: [
         "Eski POS export'unun (Excel/CSV/JSON) alınması",
         "200 ürüne kadar otomatik dönüşüm",
-        "Kategori + modifiye + alerjen eşleme",
+        "Kategori ve modifiye eşleme",
         "Yüklenen menü için sizin onayınızla yayına alma",
       ],
       requirements: [

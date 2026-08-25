@@ -14,7 +14,7 @@
  * that ships the capability — never to make a build pass.
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -77,6 +77,18 @@ const RULES = [
     pattern: /tüm veriler[^.\n]{0,90}depolamada[^.\n]{0,30}şifrelen|all data[^.\n]{0,90}(at rest|in storage)[^.\n]{0,25}encrypted/i,
   },
   {
+    id: 'hardcoded-outcome-metric',
+    why: 'Twice on this branch a corrected claim went on rendering because the number lived in a component as a bare literal, not in the message catalog: TrustSecurity shipped 99.9%/Uptime, and BusinessValue counted up 50/85/25 with a % suffix while the rewritten catalog keys sat unread. A percentage assembled in JSX is a claim no text-matching rule can see.',
+    retired: "      metric: 85,\n      metricLabel: t('values.errors.metricLabel'),\n      suffix: '%',",
+    pattern: /metric:\s*\d|suffix:\s*['"]%['"]|suffix=\{?['"]%['"]/,
+  },
+  {
+    id: 'reservation-reminder',
+    why: 'No reservation reminder exists: ReservationEvent is a closed union of created|confirmed|rejected|cancelled with an exhaustive EMAIL_SUBJECTS record, backend/templates/emails carries exactly those four .hbs files, and neither of the reservations module crons notifies anyone.',
+    retired: 'Zamanlayıcı saat yaklaşınca e-posta, gerekirse SMS ile hatırlatma gönderir',
+    pattern: /hatırlatma gönder|hatırlatma zamanlayıcı|reservation reminder|напоминани[ея] о брони/i,
+  },
+  {
     id: 'camera-heatmap',
     why: 'The camera/CV analytics suite ships inert behind CAMERA_ANALYTICS_ENABLED, which is set in no environment file; camera-analytics.gate.ts makes the endpoints answer 404.',
     retired: 'Masa doluluk ısı haritası: kenar kamera cihazlarıyla salonun yoğun bölgelerini görselleştirin',
@@ -127,13 +139,21 @@ selfTest();
  * the end of a line of real copy is still caught.
  */
 function stripComments(source) {
-  return source
-    .split('\n')
-    .filter((line) => {
-      const t = line.trim();
-      return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*'));
-    })
-    .join('\n');
+  return (
+    source
+      // Block comments first, including the JSX `{/* … */}` form — the braces
+      // sit outside the comment so the same pattern covers both. Without this,
+      // a comment explaining WHY a claim was removed trips the rule that
+      // removed it, and the only way to make the build pass is to delete the
+      // explanation. Line-by-line filtering could not do this: the middle lines
+      // of a block comment start with ordinary words.
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      // Then whole-line `//` comments. A claim appended to the end of a line of
+      // real copy is deliberately still caught.
+      .filter((line) => !line.trim().startsWith('//'))
+      .join('\n')
+  );
 }
 
 function walk(value, path, out) {
@@ -160,6 +180,60 @@ if (existsSync(contentDir)) {
   for (const file of readdirSync(contentDir).filter((f) => f.endsWith('.ts'))) {
     targets.push([`content/${file}`, stripComments(readFileSync(join(contentDir, file), 'utf8'))]);
   }
+}
+
+/**
+ * Components and pages.
+ *
+ * Added after a miss that proves the point: the "%99.9 SLA" wording was removed
+ * from all five message catalogs, and this gate enforced that — while the same
+ * claim went on rendering on the locale homepage from a hardcoded JSX literal
+ * (`<div>99.9%</div><div>Uptime</div>`) that no catalog contained. A claim
+ * scanner that only reads the translation files checks the tidy half of the
+ * site.
+ *
+ * Everything a visitor can read is in scope, wherever it is written.
+ */
+function walkFiles(dir, exts, acc = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) walkFiles(full, exts, acc);
+    else if (exts.some((e) => entry.name.endsWith(e))) acc.push(full);
+  }
+  return acc;
+}
+
+for (const dir of ['src/components', 'src/app']) {
+  const abs = join(root, dir);
+  if (!existsSync(abs)) continue;
+  for (const file of walkFiles(abs, ['.tsx', '.ts'])) {
+    targets.push([
+      relative(root, file),
+      stripComments(readFileSync(file, 'utf8')),
+    ]);
+  }
+}
+
+/**
+ * Backend catalogue text.
+ *
+ * The pricing section and the hardware store fetch product names, descriptions
+ * and `includes` lists from the API and render them verbatim, so this copy is
+ * published on landing pages even though it is authored in another package. The
+ * allergen claim removed from all five locales went on shipping for exactly
+ * this reason — through a service SKU description on /store.
+ *
+ * Reaching across packages is deliberate. The rule is "everything a visitor can
+ * read on this site", not "everything in this directory". Skipped silently if
+ * the backend is not present (a landing-only checkout).
+ */
+for (const rel of [
+  '../backend/prisma/seeds/seed-marketplace.ts',
+  '../backend/src/modules/marketplace/alacarte-catalog.const.ts',
+]) {
+  const abs = join(root, rel);
+  if (!existsSync(abs)) continue;
+  targets.push([rel, stripComments(readFileSync(abs, 'utf8'))]);
 }
 
 const violations = [];

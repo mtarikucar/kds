@@ -22,6 +22,25 @@ başkasının sayfasından gelir; kendi siteniz yüzeyin %10–18'i kadardır.
 - [ ] **Google İşletme Profili** — kategorisinde görünen tek puan şu an
       rakibinizin.
 
+## 1b. Dağıtımdan hemen sonra (tek komut)
+
+- [ ] **IndexNow gönderimi** — Bing'e (dolayısıyla Copilot'a) yeni URL'leri
+      taranmayı beklemeden bildirir. Google IndexNow kullanmadığını açıkça
+      söylüyor; bu adım Bing/Copilot içindir.
+
+          node --use-system-ca landing/scripts/indexnow-submit.mjs https://landing.hummytummy.com
+
+      Anahtar dosyası `landing/public/` içinde ve dağıtımla birlikte
+      `https://landing.hummytummy.com/<anahtar>.txt` adresinden servis edilir;
+      motor sahipliği bu dosyayla doğrular. Dosya yayında değilken göndermeyin.
+      Önce `--dry-run` ile ne gönderileceğini görebilirsiniz.
+
+- [ ] **Katalog seed'ini çalıştırın** — GitHub Actions → *Seed Runner* →
+      `prisma/seeds/seed-marketplace.ts`, ortam `prod`. Seed dağıtımda otomatik
+      koşmaz (içerik değişikliği olduğu için bilinçli bir tercih). Bu dalda
+      katalogdan kaldırılan "alerjen eşleme" ifadesi, seed çalışana kadar
+      canlıda `/store` sayfasında görünmeye devam eder.
+
 ## 2. Bu ay
 
 - [ ] **Şikayetvar profilini sahiplenin** — ilk şikâyet gelmeden. Bu sayfalar

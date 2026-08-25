@@ -65,7 +65,7 @@ export const CONTENT_META: Record<string, ModuleMeta> = {
   raporlar: {
     heroImage: "screenDashboard",
     blockImages: ["reportPhone", "analytics"],
-    related: ["analitik", "stok-envanter", "coklu-sube"],
+    related: ["stok-envanter", "coklu-sube", "raporlar"],
   },
   "coklu-sube": {
     heroImage: "dioramaBuilding",
@@ -92,7 +92,7 @@ export const CONTENT_META: Record<string, ModuleMeta> = {
   personel: {
     heroImage: "supportAgent",
     blockImages: ["mascot", "dioramaInterior"],
-    related: ["raporlar", "coklu-sube", "analitik"],
+    related: ["raporlar", "coklu-sube", "personel"],
   },
   "musteri-sadakat": {
     heroImage: "mascotServe",

@@ -325,10 +325,10 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       eyebrow: "Rezervasyon Yönetimi",
       title: "Boş masa da kalmasın, kapıdan geri dönen misafir de",
       subtitle:
-        "Telefonla gelen talebi de, müşterinin internetten kendi bıraktığı talebi de tek ekranda toplayın. Uygunluğu HummyTummy hesaplasın, ayırdığınız masayı kat planında görün, saat yaklaşınca hatırlatma misafire kendiliğinden gitsin. Rezervasyon defteri, çakışan masalar ve unutulan aramalar geride kalsın.",
+        "Telefonla gelen talebi de, müşterinin internetten kendi bıraktığı talebi de tek ekranda toplayın. Uygunluğu HummyTummy hesaplasın, ayırdığınız masayı kat planında görün, rezervasyonun her durum değişimi misafire kendiliğinden bildirilsin. Rezervasyon defteri, çakışan masalar ve unutulan aramalar geride kalsın.",
     },
     intro:
-      "Akşamın en yoğun saatinde telefon çalıyor, elinizde kalem yok, defterdeki isimler birbirine karışıyor; birazdan gelecek 6 kişilik grubun hangi masaya oturacağını kimse tam bilmiyor. Rezervasyonu kâğıda ya da aklınıza yazdığınız her yerde bu kargaşa kaçınılmaz. HummyTummy rezervasyon modülü bu işi baştan sona dijitalleştirir: personelinizin içeriden aldığı her talep ve müşterinizin internetten kendi bıraktığı her talep aynı takvimde birleşir. Sistem o saatte gerçekten boş masa var mı diye uygunluğu kendisi hesaplar, seçtiğiniz masayı kat planında canlı olarak yerleştirir, saat yaklaşınca misafire hatırlatma gönderir. Siz de sabah ilk iş günün doluluğunu bir bakışta görür, hangi masanın kaçta boşalacağını, hangi grubun kaç kişiyle geleceğini şaşırmadan planlarsınız.",
+      "Akşamın en yoğun saatinde telefon çalıyor, elinizde kalem yok, defterdeki isimler birbirine karışıyor; birazdan gelecek 6 kişilik grubun hangi masaya oturacağını kimse tam bilmiyor. Rezervasyonu kâğıda ya da aklınıza yazdığınız her yerde bu kargaşa kaçınılmaz. HummyTummy rezervasyon modülü bu işi baştan sona dijitalleştirir: personelinizin içeriden aldığı her talep ve müşterinizin internetten kendi bıraktığı her talep aynı takvimde birleşir. Sistem o saatte gerçekten boş masa var mı diye uygunluğu kendisi hesaplar, seçtiğiniz masayı kat planında canlı olarak yerleştirir. Siz de sabah ilk iş günün doluluğunu bir bakışta görür, hangi masanın kaçta boşalacağını, hangi grubun kaç kişiyle geleceğini şaşırmadan planlarsınız.",
     blocks: [
       {
         title: "İçeriden alın, dışarıdan da gelsin — tek takvim",
@@ -351,10 +351,10 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
         ],
       },
       {
-        title: "Unutulan rezervasyonu azaltın: hatırlatma ve sorgulama ekranı",
-        body: "Rezervasyon alıp misafirin gelmemesi (no-show) her işletmenin sessiz zararıdır: masa boş bekler, o akşam belki başka misafiri geri çevirmişsinizdir. Modülün zamanlayıcısı rezervasyon saati yaklaşınca devreye girer ve misafire e-posta, gerekirse SMS ile hatırlatma gönderir; böylece rezervasyonunu unutup gelmeyen misafir azalır. Misafir tarafında ise bir sorgulama (lookup) ekranı vardır: müşteri kendi rezervasyonunu bilgileriyle aratıp durumunu görebilir, sizi tekrar aramak zorunda kalmaz. Personeliniz de günün listesine bakıp kimin geleceğini, kimin hâlâ onay beklediğini tek bakışta izler.",
+        title: "Gelmeyen misafir masayı kilitlemesin: no-show ve sorgulama ekranı",
+        body: "Rezervasyon alıp misafirin gelmemesi (no-show) her işletmenin sessiz zararıdır: masa boş bekler, o akşam belki başka misafiri geri çevirmişsinizdir. Modül, rezervasyon saati geçtikten sonra tanımlı bekleme süresi dolduğunda kaydı gelmedi (no-show) olarak işaretler ve masayı otomatik serbest bırakır; böylece boş bekleyen masa, kimse fark etmeden akşamı tüketmez. Misafir tarafında ise bir sorgulama (lookup) ekranı vardır: müşteri kendi rezervasyonunu bilgileriyle aratıp durumunu görebilir, sizi tekrar aramak zorunda kalmaz. Personeliniz de günün listesine bakıp kimin geleceğini, kimin hâlâ onay beklediğini tek bakışta izler.",
         bullets: [
-          "Zamanlayıcı saat yaklaşınca e-posta, gerekirse SMS ile hatırlatma gönderir",
+          "Rezervasyon saati geçtikten sonra bekleme süresi dolunca masa otomatik serbest kalır",
           "Müşteri sorgulama ekranından kendi rezervasyonunu aratıp durumunu görür",
           "Günün rezervasyon listesi personel için tek ekranda, saat sırasına dizili",
           "Bekleyen ve onaylı talepler ayrışır; hiçbiri gözden kaçmaz",
@@ -378,7 +378,7 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
         },
         {
           title: "Hatırlatma ve gün",
-          body: "Saat yaklaşınca zamanlayıcı misafire e-posta, gerekirse SMS ile hatırlatma gönderir. Misafir sorgulama ekranından durumunu görebilir; personeliniz de listeden kimin geleceğini izleyerek masayı zamanında hazırlar.",
+          body: "Rezervasyon onaylandığında ya da iptal edildiğinde misafire e-posta gider. Misafir sorgulama ekranından durumunu görebilir; personeliniz de listeden kimin geleceğini izleyerek masayı zamanında hazırlar.",
         },
       ],
     },
@@ -386,7 +386,7 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       "Dahili ve public rezervasyon tek takvimde: telefon, kapı ve internet aynı yerde",
       "Uygunluk otomatik hesaplanır; aynı masaya iki grup yazma hatası engellenir",
       "Kat planıyla entegre — hangi masayı ayırdığınızı gerçek yerleşimde görürsünüz",
-      "Zamanlayıcı e-posta/SMS ile hatırlatma gönderir; unutmaya bağlı gelmemeleri azaltır",
+      "Durum değişimlerinde misafire e-posta gider: oluşturuldu, onaylandı, reddedildi, iptal edildi",
       "Müşteri kendi rezervasyonunu sorgulama ekranından aratır, sizi meşgul etmez",
       "Günün doluluğu ve bekleyen talepler personel için tek bakışta net",
     ],
@@ -405,11 +405,11 @@ export const MODULE_CONTENT: Record<string, ModuleCopy> = {
       },
       {
         q: "Gelmeyen misafirler (no-show) için ne yapıyor?",
-        a: "Modülün zamanlayıcısı rezervasyon saati yaklaşınca devreye girer ve misafire e-posta, gerekirse SMS ile hatırlatma gönderir; böylece rezervasyonunu unutup gelmeyen misafir azalır. Ayrıca günün listesinden kimin onaylı, kimin beklemede olduğunu görüp masayı boşuna bekletmezsiniz.",
+        a: "Modül, rezervasyon saati geçtikten sonra tanımlı bekleme süresi dolduğunda kaydı gelmedi (no-show) olarak işaretler ve masayı otomatik serbest bırakır; böylece boş bekleyen masa, kimse fark etmeden akşamı tüketmez. Ayrıca günün listesinden kimin onaylı, kimin beklemede olduğunu görüp masayı boşuna bekletmezsiniz.",
       },
       {
         q: "Rezervasyon ücretsiz çekirdeğe dahil mi?",
-        a: "Hayır; bu ekran Rezervasyon Sistemi modülüne dahildir (yıllık, lisans ön koşuluyla). Modülü açtığınız anda hem personel hem müşteri tarafı, uygunluk hesaplama, hatırlatma ve sorgulama ekranı tümüyle kullanılabilir olur. Masa ve kat planının kendisi ücretsiz çekirdeğe dahildir; modülü eklemeden de masalarınızı yönetmeye devam edersiniz.",
+        a: "Hayır; bu ekran Rezervasyon Sistemi modülüne dahildir (yıllık, lisans ön koşuluyla). Modülü açtığınız anda hem personel hem müşteri tarafı, uygunluk hesaplama ve sorgulama ekranı tümüyle kullanılabilir olur. Masa ve kat planının kendisi ücretsiz çekirdeğe dahildir; modülü eklemeden de masalarınızı yönetmeye devam edersiniz.",
       },
     ],
     ctaTitle:
