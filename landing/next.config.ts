@@ -41,9 +41,17 @@ const nextConfig: NextConfig = {
     // 2. swap Sentry's CDN replay worker for self-hosted to drop the
     //    sentry.io entry from connect-src.
     const isProd = process.env.NODE_ENV === 'production';
+    // The Jeeta web-chat widget is loaded from another origin, so it needs BOTH
+    // an entry here and one in frame-src below — the loader is a script that
+    // injects an iframe. Without them the embed fails in the quietest way
+    // possible: the browser blocks the script, no launcher button ever appears,
+    // and the only trace is a CSP violation in a console nobody has open.
+    // Verified against production before adding: widget.js and /widget both
+    // serve 200, so the headers were the whole obstacle.
+    const JEETA = 'https://jeetagrowth.com';
     const scriptSrc = isProd
-      ? "script-src 'self' 'unsafe-inline'"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+      ? `script-src 'self' 'unsafe-inline' ${JEETA}`
+      : `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${JEETA}`;
     const csp = [
       "default-src 'self'",
       scriptSrc,
@@ -51,6 +59,10 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https://hummytummy.com https://staging.hummytummy.com https://*.hugin.com.tr https://www.beko.com.tr https://www.epson.com.tr https://www.sunmi.com https://shop.interpay.com.tr https://www.penetek.com https://sps.honeywell.com https://www.zebra.com https://images.samsung.com https://productimages.hepsiburada.net https://cdn.dsmcdn.com https://img.akakce.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.sentry.io https://hummytummy.com https://staging.hummytummy.com",
+      // Only the widget's own origin — NOT a blanket allowance. frame-src was
+      // absent entirely, so it fell through to default-src 'self' and the
+      // iframe was blocked even when the script was not.
+      `frame-src 'self' ${JEETA}`,
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
