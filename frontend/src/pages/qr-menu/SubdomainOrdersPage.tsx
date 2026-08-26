@@ -130,6 +130,7 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
           onRequestBill={handleRequestBill}
           onPayNow={canSelfPay ? () => setIsSelfPayOpen(true) : undefined}
           onBrowseMenu={handleBrowseMenu}
+          currency={menuData.tenant.currency || 'TRY'}
         />
       )}
       {menuData && sessionId && (

@@ -389,8 +389,13 @@ i18next
     returnEmptyString: false,
   });
 
-// Set initial direction based on the initial language
+// Set initial language + direction. Both, together: the boot path used to set
+// only `dir`, so an Arabic guest got a document that laid out RTL while still
+// claiming lang="en" from index.html — screen readers picked the wrong voice
+// and the browser hyphenated as English. The languageChanged handler below
+// keeps the pair in sync afterwards; this is the same pair on first paint.
 const initialLang = getInitialLanguage();
+document.documentElement.lang = initialLang;
 document.documentElement.dir = RTL_LANGUAGES.includes(initialLang) ? 'rtl' : 'ltr';
 
 // Save language preference to localStorage when it changes

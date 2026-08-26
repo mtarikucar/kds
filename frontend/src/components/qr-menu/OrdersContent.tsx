@@ -18,7 +18,14 @@ interface OrdersContentProps {
   onRequestBill: () => void;
   onPayNow?: () => void;
   onBrowseMenu: () => void;
-  currency?: string;
+  /**
+   * The tenant's own currency. REQUIRED, with no default: this used to be
+   * optional and defaulted to 'TRY', which meant both pages that render this
+   * component silently showed a UZS restaurant's totals in Turkish lira. A
+   * caller that cannot say what money it is showing is a bug, so let the
+   * compiler say so instead of guessing.
+   */
+  currency: string;
 }
 
 const OrdersContent: React.FC<OrdersContentProps> = ({
@@ -30,7 +37,7 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
   onRequestBill,
   onPayNow,
   onBrowseMenu,
-  currency = 'TRY',
+  currency,
 }) => {
   const { t } = useTranslation('common');
   const addItem = useCartStore(state => state.addItem);

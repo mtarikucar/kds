@@ -29,11 +29,57 @@ export function cn(...inputs: ClassValue[]) {
 // the live tenant currency.
 export const CURRENCY_DECIMALS_OVERRIDE: Record<string, number> = { UZS: 0 };
 
+// The number locale is pinned for EVERY currency, and it has to be a locale
+// whose data is complete in every engine we render in. tr-TR is: it groups
+// 50000 as "50.000" in Node and in Chromium alike. uz-UZ is NOT — measured off
+// the same locale tag, Node gives "50 000" and Chromium gives "50,000". So the
+// guest's own locale never picks the grouping; if it did, a jsdom-green test
+// would still ship a wrong number to a phone.
+const MONEY_LOCALE = 'tr-TR';
+
+// SYMBOL OVERRIDE: currencies whose symbol ICU simply does not carry, so Intl's
+// currency style falls back to printing the bare ISO code at the guest. UZS is
+// the live case — neither Node's nor Chromium's ICU has a narrow symbol for
+// so'm, so an Uzbek guest reading the QR menu was shown "UZS 50.000" instead of
+// money. Listed currencies are formatted as a plain number and get OUR symbol
+// and OUR placement; everything else stays on Intl's currency style, which
+// renders ₺/$/€ correctly and stays the single source of truth for them.
+const CURRENCY_SYMBOL_OVERRIDE: Record<
+  string,
+  { symbol: string; position: 'prefix' | 'suffix' }
+> = {
+  // Uzbek quotes the som by word, after the amount ("50.000 so'm"); there is
+  // no som sign in Unicode for UZS (U+20C0 is the Kyrgyz som).
+  UZS: { symbol: "so'm", position: 'suffix' },
+};
+
 export function formatCurrency(amount: number, currency: string = 'TRY'): string {
   const decimals = CURRENCY_DECIMALS_OVERRIDE[currency];
-  return new Intl.NumberFormat('tr-TR', {
+  const override = CURRENCY_SYMBOL_OVERRIDE[currency];
+
+  if (override) {
+    // style:'decimal' has no currency-aware default precision of its own, so
+    // spell it out — two, unless the currency is quoted otherwise above.
+    const number = new Intl.NumberFormat(MONEY_LOCALE, {
+      style: 'decimal',
+      minimumFractionDigits: decimals ?? 2,
+      maximumFractionDigits: decimals ?? 2,
+    }).format(amount);
+    return override.position === 'suffix'
+      ? `${number} ${override.symbol}`
+      : `${override.symbol}${number}`;
+  }
+
+  return new Intl.NumberFormat(MONEY_LOCALE, {
     style: 'currency',
     currency,
+    // Without this, a currency whose full symbol ICU spells as its ISO code in
+    // some locales (RUB -> "RUB", not "₽") renders as letters. TRY/USD/EUR are
+    // byte-identical either way under tr-TR, so no existing call site moves.
+    currencyDisplay: 'narrowSymbol',
+    // Precision is deliberately left to ICU when we have no override — passing
+    // an explicit 2 would break the zero-decimal currencies (JPY, KRW) that
+    // ICU already gets right.
     ...(decimals !== undefined
       ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
       : {}),
