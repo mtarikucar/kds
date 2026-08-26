@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
@@ -106,6 +107,24 @@ export default async function LocaleLayout({ children, params }: Props) {
           {children}
           <FloatingMascot />
         </NextIntlClientProvider>
+
+        {/*
+          Jeeta web chat. The channel ("Site sohbeti — hummytummy.com") has been
+          ACTIVE with the "customer service" AI agent attached for some time —
+          this tag was the only missing piece, so no visitor could ever reach it.
+
+          The widget key is public by design: it identifies the channel in the
+          page source and grants nothing on its own. Every write behind it is
+          rate-limited and resolves server-side from the key.
+
+          afterInteractive: chat must never compete with first paint on a
+          marketing page.
+        */}
+        <Script
+          src="https://jeetagrowth.com/widget.js"
+          data-widget-key="wc_b6fe4a2d8c1d42cc9643b5136892ae18"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
