@@ -123,7 +123,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
         tabIndex={hasVideo ? 0 : undefined}
         className={cn(
           "relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer group outline-none",
-          layoutStyle === "LIST" ? "flex flex-row h-28" : "flex flex-col",
+          // min-h, not h: a 44px quick-add plus a two-line description does
+          // not fit 112px at 320px wide, and a fixed height clipped the
+          // description rather than growing the row.
+          layoutStyle === "LIST" ? "flex flex-row min-h-28" : "flex flex-col",
           isUnavailable && "opacity-75",
         )}
         whileTap={{ scale: 0.98 }}
@@ -133,7 +136,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <div
             className={cn(
               "relative overflow-hidden bg-slate-100 flex-shrink-0",
-              layoutStyle === "LIST" ? "w-28 h-28" : "w-full aspect-[4/3]",
+              layoutStyle === "LIST" ? "w-28 self-stretch" : "w-full aspect-[4/3]",
             )}
           >
             {/* Photo first (shown by default) */}
@@ -225,6 +228,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           className={cn(
             "p-3 flex-1 flex flex-col",
             layoutStyle === "LIST" ? "justify-between" : "min-h-0",
+            // The GRID quick-add floats over this box (bottom-3 right-3, 44px
+            // wide). Reserve its lane so the name and description wrap before
+            // the button instead of running underneath it.
+            layoutStyle !== "LIST" && enableCustomerOrdering && "pe-14",
           )}
         >
           <div>
@@ -265,7 +272,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 <motion.button
                   onClick={handleQuickAdd}
                   disabled={isUnavailable}
-                  className="p-2 rounded-xl transition-all duration-200"
+                  // 44px minimum tap target (was p-2 → 32×32).
+                  className="flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200"
                   style={{
                     backgroundColor: isAdded ? "#10b981" : primaryColor,
                     opacity: isUnavailable ? 0.5 : 1,
@@ -304,7 +312,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <motion.button
             onClick={handleQuickAdd}
             disabled={isUnavailable}
-            className="absolute bottom-3 right-3 rtl:right-auto rtl:left-3 p-2.5 rounded-xl shadow-lg transition-all duration-200"
+            // 44px minimum tap target (was p-2.5 → 36×36).
+            className="absolute bottom-3 right-3 rtl:right-auto rtl:left-3 flex h-11 w-11 items-center justify-center rounded-xl shadow-lg transition-all duration-200"
             style={{
               backgroundColor: isAdded ? "#10b981" : primaryColor,
               opacity: isUnavailable ? 0.5 : 1,

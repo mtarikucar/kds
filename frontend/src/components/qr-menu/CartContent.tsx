@@ -161,12 +161,13 @@ const CartContent: React.FC<CartContentProps> = ({
   }
 
   return (
-    <div className="px-4 sm:px-6 py-6 pb-52 md:pb-6">
+    <div className="px-4 sm:px-6 py-6 pb-[calc(13rem+env(safe-area-inset-bottom,0px))] md:pb-6">
       <div className="max-w-lg mx-auto">
         {/* Back to Menu Button */}
         <motion.button
           onClick={handleBrowseMenu}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
+          // py-3 -my-3 grows the hit box to 44px without moving the label.
+          className="flex items-center gap-2 py-3 -my-3 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
           whileTap={{ scale: 0.98 }}
         >
           <ArrowLeft className="h-4 w-4 rtl-flip" />
@@ -288,7 +289,11 @@ const CartContent: React.FC<CartContentProps> = ({
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed bottom-20 md:bottom-0 left-0 right-0 z-30 md:relative md:max-w-lg md:mx-auto"
+        // bottom-20 reserved 80px for a bottom nav that /cart does not
+        // render, which at 320x568 lifted this 201px panel over the qty
+        // stepper, the remove button and Special Notes on first paint. The
+        // inner padding below already carries the safe-area inset.
+        className="fixed bottom-0 left-0 right-0 z-30 md:relative md:max-w-lg md:mx-auto"
       >
         <div
           className="mx-4 md:mx-0 rounded-2xl shadow-xl overflow-hidden"

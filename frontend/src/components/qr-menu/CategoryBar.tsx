@@ -53,7 +53,8 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
           ref={setCategoryButtonRef('')}
           onClick={() => onCategoryClick('')}
           className={cn(
-            'flex-shrink-0 px-4 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 whitespace-nowrap'
+            // py-3 keeps the chip at the 44px minimum tap target.
+            'flex-shrink-0 px-4 py-3 rounded-full font-semibold text-sm transition-all duration-200 whitespace-nowrap'
           )}
           style={{
             backgroundColor: !selectedCategory && !activeSection ? primaryColor : 'white',
@@ -78,7 +79,8 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
               ref={setCategoryButtonRef(category.id)}
               onClick={() => onCategoryClick(category.id)}
               className={cn(
-                'flex-shrink-0 px-4 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 whitespace-nowrap'
+                // py-3 keeps the chip at the 44px minimum tap target.
+                'flex-shrink-0 px-4 py-3 rounded-full font-semibold text-sm transition-all duration-200 whitespace-nowrap'
               )}
               style={{
                 backgroundColor: isActive ? primaryColor : 'white',
