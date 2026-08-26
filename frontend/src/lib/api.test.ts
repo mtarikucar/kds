@@ -59,6 +59,22 @@ describe('isTenantWidePath', () => {
     }
   });
 
+  // The dine-in "pick a table" modal is reached from the PUBLIC QR menu, where
+  // nobody is logged in and no branch is resolved. Without this exemption the
+  // request interceptor rejects the call before it is ever sent — no network
+  // entry at all — and the modal shows "Failed to load tables" for every guest
+  // of every restaurant, which is exactly what shipped. The route is @Public
+  // and tenant-wide on the backend.
+  it('lets the public table list fly without a branch', () => {
+    expect(isTenantWidePath('/tables/public/3cdd093f-1fb3-4676-b767-d56bd41f6c1a')).toBe(true);
+  });
+
+  it('does not widen the branch-scoped table routes', () => {
+    for (const url of ['/tables', '/tables/123', '/tables/123/status', '/tables/publications']) {
+      expect(isTenantWidePath(url), url).toBe(false);
+    }
+  });
+
   it('strips the query string before matching', () => {
     expect(isTenantWidePath('/subscriptions/plans?cycle=YEARLY')).toBe(true);
     expect(isTenantWidePath('/menu/categories?foo=bar')).toBe(false);
