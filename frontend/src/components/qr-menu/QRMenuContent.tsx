@@ -11,6 +11,24 @@ import Skeleton from './ui/Skeleton';
 import ProductCard from './ProductCard';
 import CategoryBar from './CategoryBar';
 
+/**
+ * Column classes for the product grid.
+ *
+ * `itemsPerRow` is a MERCHANT setting, so it is honoured as the column count
+ * at the NARROWEST width and scaled up from there — it is a floor, not a cap.
+ * Pinning the merchant's phone-sized choice at every width meant a 1440px
+ * desktop rendered the same two columns as a 320px phone (688px-wide cards,
+ * fewer dishes on screen than on a tablet), and silently overriding the
+ * merchant instead would throw away a deliberate choice. A merchant who asked
+ * for denser rows keeps their extra column at every step.
+ */
+export function gridColumnsClass(itemsPerRow: number | undefined): string {
+  if (itemsPerRow === 1) return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4';
+  if (itemsPerRow === 3)
+    return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4';
+  return 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
+}
+
 interface QRMenuContentProps {
   categories: (Category & { products: Product[] })[];
   settings: MenuSettings;
@@ -293,11 +311,7 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
             <div className={cn(
               settings.layoutStyle === 'LIST'
                 ? 'flex flex-col gap-4'
-                : settings.itemsPerRow === 1
-                  ? 'grid grid-cols-1 gap-4'
-                  : settings.itemsPerRow === 3
-                    ? 'grid grid-cols-2 sm:grid-cols-3 gap-4'
-                    : 'grid grid-cols-2 gap-4'
+                : gridColumnsClass(settings.itemsPerRow)
             )}>
               {filteredProducts.map((product, index) => (
                 <motion.div
@@ -396,11 +410,7 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
                   <div className={cn(
                     settings.layoutStyle === 'LIST'
                       ? 'flex flex-col gap-4'
-                      : settings.itemsPerRow === 1
-                        ? 'grid grid-cols-1 gap-4'
-                        : settings.itemsPerRow === 3
-                          ? 'grid grid-cols-2 sm:grid-cols-3 gap-4'
-                          : 'grid grid-cols-2 gap-4'
+                      : gridColumnsClass(settings.itemsPerRow)
                   )}>
                     {products.map((product, index) => (
                       <motion.div

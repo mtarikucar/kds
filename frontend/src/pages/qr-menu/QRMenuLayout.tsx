@@ -323,7 +323,8 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
           {/* Hamburger Menu */}
           <motion.button
             onClick={() => setIsDrawerOpen(true)}
-            className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+            // 44px minimum tap target (was p-2 → 40×40).
+            className="p-2.5 rounded-xl hover:bg-slate-100 transition-colors"
             whileTap={{ scale: 0.95 }}
           >
             <Menu className="h-6 w-6 text-slate-700" />
@@ -379,7 +380,10 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
       />
 
       {/* Main Content */}
-      <main className="flex-1">
+      {/* The menu is a reading column, not a spreadsheet: without a cap the
+          grid stretched to the full 1440px and a desktop showed FEWER dishes
+          than a tablet. */}
+      <main className="flex-1 w-full max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

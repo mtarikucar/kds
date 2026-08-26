@@ -37,7 +37,62 @@ describe('formatCurrency', () => {
   // its own small override here rather than silently mis-rendering UZS
   // with two decimals like every other currency.
   it("renders UZS whole (so'm has no decimals) while TRY/USD keep theirs — unaffected", () => {
-    expect(formatCurrency(1234567.89, 'UZS')).toBe('UZS 1.234.568');
+    expect(formatCurrency(1234567.89, 'UZS')).toBe("1.234.568 so'm");
+  });
+
+  // No ICU locale can render a so'm symbol — neither Node nor Chromium has a
+  // narrow symbol for UZS, so Intl's currency style prints the bare ISO code
+  // ("UZS\u00a01.234.568") to an Uzbek guest. Measured in both engines. So the
+  // symbol is OURS, not ICU's, for the currencies in CURRENCY_SYMBOL_OVERRIDE.
+  it('prints the som word for UZS instead of the bare ISO code', () => {
+    expect(formatCurrency(50000, 'UZS')).toBe("50.000 so'm");
+    expect(formatCurrency(50000, 'UZS')).not.toContain('UZS');
+  });
+
+  // The number locale stays pinned to tr-TR for EVERY currency, UZS included.
+  // uz-UZ grouping is not portable: off the same locale tag Node renders 50000
+  // as "50\u00a0000" and Chromium as "50,000", so an assertion on it would pass
+  // in jsdom and still ship wrong. tr-TR is byte-identical in both engines.
+  it('groups UZS the same way it groups TRY (portable locale)', () => {
+    expect(formatCurrency(50000, 'UZS')).toContain('50.000');
+  });
+
+  // ~15 non-QR call sites render TRY through this helper. currencyDisplay
+  // 'narrowSymbol' is on the Intl path so a non-Turkish UI locale can never
+  // downgrade "₺" to "TRY"; these pin that TRY did not move a byte.
+  it('keeps the TRY rendering byte-identical (the call sites depend on it)', () => {
+    expect(formatCurrency(0, 'TRY')).toBe('₺0,00');
+    expect(formatCurrency(1234567.89, 'TRY')).toBe('₺1.234.567,89');
+    expect(formatCurrency(-19.5, 'TRY')).toBe('-₺19,50');
+  });
+
+  // `currencyDisplay: 'narrowSymbol'` landed in Safari 14.1 / WebKitGTK 2.32,
+  // and an engine older than that does not ignore the option — it throws
+  // RangeError from the CONSTRUCTOR. Our web build targets es2020 (Safari
+  // 13.1) and the Tauri shell targets safari13, so that engine is inside the
+  // supported set, and an uncaught throw here takes down every price on the
+  // page — a white screen at the table. Fall back to ICU's default display.
+  it('still renders money on an engine that rejects narrowSymbol', () => {
+    const real = Intl.NumberFormat;
+    const spy = vi
+      .spyOn(Intl, 'NumberFormat')
+      .mockImplementation(((locale?: string, options?: Intl.NumberFormatOptions) => {
+        if (options?.currencyDisplay === 'narrowSymbol') {
+          throw new RangeError(
+            "invalid value narrowSymbol for option currencyDisplay",
+          );
+        }
+        return new real(locale, options);
+      }) as unknown as typeof Intl.NumberFormat);
+
+    try {
+      expect(formatCurrency(2999, 'TRY')).toBe('₺2.999,00');
+      // The override path never asks for a currency style at all, so it is
+      // unaffected either way.
+      expect(formatCurrency(50000, 'UZS')).toBe("50.000 so'm");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

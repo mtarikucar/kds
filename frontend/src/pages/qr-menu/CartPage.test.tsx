@@ -13,8 +13,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
  */
 
 const post = vi.fn();
+// getApiErrorMessage (catch path) reads the named isAxiosError export.
 vi.mock("axios", () => ({
   default: { post: (...a: unknown[]) => post(...a) },
+  isAxiosError: (e: unknown) =>
+    !!(e as { isAxiosError?: boolean } | undefined)?.isAxiosError,
 }));
 
 // Review C1: the session rail is its own module (unit-tested in
@@ -40,6 +43,9 @@ vi.mock("sonner", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
+// getApiErrorMessage (reached via the catch path) imports i18n/config, which
+// would eagerly re-init i18next against the partial react-i18next mock. Stub it.
+vi.mock("../../i18n/config", () => ({ default: { t: (k: string) => k } }));
 
 const navigate = vi.fn();
 let tableIdParam: string | null = null;
@@ -58,18 +64,12 @@ vi.mock("react-router-dom", async () => {
 let cart: any;
 vi.mock("../../store/cartStore", () => ({ useCartStore: () => cart }));
 
-const getCurrentPosition = vi
-  .fn()
-  .mockResolvedValue({ latitude: 1, longitude: 2 });
+// Mutable so a spec can put the browser in "no position" state — the case
+// that used to POST anyway and hand the guest the server's Turkish refusal.
+let geo: { latitude: number | null; longitude: number | null; loading: boolean };
+const getCurrentPosition = vi.fn();
 vi.mock("../../hooks", () => ({
-  useGeolocation: () => ({
-    latitude: 1,
-    longitude: 2,
-    error: null,
-    loading: false,
-    getCurrentPosition,
-    permissionStatus: "granted",
-  }),
+  useGeolocation: () => ({ ...geo, error: null, getCurrentPosition }),
 }));
 
 const clearCart = vi.fn();
@@ -106,6 +106,8 @@ import CartPage from "./CartPage";
 beforeEach(() => {
   vi.clearAllMocks();
   ensureCustomerSession.mockResolvedValue(MINTED_SESSION);
+  geo = { latitude: 1, longitude: 2, loading: false };
+  getCurrentPosition.mockResolvedValue({ latitude: 1, longitude: 2 });
   tableIdParam = null;
   cart = {
     items: [{ product: { id: "p1" }, quantity: 2, modifiers: [], notes: "x" }],
@@ -250,7 +252,8 @@ describe("CartPage — order submission", () => {
 
   it("toasts the server error and does NOT clear the cart on failure", async () => {
     post.mockRejectedValue({
-      response: { data: { message: "kitchen closed" } },
+      isAxiosError: true,
+      response: { status: 400, data: { message: "kitchen closed" } },
     });
     await loadAndSubmit();
 
@@ -258,5 +261,72 @@ describe("CartPage — order submission", () => {
       expect(toastError).toHaveBeenCalledWith("kitchen closed"),
     );
     expect(clearCart).not.toHaveBeenCalled();
+  });
+});
+
+describe("CartPage — location gate", () => {
+  /** Browser refuses/cannot supply a fix. */
+  function denyLocation() {
+    geo = { latitude: null, longitude: null, loading: false };
+    getCurrentPosition.mockResolvedValue(null);
+  }
+
+  it("does NOT post an order it cannot locate, and says so in the guest locale", async () => {
+    // A tenant with coordinates on file 400s a positionless order with a
+    // hardcoded Turkish sentence, which the diner then read on an English UI.
+    denyLocation();
+    await loadAndSubmit();
+
+    await waitFor(() =>
+      expect(screen.getByText("cart.location.unavailable")).toBeInTheDocument(),
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("retrying location clears the notice and the next submit carries the fix", async () => {
+    denyLocation();
+    render(<CartPage />);
+    fireEvent.click(screen.getByText("load"));
+    expect(await screen.findByText("cart.location.unavailable")).toBeInTheDocument();
+
+    getCurrentPosition.mockResolvedValue({ latitude: 41.01, longitude: 28.97 });
+    post.mockResolvedValue({ data: {} });
+    fireEvent.click(screen.getByText("cart.location.retry"));
+    await waitFor(() =>
+      expect(screen.queryByText("cart.location.unavailable")).toBeNull(),
+    );
+
+    fireEvent.click(screen.getByText("submit"));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body).toMatchObject({ latitude: 41.01, longitude: 28.97 });
+  });
+
+  it("lets the guest order without a position once they choose to", async () => {
+    // Most tenants set no coordinates at all and never geofence; refusing to
+    // submit forever would invent a requirement the server does not have.
+    denyLocation();
+    post.mockResolvedValue({ data: {} });
+    render(<CartPage />);
+    fireEvent.click(screen.getByText("load"));
+    fireEvent.click(await screen.findByText("cart.location.orderAnyway"));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.latitude).toBeUndefined();
+    expect(body.longitude).toBeUndefined();
+  });
+
+  it("sends coordinates at 0,0 instead of dropping them", async () => {
+    // `orderLat || undefined` erased a real position on the equator / prime
+    // meridian, turning a locatable order into a positionless one.
+    geo = { latitude: 0, longitude: 0, loading: false };
+    post.mockResolvedValue({ data: {} });
+    await loadAndSubmit();
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.latitude).toBe(0);
+    expect(body.longitude).toBe(0);
   });
 });

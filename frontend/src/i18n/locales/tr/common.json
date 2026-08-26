@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "Menüyü Gözat",
-    "backToMenu": "Menüye Dön"
+    "backToMenu": "Menüye Dön",
+    "delete": "Sil",
+    "language": "Dil",
+    "copyFailed": "Kopyalanamadı"
   },
   "navigation": {
     "dashboard": "Kontrol Paneli",
@@ -1239,7 +1242,11 @@
     "productImage": "Ürün görseli",
     "campaign": "Kampanya",
     "startingFrom": "başlangıç",
-    "required": "Zorunlu"
+    "required": "Zorunlu",
+    "noProducts": "Ürün bulunamadı",
+    "noProductsDescription": "Aramanızı değiştirin veya tüm kategorilere göz atın",
+    "clearFilters": "Filtreleri temizle",
+    "notesPlaceholder": "Örn. soğansız, ekstra sos..."
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -1253,8 +1260,6 @@
   "cart": {
     "title": "Sepetim",
     "items": "Ürün",
-    "item_one": "{{count}} Ürün",
-    "item_other": "{{count}} Ürün",
     "empty": "Sepetiniz boş",
     "emptyDescription": "Başlamak için lezzetli ürünler ekleyin",
     "backToMenu": "Menüye Dön",
@@ -1274,7 +1279,17 @@
     "specialNotes": "Özel Notlar",
     "continueShopping": "Alışverişe Devam Et",
     "viewCart": "Sepeti Görüntüle",
-    "cart": "Sepet"
+    "cart": "Sepet",
+    "location": {
+      "unavailable": "Konumunuz alınamadı. Bazı restoranlar yalnızca masada verilen siparişleri kabul eder.",
+      "checking": "Konumunuz alınıyor...",
+      "retry": "Konumu tekrar dene",
+      "orderAnyway": "Konumsuz sipariş ver"
+    },
+    "swipeToDelete": "Silmek için sola kaydırın",
+    "dragToReorder": "Sıralamak için ürünleri sürükleyin",
+    "itemCount_one": "{{count}} ürün",
+    "itemCount_other": "{{count}} ürün"
   },
   "orders": {
     "title": "Siparişlerim",
@@ -1284,7 +1299,12 @@
     "noOrdersDescription": "Menüyü inceleyerek başlayın",
     "total": "Toplam",
     "note": "Not",
-    "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin."
+    "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin.",
+    "tableRequiredForActions": "Garson çağırmak veya hesap istemek için masadaki karekodu okutun.",
+    "activeOrders": "Aktif Siparişler",
+    "pastOrders": "Geçmiş Siparişler",
+    "reorder": "Tekrar sipariş ver",
+    "adding": "Ekleniyor..."
   },
   "waiter": {
     "call": "Garson Çağır",
@@ -1297,7 +1317,8 @@
   "bill": {
     "request": "Hesap İste",
     "requestSuccess": "Hesap isteği gönderildi!",
-    "requestError": "Hesap isteği gönderilemedi"
+    "requestError": "Hesap isteği gönderilemedi",
+    "noTable": "Hesabı istemek için lütfen masadaki karekodu okutun"
   },
   "payment": {
     "errors": {
@@ -1393,7 +1414,8 @@
     "yourReferralCode": "Referans Kodunuz",
     "referrals": "Referanslar",
     "pointsEarned": "Kazanılan Puanlar",
-    "noReferralCode": "Referans kodunuz için destek ekibiyle iletişime geçin"
+    "noReferralCode": "Referans kodunuz için destek ekibiyle iletişime geçin",
+    "viewRewards": "Ödüllerinizi görüntüleyin"
   },
   "cancel": "İptal"
 }

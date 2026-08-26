@@ -52,9 +52,12 @@ vi.mock('../../utils/subdomain', () => ({ buildQRMenuUrl: (...a: unknown[]) => b
 let cart: any;
 vi.mock('../../store/cartStore', () => ({ useCartStore: () => cart }));
 
-const getCurrentPosition = vi.fn().mockResolvedValue({ latitude: 1, longitude: 2 });
+// Mutable so a spec can put the browser in "no position" state — the case
+// that used to POST anyway and hand the guest the server's Turkish refusal.
+let geo: { latitude: number | null; longitude: number | null; loading: boolean };
+const getCurrentPosition = vi.fn();
 vi.mock('../../hooks', () => ({
-  useGeolocation: () => ({ latitude: 1, longitude: 2, getCurrentPosition }),
+  useGeolocation: () => ({ ...geo, getCurrentPosition }),
 }));
 
 const clearCart = vi.fn();
@@ -82,6 +85,8 @@ import SubdomainCartPage from './SubdomainCartPage';
 beforeEach(() => {
   vi.clearAllMocks();
   ensureCustomerSession.mockResolvedValue(MINTED_SESSION);
+  geo = { latitude: 1, longitude: 2, loading: false };
+  getCurrentPosition.mockResolvedValue({ latitude: 1, longitude: 2 });
   cart = {
     items: [{ product: { id: 'p2' }, quantity: 1, modifiers: [], notes: '' }],
     sessionId: null,
@@ -160,5 +165,73 @@ describe('SubdomainCartPage', () => {
     await waitFor(() => expect(post).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 50));
     expect(post).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SubdomainCartPage — location gate', () => {
+  /** Browser refuses/cannot supply a fix. */
+  function denyLocation() {
+    geo = { latitude: null, longitude: null, loading: false };
+    getCurrentPosition.mockResolvedValue(null);
+  }
+
+  it('does NOT post an order it cannot locate, and says so in the guest locale', async () => {
+    // A tenant with coordinates on file 400s a positionless order with a
+    // hardcoded Turkish sentence, which the diner then read on an English UI.
+    denyLocation();
+    await loadAndSubmit();
+
+    await waitFor(() =>
+      expect(screen.getByText('cart.location.unavailable')).toBeInTheDocument(),
+    );
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('retrying location clears the notice and the next submit carries the fix', async () => {
+    denyLocation();
+    render(<SubdomainCartPage subdomain="acme" />);
+    fireEvent.click(screen.getByText('load'));
+    const notice = await screen.findByText('cart.location.unavailable');
+    expect(notice).toBeInTheDocument();
+
+    getCurrentPosition.mockResolvedValue({ latitude: 41.01, longitude: 28.97 });
+    post.mockResolvedValue({ data: {} });
+    fireEvent.click(screen.getByText('cart.location.retry'));
+    await waitFor(() =>
+      expect(screen.queryByText('cart.location.unavailable')).toBeNull(),
+    );
+
+    fireEvent.click(screen.getByText('submit'));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body).toMatchObject({ latitude: 41.01, longitude: 28.97 });
+  });
+
+  it('lets the guest order without a position once they choose to', async () => {
+    // Most tenants set no coordinates at all and never geofence; refusing to
+    // submit forever would invent a requirement the server does not have.
+    denyLocation();
+    post.mockResolvedValue({ data: {} });
+    render(<SubdomainCartPage subdomain="acme" />);
+    fireEvent.click(screen.getByText('load'));
+    fireEvent.click(await screen.findByText('cart.location.orderAnyway'));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.latitude).toBeUndefined();
+    expect(body.longitude).toBeUndefined();
+  });
+
+  it('sends coordinates at 0,0 instead of dropping them', async () => {
+    // `orderLat || undefined` erased a real position on the equator / prime
+    // meridian, turning a locatable order into a positionless one.
+    geo = { latitude: 0, longitude: 0, loading: false };
+    post.mockResolvedValue({ data: {} });
+    await loadAndSubmit();
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [, body] = post.mock.calls[0] as [string, any];
+    expect(body.latitude).toBe(0);
+    expect(body.longitude).toBe(0);
   });
 });

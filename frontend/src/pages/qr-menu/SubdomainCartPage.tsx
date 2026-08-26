@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { toast } from "sonner";
 import { useGeolocation } from "../../hooks";
+import { MapPinOff } from "lucide-react";
 import { buildQRMenuUrl } from "../../utils/subdomain";
 import { getApiErrorMessage } from "../../lib/api-error";
 
@@ -26,6 +27,15 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
   const [isShowingTableSelection, setIsShowingTableSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locationRequested, setLocationRequested] = useState(false);
+  // A tenant that has coordinates on file refuses any order placed without a
+  // position — in hardcoded Turkish, whatever language the guest is reading.
+  // The menu payload doesn't say whether THIS tenant geofences, so instead of
+  // posting blind and forwarding that sentence, we stop, explain it in the
+  // guest's own language, and offer the retry that actually fixes it.
+  const [locationBlocked, setLocationBlocked] = useState(false);
+  // Read synchronously by the submit handler: "order anyway" submits in the
+  // same tick it is set, before a state update could land.
+  const skipLocationRef = useRef(false);
   // Review C4: order-level special notes live on the page (not inside
   // CartContent) so the table-selection detour can't lose them and the POST
   // body can actually carry them.
@@ -36,15 +46,34 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
   const submitLockRef = useRef(false);
 
   const { items, tableId: cartTableId, clearCart, setTableId } = useCartStore();
-  const { latitude, longitude, getCurrentPosition } = useGeolocation();
+  const {
+    latitude,
+    longitude,
+    loading: locationLoading,
+    getCurrentPosition,
+  } = useGeolocation();
 
-  // Request location when page loads
+  // Request location when page loads. Surfacing the refusal here — not on the
+  // tap that would have dead-ended — is the point: the guest sees the problem
+  // while they still have their hands on the phone.
   useEffect(() => {
-    if (!locationRequested) {
-      setLocationRequested(true);
-      getCurrentPosition();
-    }
+    if (locationRequested) return;
+    setLocationRequested(true);
+    void getCurrentPosition().then((position) => {
+      if (!position && !skipLocationRef.current) setLocationBlocked(true);
+    });
   }, [locationRequested, getCurrentPosition]);
+
+  const handleRetryLocation = async () => {
+    const position = await getCurrentPosition();
+    if (position) setLocationBlocked(false);
+  };
+
+  const handleOrderWithoutLocation = () => {
+    skipLocationRef.current = true;
+    setLocationBlocked(false);
+    void handleSubmitOrder();
+  };
 
   const handleSubmitOrder = async (selectedTableId?: string) => {
     // Review C6: latch synchronously before ANY await.
@@ -73,15 +102,24 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
         return;
       }
 
-      // Try to get location if not already available
+      // Try to get location if not already available. Null checks, not
+      // falsiness: 0 is a real coordinate (equator / prime meridian) and the
+      // old `!orderLat` threw such a fix away.
       let orderLat = latitude;
       let orderLng = longitude;
 
-      if (!orderLat || !orderLng) {
+      if (orderLat === null || orderLng === null) {
         const position = await getCurrentPosition();
         if (position) {
           orderLat = position.latitude;
           orderLng = position.longitude;
+          setLocationBlocked(false);
+        } else if (!skipLocationRef.current) {
+          // Stop here: the server would refuse this order in a language the
+          // guest may not read. The banner offers retry, or ordering anyway
+          // for the (common) tenant that never geofenced in the first place.
+          setLocationBlocked(true);
+          return;
         }
       }
 
@@ -99,8 +137,8 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
           sessionId,
           // Review C4: order-level notes were captured but silently dropped.
           notes: specialNotes.trim() || undefined,
-          latitude: orderLat || undefined,
-          longitude: orderLng || undefined,
+          latitude: orderLat ?? undefined,
+          longitude: orderLng ?? undefined,
           items: items.map((item) => ({
             productId: item.product.id,
             quantity: item.quantity,
@@ -151,6 +189,36 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
     >
       {menuData && (
         <>
+          {locationBlocked && items.length > 0 && (
+            <div
+              role="alert"
+              className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              <p className="flex items-start gap-2">
+                <MapPinOff className="mt-0.5 h-4 w-4 shrink-0" />
+                {t("cart.location.unavailable")}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleRetryLocation}
+                  disabled={locationLoading}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+                >
+                  {locationLoading
+                    ? t("cart.location.checking")
+                    : t("cart.location.retry")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOrderWithoutLocation}
+                  className="rounded-lg border border-amber-300 px-3 py-1.5 font-semibold text-amber-900"
+                >
+                  {t("cart.location.orderAnyway")}
+                </button>
+              </div>
+            </div>
+          )}
           <CartContent
             settings={menuData.settings}
             enableCustomerOrdering={menuData.enableCustomerOrdering}

@@ -69,7 +69,9 @@ const SortableCartItem: React.FC<SortableCartItemProps> = ({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-base mb-1 truncate" style={{ color: secondaryColor }}>
+          {/* There is vertical room here; truncate cut the dish name
+              mid-word at 320px. */}
+          <h3 className="font-bold text-base mb-1 line-clamp-2 leading-tight" style={{ color: secondaryColor }}>
             {item.product.name}
           </h3>
           <p className="text-sm font-semibold mb-2" style={{ color: primaryColor }}>
@@ -107,7 +109,7 @@ const SortableCartItem: React.FC<SortableCartItemProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-              className="p-2.5 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-[40px] min-h-[40px] flex items-center justify-center"
+              className="p-2.5 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-11 min-h-11 flex items-center justify-center"
               style={{ borderColor: primaryColor, color: primaryColor }}
             >
               <Minus className="h-4 w-4" />
@@ -117,7 +119,7 @@ const SortableCartItem: React.FC<SortableCartItemProps> = ({
             </span>
             <button
               onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-              className="p-2.5 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-[40px] min-h-[40px] flex items-center justify-center"
+              className="p-2.5 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-11 min-h-11 flex items-center justify-center"
               style={{ borderColor: primaryColor, color: primaryColor }}
             >
               <Plus className="h-4 w-4" />
@@ -132,7 +134,8 @@ const SortableCartItem: React.FC<SortableCartItemProps> = ({
           </span>
           <button
             onClick={() => onRemove(item.id)}
-            className="p-2 rounded-lg hover:bg-red-50 transition-all active:scale-95"
+            // 44px minimum tap target (was p-2 around an h-5 icon → 36×36).
+            className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-red-50 transition-all active:scale-95"
           >
             <Trash2 className="h-5 w-5 text-red-500" />
           </button>

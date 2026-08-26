@@ -125,6 +125,20 @@ describe('OrderTrackingPage — request bill', () => {
       { tenantId: 't-1', tableId: 'tbl-5', sessionId: 'sess-1' },
     ));
   });
+
+  it('blocks the bill request with a toast when there is no table', () => {
+    // /bill-requests refuses a tableless request with "tableId is required to
+    // request the bill — request is otherwise ambiguous across branches", in
+    // English, straight to the guest. Mirror the call-waiter guard.
+    tableIdParam = null;
+    load();
+    fireEvent.click(screen.getByText('bill'));
+    expect(toastError).toHaveBeenCalledWith('bill.noTable');
+    expect(post).not.toHaveBeenCalledWith(
+      expect.stringContaining('/bill-requests'),
+      expect.anything(),
+    );
+  });
 });
 
 describe('OrderTrackingPage — browse menu + self-pay gate', () => {

@@ -35,7 +35,10 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           />
 
           {/* Sheet */}
-          <div className="fixed inset-0 flex items-end">
+          {/* Phones get a bottom sheet; from sm up it is a centred dialog —
+              the same shape SelfPayModal uses. Left full-bleed, a 1440px
+              window showed the hero photo and nothing else. */}
+          <div className="fixed inset-0 flex items-end justify-center sm:items-center">
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
@@ -49,7 +52,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.5 }}
               onDragEnd={handleDragEnd}
-              className="relative w-full bg-white rounded-t-3xl shadow-2xl overflow-hidden flex flex-col"
+              className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
               style={{ maxHeight }}
             >
               {/* Drag Handle */}

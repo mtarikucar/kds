@@ -95,6 +95,50 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'fallback')).toBe(expected);
   });
 
+  it('never shows the raw 429 message to the user (ThrottlerException leak)', () => {
+    // Nest's ThrottlerGuard answers with the literal body
+    // { statusCode: 429, message: 'ThrottlerException: Too Many Requests' }
+    // and attaches no errorCode. A QR-menu diner was shown that string.
+    const err = axiosErrorWith(
+      { statusCode: 429, message: 'ThrottlerException: Too Many Requests' },
+      429,
+    );
+    const shown = getApiErrorMessage(err, 'fallback');
+    expect(shown).not.toMatch(/Throttler/i);
+    expect(shown).toBe(i18n.t('errors:apiCodes.TOO_MANY_REQUESTS'));
+  });
+
+  it('never shows raw 5xx internals to the user', () => {
+    const err = axiosErrorWith(
+      { statusCode: 500, message: 'connect ECONNREFUSED 10.0.0.4:5432' },
+      500,
+    );
+    const shown = getApiErrorMessage(err, 'fallback');
+    expect(shown).not.toMatch(/ECONNREFUSED/);
+    expect(shown).toBe(i18n.t('errors:apiCodes.INTERNAL_SERVER_ERROR'));
+  });
+
+  it('maps 503 to the service-unavailable string', () => {
+    const err = axiosErrorWith({ statusCode: 503, message: 'upstream down' }, 503);
+    expect(getApiErrorMessage(err, 'fallback')).toBe(
+      i18n.t('errors:apiCodes.SERVICE_UNAVAILABLE'),
+    );
+  });
+
+  it('still shows 4xx validation messages, which ARE written for the user', () => {
+    // The other direction: 400/403/409 messages are the domain refusals a
+    // guest needs to read ("Table already occupied"), so they pass through.
+    expect(
+      getApiErrorMessage(axiosErrorWith({ message: 'Table already occupied' }, 409), 'fallback'),
+    ).toBe('Table already occupied');
+    expect(
+      getApiErrorMessage(
+        axiosErrorWith({ message: ['price must be positive'] }, 400),
+        'fallback',
+      ),
+    ).toBe('price must be positive');
+  });
+
   it('keeps the specific backend message for an unmapped errorCode', () => {
     const err = axiosErrorWith({
       errorCode: 'SOME_UNMAPPED_CODE',

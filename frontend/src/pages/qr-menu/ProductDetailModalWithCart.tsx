@@ -316,9 +316,11 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose}>
-      {/* Product Image */}
+      {/* Product Image. max-h caps the 4:3 hero: on a short landscape window
+          the photo alone was taller than the sheet, so the name, the options
+          and the add-to-cart CTA were all below the fold. */}
       {showImages && (
-        <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-200">
+        <div className="relative w-full aspect-[4/3] max-h-[45vh] bg-gradient-to-br from-slate-100 to-slate-200">
           {productImages.length > 0 ? (
             <ProductImageGallery
               images={productImages}

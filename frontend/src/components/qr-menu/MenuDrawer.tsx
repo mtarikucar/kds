@@ -21,7 +21,6 @@ import { WifiInfo, SocialMedia } from '../../pages/qr-menu/QRMenuLayout';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 import { localeMap } from '../../i18n/localeMap';
 import { RTL_LANGUAGES } from '../../i18n/config';
-import { cn } from '../../lib/utils';
 
 // Social media icons type
 interface IconProps {
@@ -233,10 +232,12 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
             animate={{ x: 0 }}
             exit={{ x: isRTL ? '100%' : '-100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className={cn(
-              "fixed top-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto",
-              isRTL ? "right-0" : "left-0"
-            )}
+            /* Anchored left unconditionally: index.css mirrors every
+               [dir="rtl"] .fixed.left-0 panel to the right edge. Branching on
+               isRTL here as well made the two flips cancel, so the Arabic
+               drawer opened on the LEFT. The x transform above is the slide
+               direction, not the anchor, so it does still branch on isRTL. */
+            className="fixed top-0 bottom-0 left-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto"
           >
             {/* Header */}
             <div

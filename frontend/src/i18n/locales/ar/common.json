@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "تصفح القائمة",
-    "backToMenu": "العودة للقائمة"
+    "backToMenu": "العودة للقائمة",
+    "delete": "حذف",
+    "language": "اللغة",
+    "copyFailed": "تعذّر النسخ"
   },
   "navigation": {
     "dashboard": "لوحة التحكم",
@@ -1239,7 +1242,11 @@
     "connectWithUs": "تواصل معنا",
     "campaign": "عرض",
     "startingFrom": "من",
-    "required": "مطلوب"
+    "required": "مطلوب",
+    "noProducts": "لم يتم العثور على منتجات",
+    "noProductsDescription": "جرّب تعديل بحثك أو تصفّح كل الفئات",
+    "clearFilters": "مسح عوامل التصفية",
+    "notesPlaceholder": "مثال: بدون بصل، صلصة إضافية..."
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",
@@ -1273,8 +1280,20 @@
     "continueShopping": "مواصلة التسوق",
     "viewCart": "عرض السلة",
     "cart": "السلة",
-    "item_one": "{{count}} عنصر",
-    "item_other": "{{count}} عناصر"
+    "location": {
+      "unavailable": "تعذّر تحديد موقعك. بعض المطاعم تقبل الطلبات من الطاولة فقط.",
+      "checking": "جارٍ تحديد موقعك...",
+      "retry": "إعادة تحديد الموقع",
+      "orderAnyway": "الطلب بدون تحديد الموقع"
+    },
+    "swipeToDelete": "اسحب لليسار للحذف",
+    "dragToReorder": "اسحب العناصر لإعادة الترتيب",
+    "itemCount_zero": "لا توجد عناصر",
+    "itemCount_one": "عنصر واحد",
+    "itemCount_two": "عنصران",
+    "itemCount_few": "{{count}} عناصر",
+    "itemCount_many": "{{count}} عنصرًا",
+    "itemCount_other": "{{count}} عنصر"
   },
   "orders": {
     "title": "طلباتي",
@@ -1284,7 +1303,12 @@
     "noOrdersDescription": "ابدأ بتصفح قائمتنا",
     "total": "الإجمالي",
     "note": "ملاحظة",
-    "reorderComboSkipped": "تم تخطي الوجبات المركّبة — يرجى إضافتها من القائمة مرة أخرى."
+    "reorderComboSkipped": "تم تخطي الوجبات المركّبة — يرجى إضافتها من القائمة مرة أخرى.",
+    "tableRequiredForActions": "امسح رمز QR الخاص بالطاولة لاستدعاء النادل أو طلب الفاتورة.",
+    "activeOrders": "الطلبات الحالية",
+    "pastOrders": "الطلبات السابقة",
+    "reorder": "إعادة الطلب",
+    "adding": "جارٍ الإضافة..."
   },
   "waiter": {
     "call": "استدعاء النادل",
@@ -1297,7 +1321,8 @@
   "bill": {
     "request": "طلب الفاتورة",
     "requestSuccess": "تم إرسال طلب الفاتورة!",
-    "requestError": "فشل طلب الفاتورة"
+    "requestError": "فشل طلب الفاتورة",
+    "noTable": "امسح رمز QR الخاص بالطاولة لطلب الفاتورة"
   },
   "payment": {
     "errors": {
@@ -1393,7 +1418,8 @@
     "yourReferralCode": "رمز الإحالة الخاص بك",
     "referrals": "الإحالات",
     "pointsEarned": "النقاط المكتسبة",
-    "noReferralCode": "تواصل مع الدعم للحصول على رمز الإحالة الخاص بك"
+    "noReferralCode": "تواصل مع الدعم للحصول على رمز الإحالة الخاص بك",
+    "viewRewards": "اعرض مكافآتك"
   },
   "pos": {
     "floorPlan": {
