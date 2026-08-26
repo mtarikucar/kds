@@ -186,7 +186,7 @@ const CartContent: React.FC<CartContentProps> = ({
               {t('cart.title', 'Your Cart')}
             </h2>
             <p className="text-sm text-slate-500">
-              {items.length} {items.length === 1 ? t('cart.item', 'item') : t('cart.items', 'items')}
+              {t('cart.itemCount', { count: items.length })}
             </p>
           </div>
         </div>

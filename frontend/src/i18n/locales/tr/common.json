@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "Menüyü Gözat",
-    "backToMenu": "Menüye Dön"
+    "backToMenu": "Menüye Dön",
+    "delete": "Sil",
+    "language": "Dil",
+    "copyFailed": "Kopyalanamadı"
   },
   "navigation": {
     "dashboard": "Kontrol Paneli",
@@ -1239,7 +1242,10 @@
     "productImage": "Ürün görseli",
     "campaign": "Kampanya",
     "startingFrom": "başlangıç",
-    "required": "Zorunlu"
+    "required": "Zorunlu",
+    "noProducts": "Ürün bulunamadı",
+    "noProductsDescription": "Aramanızı değiştirin veya tüm kategorilere göz atın",
+    "clearFilters": "Filtreleri temizle"
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -1253,8 +1259,6 @@
   "cart": {
     "title": "Sepetim",
     "items": "Ürün",
-    "item_one": "{{count}} Ürün",
-    "item_other": "{{count}} Ürün",
     "empty": "Sepetiniz boş",
     "emptyDescription": "Başlamak için lezzetli ürünler ekleyin",
     "backToMenu": "Menüye Dön",
@@ -1280,7 +1284,11 @@
       "checking": "Konumunuz alınıyor...",
       "retry": "Konumu tekrar dene",
       "orderAnyway": "Konumsuz sipariş ver"
-    }
+    },
+    "swipeToDelete": "Silmek için sola kaydırın",
+    "dragToReorder": "Sıralamak için ürünleri sürükleyin",
+    "itemCount_one": "{{count}} ürün",
+    "itemCount_other": "{{count}} ürün"
   },
   "orders": {
     "title": "Siparişlerim",
@@ -1401,7 +1409,8 @@
     "yourReferralCode": "Referans Kodunuz",
     "referrals": "Referanslar",
     "pointsEarned": "Kazanılan Puanlar",
-    "noReferralCode": "Referans kodunuz için destek ekibiyle iletişime geçin"
+    "noReferralCode": "Referans kodunuz için destek ekibiyle iletişime geçin",
+    "viewRewards": "Ödüllerinizi görüntüleyin"
   },
   "cancel": "İptal"
 }

@@ -66,7 +66,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
           }}
           whileTap={{ scale: 0.95 }}
         >
-          {t('qrMenu.allCategories', 'All')}
+          {t('qrMenu.all', 'All')}
         </motion.button>
 
         {/* Category Buttons */}

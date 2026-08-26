@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "Browse Menu",
-    "backToMenu": "Back to Menu"
+    "backToMenu": "Back to Menu",
+    "delete": "Delete",
+    "language": "Language",
+    "copyFailed": "Failed to copy"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -1239,7 +1242,10 @@
     "productImage": "Product image",
     "campaign": "Campaign",
     "startingFrom": "from",
-    "required": "Required"
+    "required": "Required",
+    "noProducts": "No products found",
+    "noProductsDescription": "Try adjusting your search or browse all categories",
+    "clearFilters": "Clear filters"
   },
   "qr": {
     "shareText": "Check out our menu",
@@ -1253,8 +1259,6 @@
   "cart": {
     "title": "Your Cart",
     "items": "Items",
-    "item_one": "{{count}} Item",
-    "item_other": "{{count}} Items",
     "empty": "Your cart is empty",
     "emptyDescription": "Add some delicious items to get started",
     "backToMenu": "Back to Menu",
@@ -1280,7 +1284,11 @@
       "checking": "Getting your location...",
       "retry": "Retry location",
       "orderAnyway": "Order without location"
-    }
+    },
+    "swipeToDelete": "Swipe left to delete",
+    "dragToReorder": "Drag items to reorder",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items"
   },
   "orders": {
     "title": "My Orders",
@@ -1401,7 +1409,8 @@
     "yourReferralCode": "Your Referral Code",
     "referrals": "Referrals",
     "pointsEarned": "Points Earned",
-    "noReferralCode": "Contact support to get your referral code"
+    "noReferralCode": "Contact support to get your referral code",
+    "viewRewards": "View your rewards"
   },
   "cancel": "Cancel"
 }

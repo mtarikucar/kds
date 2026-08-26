@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "Просмотр меню",
-    "backToMenu": "Вернуться в меню"
+    "backToMenu": "Вернуться в меню",
+    "delete": "Удалить",
+    "language": "Язык",
+    "copyFailed": "Не удалось скопировать"
   },
   "navigation": {
     "dashboard": "Панель управления",
@@ -1229,7 +1232,10 @@
     "connectWithUs": "Свяжитесь с нами",
     "campaign": "Акция",
     "startingFrom": "от",
-    "required": "Обязательно"
+    "required": "Обязательно",
+    "noProducts": "Товары не найдены",
+    "noProductsDescription": "Измените запрос или посмотрите все категории",
+    "clearFilters": "Сбросить фильтры"
   },
   "qr": {
     "shareText": "Посмотрите наше меню",
@@ -1263,14 +1269,18 @@
     "continueShopping": "Продолжить покупки",
     "viewCart": "Посмотреть корзину",
     "cart": "Корзина",
-    "item_one": "{{count}} позиция",
-    "item_other": "{{count}} позиций",
     "location": {
       "unavailable": "Не удалось определить ваше местоположение. Некоторые рестораны принимают заказы только за столиком.",
       "checking": "Определяем ваше местоположение...",
       "retry": "Повторить определение",
       "orderAnyway": "Заказать без местоположения"
-    }
+    },
+    "swipeToDelete": "Проведите влево, чтобы удалить",
+    "dragToReorder": "Перетащите позиции, чтобы изменить порядок",
+    "itemCount_one": "{{count}} позиция",
+    "itemCount_few": "{{count}} позиции",
+    "itemCount_many": "{{count}} позиций",
+    "itemCount_other": "{{count}} позиции"
   },
   "orders": {
     "title": "Мои заказы",
@@ -1391,7 +1401,8 @@
     "yourReferralCode": "Ваш реферальный код",
     "referrals": "Рефералы",
     "pointsEarned": "Заработано баллов",
-    "noReferralCode": "Свяжитесь с поддержкой для получения реферального кода"
+    "noReferralCode": "Свяжитесь с поддержкой для получения реферального кода",
+    "viewRewards": "Посмотреть ваши награды"
   },
   "pos": {
     "floorPlan": {

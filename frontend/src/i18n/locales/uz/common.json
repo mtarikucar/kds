@@ -70,7 +70,10 @@
   },
   "common": {
     "browseMenu": "Menyuni ko'rish",
-    "backToMenu": "Menyuga qaytish"
+    "backToMenu": "Menyuga qaytish",
+    "delete": "O'chirish",
+    "language": "Til",
+    "copyFailed": "Nusxalab bo'lmadi"
   },
   "navigation": {
     "dashboard": "Boshqaruv paneli",
@@ -1219,7 +1222,10 @@
     "connectWithUs": "Biz bilan bog'laning",
     "campaign": "Aksiya",
     "startingFrom": "dan",
-    "required": "Majburiy"
+    "required": "Majburiy",
+    "noProducts": "Mahsulot topilmadi",
+    "noProductsDescription": "Qidiruvni o'zgartiring yoki barcha turkumlarni ko'rib chiqing",
+    "clearFilters": "Filtrlarni tozalash"
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",
@@ -1253,14 +1259,16 @@
     "continueShopping": "Xaridni davom ettirish",
     "viewCart": "Savatni ko'rish",
     "cart": "Savat",
-    "item_one": "{{count}} mahsulot",
-    "item_other": "{{count}} mahsulot",
     "location": {
       "unavailable": "Joylashuvingizni aniqlab boʻlmadi. Ayrim restoranlar faqat stol yonida berilgan buyurtmalarni qabul qiladi.",
       "checking": "Joylashuvingiz aniqlanmoqda...",
       "retry": "Joylashuvni qayta aniqlash",
       "orderAnyway": "Joylashuvsiz buyurtma berish"
-    }
+    },
+    "swipeToDelete": "O'chirish uchun chapga suring",
+    "dragToReorder": "Tartibni o'zgartirish uchun mahsulotlarni torting",
+    "itemCount_one": "{{count}} ta mahsulot",
+    "itemCount_other": "{{count}} ta mahsulot"
   },
   "orders": {
     "title": "Mening buyurtmalarim",
@@ -1381,7 +1389,8 @@
     "yourReferralCode": "Sizning referal kodingiz",
     "referrals": "Referallar",
     "pointsEarned": "To'plangan ballar",
-    "noReferralCode": "Referal kodingizni olish uchun qo'llab-quvvatlash bilan bog'laning"
+    "noReferralCode": "Referal kodingizni olish uchun qo'llab-quvvatlash bilan bog'laning",
+    "viewRewards": "Mukofotlaringizni ko'ring"
   },
   "pos": {
     "floorPlan": {

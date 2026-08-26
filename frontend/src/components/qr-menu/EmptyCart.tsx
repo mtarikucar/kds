@@ -60,7 +60,7 @@ const EmptyCart: React.FC<EmptyCartProps> = ({
         className="text-center mb-8"
       >
         <h2 className="text-xl font-bold text-slate-800 mb-2">
-          {t('cart.emptyTitle', 'Your cart is empty')}
+          {t('cart.empty', 'Your cart is empty')}
         </h2>
         <p className="text-slate-500 text-sm max-w-xs">
           {t('cart.emptyDescription', 'Looks like you haven\'t added anything to your cart yet. Start browsing our delicious menu!')}
