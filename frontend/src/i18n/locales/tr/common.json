@@ -1274,7 +1274,13 @@
     "specialNotes": "Özel Notlar",
     "continueShopping": "Alışverişe Devam Et",
     "viewCart": "Sepeti Görüntüle",
-    "cart": "Sepet"
+    "cart": "Sepet",
+    "location": {
+      "unavailable": "Konumunuz alınamadı. Bazı restoranlar yalnızca masada verilen siparişleri kabul eder.",
+      "checking": "Konumunuz alınıyor...",
+      "retry": "Konumu tekrar dene",
+      "orderAnyway": "Konumsuz sipariş ver"
+    }
   },
   "orders": {
     "title": "Siparişlerim",
@@ -1284,7 +1290,8 @@
     "noOrdersDescription": "Menüyü inceleyerek başlayın",
     "total": "Toplam",
     "note": "Not",
-    "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin."
+    "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin.",
+    "tableRequiredForActions": "Garson çağırmak veya hesap istemek için masadaki karekodu okutun."
   },
   "waiter": {
     "call": "Garson Çağır",
@@ -1297,7 +1304,8 @@
   "bill": {
     "request": "Hesap İste",
     "requestSuccess": "Hesap isteği gönderildi!",
-    "requestError": "Hesap isteği gönderilemedi"
+    "requestError": "Hesap isteği gönderilemedi",
+    "noTable": "Hesabı istemek için lütfen masadaki karekodu okutun"
   },
   "payment": {
     "errors": {

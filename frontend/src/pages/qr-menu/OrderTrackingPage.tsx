@@ -87,6 +87,15 @@ const OrderTrackingPage = () => {
       return;
     }
 
+    if (!tableId) {
+      // /bill-requests refuses a tableless request ("tableId is required to
+      // request the bill — request is otherwise ambiguous across branches"),
+      // and that English sentence went straight to the guest. Mirror the
+      // call-waiter guard above and say it in their language instead.
+      toast.error(t('bill.noTable'));
+      return;
+    }
+
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       // Review C1: transparently re-mint + retry once on 401 (expired session).
@@ -94,7 +103,7 @@ const OrderTrackingPage = () => {
         (sid) =>
           axios.post(`${API_URL}/customer-orders/bill-requests`, {
             tenantId,
-            tableId: tableId || null,
+            tableId,
             sessionId: sid,
           }),
         sessionId,

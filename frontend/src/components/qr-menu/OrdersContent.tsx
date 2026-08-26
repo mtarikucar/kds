@@ -41,6 +41,11 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
 }) => {
   const { t } = useTranslation('common');
   const addItem = useCartStore(state => state.addItem);
+  // Both /waiter-requests and /bill-requests refuse a request that carries no
+  // tableId ("ambiguous across branches"), so without a table these buttons
+  // were a one-way trip to an error toast. Offer them only when the guest
+  // arrived through a table QR, and say what would make them work.
+  const tableRequired = !tableId;
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
 
@@ -209,9 +214,14 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
         )}>
           <motion.button
             onClick={onCallWaiter}
-            className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 hover:shadow-lg transition-all duration-200"
-            whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.02 }}
+            disabled={tableRequired}
+            aria-describedby={tableRequired ? 'qr-table-required-hint' : undefined}
+            className={cn(
+              'bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 transition-all duration-200',
+              tableRequired ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg',
+            )}
+            whileTap={tableRequired ? undefined : { scale: 0.95 }}
+            whileHover={tableRequired ? undefined : { scale: 1.02 }}
           >
             <div className="p-3 rounded-full" style={{ backgroundColor: `${settings.primaryColor}15` }}>
               <User className="h-5 w-5" style={{ color: settings.primaryColor }} />
@@ -222,9 +232,14 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
           </motion.button>
           <motion.button
             onClick={onRequestBill}
-            className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 hover:shadow-lg transition-all duration-200"
-            whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.02 }}
+            disabled={tableRequired}
+            aria-describedby={tableRequired ? 'qr-table-required-hint' : undefined}
+            className={cn(
+              'bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 transition-all duration-200',
+              tableRequired ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg',
+            )}
+            whileTap={tableRequired ? undefined : { scale: 0.95 }}
+            whileHover={tableRequired ? undefined : { scale: 1.02 }}
           >
             <div className="p-3 rounded-full" style={{ backgroundColor: `${settings.secondaryColor}15` }}>
               <Receipt className="h-5 w-5" style={{ color: settings.secondaryColor }} />
@@ -249,6 +264,18 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
             </motion.button>
           )}
         </div>
+
+        {tableRequired && (
+          <p
+            id="qr-table-required-hint"
+            className="text-xs text-slate-500 text-center -mt-4 mb-6"
+          >
+            {t(
+              'orders.tableRequiredForActions',
+              'Scan the table QR code to call a waiter or request the bill.',
+            )}
+          </p>
+        )}
 
         {/* Orders List */}
         {orders.length === 0 ? (

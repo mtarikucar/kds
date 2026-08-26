@@ -1274,7 +1274,13 @@
     "specialNotes": "Special Notes",
     "continueShopping": "Continue Shopping",
     "viewCart": "View Cart",
-    "cart": "Cart"
+    "cart": "Cart",
+    "location": {
+      "unavailable": "We couldn't get your location. Some restaurants only accept orders placed at the table.",
+      "checking": "Getting your location...",
+      "retry": "Retry location",
+      "orderAnyway": "Order without location"
+    }
   },
   "orders": {
     "title": "My Orders",
@@ -1284,7 +1290,8 @@
     "noOrdersDescription": "Start by browsing our menu",
     "total": "Total",
     "note": "Note",
-    "reorderComboSkipped": "Combo items were skipped — please add them from the menu again."
+    "reorderComboSkipped": "Combo items were skipped — please add them from the menu again.",
+    "tableRequiredForActions": "Scan the table QR code to call a waiter or request the bill."
   },
   "waiter": {
     "call": "Call Waiter",
@@ -1297,7 +1304,8 @@
   "bill": {
     "request": "Request Bill",
     "requestSuccess": "Bill request sent!",
-    "requestError": "Failed to request bill"
+    "requestError": "Failed to request bill",
+    "noTable": "Please scan the table QR code to request the bill"
   },
   "payment": {
     "errors": {

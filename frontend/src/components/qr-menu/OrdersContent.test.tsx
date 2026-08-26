@@ -105,19 +105,27 @@ const mixedOrder: any = {
   ],
 };
 
-function renderOrders(orders: any[]) {
+function renderOrders(orders: any[], tableId: string | null = null) {
   return render(
     <OrdersContent
       orders={orders}
       settings={settings}
       tenantId="t-1"
-      tableId={null}
-      onCallWaiter={vi.fn()}
-      onRequestBill={vi.fn()}
+      tableId={tableId}
+      onCallWaiter={onCallWaiter}
+      onRequestBill={onRequestBill}
       onBrowseMenu={vi.fn()}
       currency="TRY"
     />,
   );
+}
+
+const onCallWaiter = vi.fn();
+const onRequestBill = vi.fn();
+
+/** The <button> wrapping a label (the label itself is a <span>). */
+function buttonFor(label: string) {
+  return screen.getByText(label).closest('button') as HTMLButtonElement;
 }
 
 beforeEach(() => {
@@ -172,5 +180,35 @@ describe('OrdersContent — reorder (C3)', () => {
     expect(addItem).toHaveBeenCalledTimes(1);
     expect(addItem.mock.calls[0][0].id).toBe('p-plain');
     expect(toastInfo).toHaveBeenCalled();
+  });
+});
+
+describe('OrdersContent — table-scoped actions', () => {
+  it('offers Call Waiter / Request Bill when the QR carried a table', () => {
+    renderOrders([mixedOrder], 'tbl-3');
+    expect(buttonFor('Call Waiter').disabled).toBe(false);
+    expect(buttonFor('Request Bill').disabled).toBe(false);
+    expect(
+      screen.queryByText(
+        'Scan the table QR code to call a waiter or request the bill.',
+      ),
+    ).toBeNull();
+  });
+
+  it('disables both, with a hint, when there is no table', () => {
+    // Both endpoints refuse a tableless request ("ambiguous across
+    // branches"), so the buttons were only ever a route to an error toast.
+    renderOrders([mixedOrder], null);
+    expect(buttonFor('Call Waiter').disabled).toBe(true);
+    expect(buttonFor('Request Bill').disabled).toBe(true);
+    fireEvent.click(buttonFor('Call Waiter'));
+    fireEvent.click(buttonFor('Request Bill'));
+    expect(onCallWaiter).not.toHaveBeenCalled();
+    expect(onRequestBill).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        'Scan the table QR code to call a waiter or request the bill.',
+      ),
+    ).toBeInTheDocument();
   });
 });

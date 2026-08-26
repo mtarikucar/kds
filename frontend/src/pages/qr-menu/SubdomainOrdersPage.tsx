@@ -93,6 +93,15 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
       return;
     }
 
+    if (!tableId) {
+      // /bill-requests refuses a tableless request ("tableId is required to
+      // request the bill — request is otherwise ambiguous across branches"),
+      // and that English sentence went straight to the guest. Mirror the
+      // call-waiter guard above and say it in their language instead.
+      toast.error(t('bill.noTable'));
+      return;
+    }
+
     const tenantId = menuData.tenant.id;
 
     try {
@@ -102,7 +111,7 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
         (sid) =>
           axios.post(`${API_URL}/customer-orders/bill-requests`, {
             tenantId,
-            tableId: tableId || null,
+            tableId,
             sessionId: sid,
           }),
         sessionId,

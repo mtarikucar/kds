@@ -73,6 +73,9 @@ export function asApiError(err: unknown): ApiError | null {
  *   - axios error with `{ message: string[] }` body → joined with "; "
  *     (class-validator returns an array of one per failed field)
  *   - non-axios / no body → `fallback`
+ *
+ * 429 and 5xx are the exception: their bodies are operator-facing, so they
+ * resolve to a localized string instead of the server's own words.
  */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   const api = asApiError(err);
@@ -91,6 +94,25 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
     // actually translated.
     const key = `errors:apiCodes.${code}`;
     if (i18n.exists(key)) return i18n.t(key);
+  }
+  // The backend's raw `message` is only written FOR A USER on the 4xx
+  // validation / domain paths ("Table already occupied", "price must be
+  // positive"). The infrastructure statuses carry operator text: Nest's
+  // ThrottlerGuard answers 429 with the literal "ThrottlerException: Too Many
+  // Requests", and a 5xx body can hold a driver string like "connect
+  // ECONNREFUSED 10.0.0.4:5432". A QR-menu diner was being shown both. Map
+  // those statuses onto the localized strings we already ship for the
+  // equivalent errorCodes, so nothing internal reaches a guest in a language
+  // they don't read anyway.
+  const status = api?.response?.status;
+  if (status === 429) {
+    return i18n.t('errors:apiCodes.TOO_MANY_REQUESTS', { defaultValue: fallback });
+  }
+  if (status === 503) {
+    return i18n.t('errors:apiCodes.SERVICE_UNAVAILABLE', { defaultValue: fallback });
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return i18n.t('errors:apiCodes.INTERNAL_SERVER_ERROR', { defaultValue: fallback });
   }
   const raw = api?.response?.data?.message;
   if (typeof raw === 'string' && raw.length > 0) return raw;

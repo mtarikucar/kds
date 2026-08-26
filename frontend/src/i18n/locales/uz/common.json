@@ -1254,7 +1254,13 @@
     "viewCart": "Savatni ko'rish",
     "cart": "Savat",
     "item_one": "{{count}} mahsulot",
-    "item_other": "{{count}} mahsulot"
+    "item_other": "{{count}} mahsulot",
+    "location": {
+      "unavailable": "Joylashuvingizni aniqlab boʻlmadi. Ayrim restoranlar faqat stol yonida berilgan buyurtmalarni qabul qiladi.",
+      "checking": "Joylashuvingiz aniqlanmoqda...",
+      "retry": "Joylashuvni qayta aniqlash",
+      "orderAnyway": "Joylashuvsiz buyurtma berish"
+    }
   },
   "orders": {
     "title": "Mening buyurtmalarim",
@@ -1264,7 +1270,8 @@
     "noOrdersDescription": "Menyumizni ko'rishdan boshlang",
     "total": "Jami",
     "note": "Eslatma",
-    "reorderComboSkipped": "Kombo taomlar o'tkazib yuborildi — iltimos, ularni menyudan qaytadan qo'shing."
+    "reorderComboSkipped": "Kombo taomlar o'tkazib yuborildi — iltimos, ularni menyudan qaytadan qo'shing.",
+    "tableRequiredForActions": "Ofitsiantni chaqirish yoki hisobni soʻrash uchun stoldagi QR kodni skanerlang."
   },
   "waiter": {
     "call": "Ofitsiantni chaqirish",
@@ -1277,7 +1284,8 @@
   "bill": {
     "request": "Hisob so'rash",
     "requestSuccess": "Hisob so'rovi yuborildi!",
-    "requestError": "Hisob so'rab bo'lmadi"
+    "requestError": "Hisob so'rab bo'lmadi",
+    "noTable": "Hisobni soʻrash uchun stoldagi QR kodni skanerlang"
   },
   "payment": {
     "errors": {
