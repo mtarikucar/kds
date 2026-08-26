@@ -38,6 +38,13 @@ export const TENANT_WIDE_PATH_PREFIXES = [
   // dropdown gets an empty list and stays disabled. Bare segment so it does NOT
   // widen to the branch-scoped /tenants/settings routes.
   "/tenants/public",
+  // GET /tables/public/:tenantId backs the dine-in "pick a table" step of the
+  // PUBLIC QR menu: no session, no branch resolved. Without this the request
+  // interceptor rejected the call before it left the browser — no network entry
+  // at all — so every guest of every restaurant hit "Failed to load tables" and
+  // could not place an order. Bare segment so it does NOT widen to the
+  // branch-scoped /tables/:id routes the staff app uses.
+  "/tables/public",
   // Partner Display API key management is tenant-level (class-level
   // @SkipBranchScope, tenant-fenced by req.user.tenantId). Bare segment so it
   // matches /v1/partner/api-keys without a branch header. (The /v1/display/*
