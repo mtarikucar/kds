@@ -68,10 +68,6 @@
   "menu:threeD.title",
   "nav.openMenu",
   "orderPaymentFailed",
-  "orders.activeOrders",
-  "orders.adding",
-  "orders.pastOrders",
-  "orders.reorder",
   "payment.amountTendered",
   "payment.changeDue",
   "payment.exactAmount",
@@ -103,7 +99,6 @@
   "pos.reprint.notReprintable",
   "pos.reprint.printing",
   "pos.reprint.success",
-  "qrMenu.notesPlaceholder",
   "updateOrderBeforePayment",
   "verifyEmail.codeLabel",
   "versionLabel"

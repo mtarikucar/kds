@@ -70,20 +70,34 @@ export function formatCurrency(amount: number, currency: string = 'TRY'): string
       : `${override.symbol}${number}`;
   }
 
-  return new Intl.NumberFormat(MONEY_LOCALE, {
+  const currencyOptions: Intl.NumberFormatOptions = {
     style: 'currency',
     currency,
-    // Without this, a currency whose full symbol ICU spells as its ISO code in
-    // some locales (RUB -> "RUB", not "₽") renders as letters. TRY/USD/EUR are
-    // byte-identical either way under tr-TR, so no existing call site moves.
-    currencyDisplay: 'narrowSymbol',
     // Precision is deliberately left to ICU when we have no override — passing
     // an explicit 2 would break the zero-decimal currencies (JPY, KRW) that
     // ICU already gets right.
     ...(decimals !== undefined
       ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
       : {}),
-  }).format(amount);
+  };
+
+  try {
+    return new Intl.NumberFormat(MONEY_LOCALE, {
+      ...currencyOptions,
+      // Without this, a currency whose full symbol ICU spells as its ISO code in
+      // some locales (RUB -> "RUB", not "₽") renders as letters. TRY/USD/EUR are
+      // byte-identical either way under tr-TR, so no existing call site moves.
+      currencyDisplay: 'narrowSymbol',
+    }).format(amount);
+  } catch {
+    // 'narrowSymbol' arrived in Safari 14.1 / WebKitGTK 2.32, and an older
+    // engine does not ignore the option — the CONSTRUCTOR throws RangeError.
+    // Our web build targets es2020 and the Tauri shell targets safari13, so
+    // such an engine is inside the supported set and an uncaught throw would
+    // take down every price on the page. Take ICU's default display instead:
+    // one currency loses its symbol, nobody loses the screen.
+    return new Intl.NumberFormat(MONEY_LOCALE, currencyOptions).format(amount);
+  }
 }
 
 export function formatDate(date: string | Date, formatStr: string = 'PPP'): string {

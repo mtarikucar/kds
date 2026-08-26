@@ -70,6 +70,14 @@ describe('qr-menu guest strings exist in every locale', () => {
     'cart.swipeToDelete',
     'cart.dragToReorder',
     'cart.empty',
+    // The orders screen's own headings and the reorder button: this file's
+    // sibling fix translated the drawer and the cart around them, but the
+    // guest's order list itself still read English on a Turkish tenant.
+    'orders.activeOrders',
+    'orders.pastOrders',
+    'orders.reorder',
+    'orders.adding',
+    'qrMenu.notesPlaceholder',
     'common.delete',
     'common.language',
     'common.copyFailed',

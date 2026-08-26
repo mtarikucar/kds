@@ -1245,7 +1245,8 @@
     "required": "Zorunlu",
     "noProducts": "Ürün bulunamadı",
     "noProductsDescription": "Aramanızı değiştirin veya tüm kategorilere göz atın",
-    "clearFilters": "Filtreleri temizle"
+    "clearFilters": "Filtreleri temizle",
+    "notesPlaceholder": "Örn. soğansız, ekstra sos..."
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -1299,7 +1300,11 @@
     "total": "Toplam",
     "note": "Not",
     "reorderComboSkipped": "Kombo ürünler atlandı — lütfen menüden yeniden ekleyin.",
-    "tableRequiredForActions": "Garson çağırmak veya hesap istemek için masadaki karekodu okutun."
+    "tableRequiredForActions": "Garson çağırmak veya hesap istemek için masadaki karekodu okutun.",
+    "activeOrders": "Aktif Siparişler",
+    "pastOrders": "Geçmiş Siparişler",
+    "reorder": "Tekrar sipariş ver",
+    "adding": "Ekleniyor..."
   },
   "waiter": {
     "call": "Garson Çağır",

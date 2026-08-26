@@ -1225,7 +1225,8 @@
     "required": "Majburiy",
     "noProducts": "Mahsulot topilmadi",
     "noProductsDescription": "Qidiruvni o'zgartiring yoki barcha turkumlarni ko'rib chiqing",
-    "clearFilters": "Filtrlarni tozalash"
+    "clearFilters": "Filtrlarni tozalash",
+    "notesPlaceholder": "Masalan: piyozsiz, ko'proq sous..."
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",
@@ -1279,7 +1280,11 @@
     "total": "Jami",
     "note": "Eslatma",
     "reorderComboSkipped": "Kombo taomlar o'tkazib yuborildi — iltimos, ularni menyudan qaytadan qo'shing.",
-    "tableRequiredForActions": "Ofitsiantni chaqirish yoki hisobni soʻrash uchun stoldagi QR kodni skanerlang."
+    "tableRequiredForActions": "Ofitsiantni chaqirish yoki hisobni soʻrash uchun stoldagi QR kodni skanerlang.",
+    "activeOrders": "Faol buyurtmalar",
+    "pastOrders": "Oldingi buyurtmalar",
+    "reorder": "Qayta buyurtma berish",
+    "adding": "Qo'shilmoqda..."
   },
   "waiter": {
     "call": "Ofitsiantni chaqirish",

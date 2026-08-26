@@ -1245,7 +1245,8 @@
     "required": "Required",
     "noProducts": "No products found",
     "noProductsDescription": "Try adjusting your search or browse all categories",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "notesPlaceholder": "E.g., No onions, extra sauce..."
   },
   "qr": {
     "shareText": "Check out our menu",
@@ -1299,7 +1300,11 @@
     "total": "Total",
     "note": "Note",
     "reorderComboSkipped": "Combo items were skipped — please add them from the menu again.",
-    "tableRequiredForActions": "Scan the table QR code to call a waiter or request the bill."
+    "tableRequiredForActions": "Scan the table QR code to call a waiter or request the bill.",
+    "activeOrders": "Active Orders",
+    "pastOrders": "Past Orders",
+    "reorder": "Reorder",
+    "adding": "Adding..."
   },
   "waiter": {
     "call": "Call Waiter",

@@ -65,6 +65,35 @@ describe('formatCurrency', () => {
     expect(formatCurrency(1234567.89, 'TRY')).toBe('₺1.234.567,89');
     expect(formatCurrency(-19.5, 'TRY')).toBe('-₺19,50');
   });
+
+  // `currencyDisplay: 'narrowSymbol'` landed in Safari 14.1 / WebKitGTK 2.32,
+  // and an engine older than that does not ignore the option — it throws
+  // RangeError from the CONSTRUCTOR. Our web build targets es2020 (Safari
+  // 13.1) and the Tauri shell targets safari13, so that engine is inside the
+  // supported set, and an uncaught throw here takes down every price on the
+  // page — a white screen at the table. Fall back to ICU's default display.
+  it('still renders money on an engine that rejects narrowSymbol', () => {
+    const real = Intl.NumberFormat;
+    const spy = vi
+      .spyOn(Intl, 'NumberFormat')
+      .mockImplementation(((locale?: string, options?: Intl.NumberFormatOptions) => {
+        if (options?.currencyDisplay === 'narrowSymbol') {
+          throw new RangeError(
+            "invalid value narrowSymbol for option currencyDisplay",
+          );
+        }
+        return new real(locale, options);
+      }) as unknown as typeof Intl.NumberFormat);
+
+    try {
+      expect(formatCurrency(2999, 'TRY')).toBe('₺2.999,00');
+      // The override path never asks for a currency style at all, so it is
+      // unaffected either way.
+      expect(formatCurrency(50000, 'UZS')).toBe("50.000 so'm");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 // A fixed "now" makes every Date.now()-based helper deterministic.
