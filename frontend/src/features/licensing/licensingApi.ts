@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
+import { formatCurrency } from '../../lib/utils';
 
 /** Prefixed entitlement keys, exactly as the engine folds them. */
 export interface EntitlementSet {
@@ -186,9 +187,5 @@ export function useCatalogPricing() {
 
 /** Kuruş → "₺1.254,66". */
 export function formatCents(cents: number, currency = 'TRY'): string {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(cents / 100);
+  return formatCurrency(cents / 100, currency);
 }

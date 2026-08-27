@@ -18,6 +18,7 @@ import {
   useSaUpdateAddOn,
   useSaUpdateProduct,
 } from '../../features/superadmin/api/superadminMarketplaceApi';
+import { formatCurrency } from '../../lib/utils';
 
 /**
  * SuperAdmin marketplace management.
@@ -116,7 +117,7 @@ function AddOnsSection() {
                   )}
                 </td>
                 <td className="px-3 py-2 tabular-nums">
-                  {(a.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: a.currency })}
+                  {formatCurrency(a.priceCents / 100, a.currency)}
                   {a.creditKind && (
                     <div className="text-xs font-normal text-gray-500">
                       {a.creditUnits} × {a.creditKind}
@@ -326,7 +327,7 @@ function AddOnEditorModal({ initial, onSubmit, onClose }: AddOnEditorProps) {
           <Field label={tr('marketplace.addons.fields.priceCents')}>
             <input className="rounded border px-2 py-1 text-sm w-full tabular-nums" type="number" value={form.priceCents} onChange={(e) => setForm((f) => ({ ...f, priceCents: Number(e.target.value) }))} />
             <span className="mt-0.5 block text-[11px] text-gray-500">
-              {(Number(form.priceCents) / 100).toLocaleString('tr-TR', { style: 'currency', currency: form.currency || 'TRY' })}
+              {formatCurrency(Number(form.priceCents) / 100, form.currency || 'TRY')}
               {form.billing === 'annual' && ` ${tr('marketplace.addons.perYear')}`}
             </span>
           </Field>
@@ -489,7 +490,7 @@ function ProductsSection() {
                 <td className="px-3 py-2">{p.name}</td>
                 <td className="px-3 py-2 text-xs">{p.category}</td>
                 <td className="px-3 py-2 tabular-nums">
-                  {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+                  {formatCurrency(p.priceCents / 100, p.currency)}
                 </td>
                 <td className="px-3 py-2 tabular-nums">
                   {p.inventory?.available ?? 0}
