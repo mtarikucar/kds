@@ -79,8 +79,11 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
       kuralları düşürebilir. Doğru sıra:
 
           # 1. canlı hâli al ve repodakiyle karşılaştır
-          ssh root@38.242.233.166 "nginx -T" > /tmp/live-nginx.txt
-          sed -n '/server_name hummytummy.com/,/^}/p' /tmp/live-nginx.txt
+          ssh root@38.242.233.166 'nginx -T' > /tmp/live-nginx.txt
+          # Tam yolu eşleştirin: ".*hummytummy.com.conf" gibi gevşek bir kalıp
+          # staging. ve help. bölümlerini de yakalayıp birbirine karıştırır.
+          awk '/^# configuration file /{p = ($0 ~ /sites-enabled\/hummytummy\.com\.conf:$/)} p' \
+            /tmp/live-nginx.txt
           # 2. /robots.txt'yi kesen kuralı bul, repodaki dosyaya canlıda olup
           #    repoda olmayan diğer kuralları taşı, robots kuralını çıkar
           # 3. ancak ondan sonra uygula (yedekler, nginx -t koşar,
@@ -93,6 +96,14 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
       Repodaki iki vhost'a niyeti sabitleyen açık bir
       `location = /robots.txt { proxy_pass … }` kuralı eklendi; yukarıdaki
       mutabakat yapılmadan uygulanmamalı.
+
+      📎 Bu dört adımın kanonik hâli, geri alma komutu ve "neden `nginx -t`
+      yetmez" açıklaması artık **`ops/nginx/README.md`** içinde. Ayrıca
+      `.github/workflows/nginx-drift.yml` her gün `nginx -T` alıp repo
+      kopyalarıyla karşılaştırıyor ve fark varsa kırmızı yanıyor — yani bu
+      madde kapandıktan sonra sapma tekrar oluşursa sessiz kalmayacak. İş
+      **okuma yönlüdür**: CI canlı edge'i yazmaz, `apply.sh` elle
+      çalıştırılmaya devam eder.
 
       Neden önemli: robots.txt, dört sitemap'in crawler'a duyurulduğu yer.
       404 olduğu sürece keşif tamamen elle Search Console gönderimine kalır.

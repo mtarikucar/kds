@@ -1,0 +1,378 @@
+name: nginx Edge Drift
+
+# The production edge (host nginx on 38.242.233.166) is applied BY HAND with
+# ops/nginx/apply.sh; nothing deploys it. So the repo copies under ops/nginx/
+# are a claim about the edge, not a description of it — and that claim is known
+# to be false: on 2026-08-25 /robots.txt returned 404 from the HOST nginx
+# ("nginx/1.24.0 (Ubuntu)" body) on both hummytummy.com and help.hummytummy.com,
+# a rule that exists nowhere in this repo.
+#
+# This job READS the edge and reports the difference. It deliberately does NOT
+# write it: giving CI a credential that can rewrite the production edge is a
+# trust boundary the owner has not agreed to, and `nginx -t` only proves syntax,
+# so an automated apply could still take every hostname down. Fixing drift stays
+# a human running ops/nginx/apply.sh after reconciling — see ops/nginx/README.md.
+
+on:
+  schedule:
+    # Daily, off the hour so it does not queue behind the :00 cron rush.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+# No pull_request / push trigger on purpose: those run from forks and untrusted
+# refs, and this job holds the production SSH key.
+permissions:
+  contents: read
+
+concurrency:
+  group: nginx-edge-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: Compare live nginx -T against ops/nginx
+    runs-on: ubuntu-latest
+    env:
+      SERVER_HOST: '38.242.233.166'
+
+    steps:
+      # The composite action lives under .github/actions/, so `uses: ./...`
+      # needs the repo on disk first.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Capture live nginx -T
+        env:
+          DUMP: ${{ runner.temp }}/nginx-T.txt
+          ERRS: ${{ runner.temp }}/nginx-T.err
+        run: |
+          set -euo pipefail
+
+          # The dump holds internal ports, upstream addresses and cert paths.
+          # It goes STRAIGHT to a 0600 file and is never echoed; only the
+          # reduced, redacted report reaches the log.
+          umask 077
+          : > "$DUMP"
+          : > "$ERRS"
+
+          if ! ssh -o ConnectTimeout=20 -o BatchMode=yes -o StrictHostKeyChecking=yes \
+                 "root@${SERVER_HOST}" 'nginx -T' > "$DUMP" 2> "$ERRS"; then
+            # Not printing stderr: a failing `nginx -t` quotes the offending
+            # directive back at you, which is exactly the content this job is
+            # careful not to publish. The operator can read it on the box.
+            echo "::error::nginx -T exited non-zero on ${SERVER_HOST} ($(wc -l < "$ERRS") stderr lines, withheld). Run: ssh root@${SERVER_HOST} 'nginx -t'"
+            exit 1
+          fi
+
+          sections="$(grep -c '^# configuration file ' "$DUMP" || true)"
+          if [ "$sections" -eq 0 ]; then
+            echo "::error::nginx -T returned no '# configuration file' sections ($(wc -c < "$DUMP") bytes) — nothing to compare."
+            exit 1
+          fi
+          echo "Captured $sections config sections ($(wc -c < "$DUMP") bytes). Contents not logged."
+
+      - name: Compare against ops/nginx
+        env:
+          NGINX_DUMP: ${{ runner.temp }}/nginx-T.txt
+          REPO_NGINX: ops/nginx
+        run: |
+          # (dry-run locally against a saved nginx -T sample; shellcheck-clean)
+          # Compare each tracked ops/nginx/*.conf against the matching section of a
+          # saved `nginx -T` dump. Prints a redacted report; exits 1 if anything drifted.
+          #
+          # Reads:  NGINX_DUMP  path to the raw `nginx -T` output (never printed)
+          #         REPO_NGINX  directory holding the repo's .conf files
+          # Writes: a report on stdout, and the same on $GITHUB_STEP_SUMMARY if set.
+          set -euo pipefail
+          # Deterministic collation: `comm` requires both inputs sorted the same way, and
+          # a runner whose locale differs from ours would otherwise report phantom drift.
+          export LC_ALL=C
+
+          : "${NGINX_DUMP:?NGINX_DUMP must point at a saved nginx -T dump}"
+          : "${REPO_NGINX:=ops/nginx}"
+          # Which repo files are expected to be live, verbatim.
+          #
+          # upstream-blue.conf / upstream-green.conf are deliberately NOT tracked: the
+          # host includes upstream-active.conf, a symlink that deploy-blue-green.sh flips
+          # between the two, so exactly one of them is live at any moment and which one is
+          # not drift.
+          TRACKED=(
+            hummytummy.com.conf
+            staging.hummytummy.com.conf
+            help.hummytummy.com.conf
+            developer.hummytummy.com.conf
+            grafana.hummytummy.com.conf
+          )
+
+          # Fingerprints let a reader tell "these two redacted values are the same" from
+          # "they differ" without learning either value. The salt is random per run and
+          # never printed, so a hash cannot be brute-forced against a guessed value
+          # (a bare sha256 of "proxy_pass http://127.0.0.1:NNNN" has ~65k candidates).
+          SALT="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          AWK_LIB="$work/normalize.awk"
+          cat > "$AWK_LIB" <<'NORMALIZE_AWK'
+          # Flatten an nginx config into one canonical line per statement:
+          #     <context> \t <directive-name> \t <value>
+          #
+          # Why flatten instead of diffing the text: the repo files carry long comment
+          # banners the live files do not, and nginx does not care about whitespace or
+          # comments. Comparing raw text would report drift on every run and teach the
+          # owner to ignore this job. Comparing statements reports only what nginx
+          # actually acts on.
+          #
+          # Emission is in document order, so a plain `cmp` of two normalized files also
+          # catches a pure re-ordering (which IS load-bearing for `rewrite`/`return`).
+          { buf = buf $0 "\n" }
+
+          function flush_stack_ctx(   i, s) {
+            s = ""
+            for (i = 1; i <= depth; i++) s = (s == "" ? stack[i] : s " > " stack[i])
+            return (s == "" ? "(top)" : s)
+          }
+
+          function norm(t) {
+            gsub(/[ \t\r\n]+/, " ", t)
+            sub(/^ +/, "", t)
+            sub(/ +$/, "", t)
+            return t
+          }
+
+          function emit(stmt,   name, val) {
+            stmt = norm(stmt)
+            if (stmt == "") return
+            name = stmt
+            val = ""
+            if (match(stmt, / /)) {
+              name = substr(stmt, 1, RSTART - 1)
+              val = substr(stmt, RSTART + 1)
+            }
+            print flush_stack_ctx() "\t" name "\t" val
+          }
+
+          END {
+            n = length(buf)
+            tok = ""; depth = 0; sq = 0; dq = 0
+            for (i = 1; i <= n; i++) {
+              c = substr(buf, i, 1)
+              if (sq) { tok = tok c; if (c == "'") sq = 0; continue }
+              if (dq) {
+                tok = tok c
+                if (c == "\\") { i++; tok = tok substr(buf, i, 1); continue }
+                if (c == "\"") dq = 0
+                continue
+              }
+              if (c == "'") { tok = tok c; sq = 1; continue }
+              if (c == "\"") { tok = tok c; dq = 1; continue }
+              if (c == "#") { while (i <= n && substr(buf, i, 1) != "\n") i++; continue }
+              if (c == ";") { emit(tok); tok = ""; continue }
+              if (c == "{") {
+                hdr = norm(tok)
+                emit(tok)                       # the block header is itself a statement
+                # Two `server` blocks in one vhost (:80 redirect and :443 real) would
+                # otherwise share the context string "server" and their directives would
+                # pool together — a directive moving from the TLS block to the plaintext
+                # block would then compare equal. Disambiguate same-named siblings.
+                key = flush_stack_ctx() SUBSEP hdr
+                seen[key]++
+                depth++
+                stack[depth] = (seen[key] > 1 ? hdr "#" seen[key] : hdr)
+                tok = ""
+                continue
+              }
+              if (c == "}") {
+                emit(tok)                       # tolerate a missing final `;`
+                if (depth > 0) depth--
+                tok = ""
+                continue
+              }
+              tok = tok c
+            }
+            emit(tok)
+          }
+          NORMALIZE_AWK
+
+          fp() { # fp <text> -> 8 hex chars, salted
+            printf '%s\0%s' "$SALT" "$1" | sha256sum | cut -c1-8
+          }
+
+          kind() { # coarse shape of a value; leaks far less than the value itself
+            case "$1" in
+              http://*|https://*)  echo url ;;
+              /*)                  echo path ;;
+              *'$'*)               echo var-expr ;;
+              ''|*[!0-9]*)         echo other ;;
+              *)                   echo number ;;
+            esac
+          }
+
+          drifted=()
+          report="$work/report.txt"
+          : > "$report"
+          say() { printf '%s\n' "$*" >> "$report"; }
+
+          # Split the dump into per-file sections. `nginx -T` prefixes each file it read
+          # with "# configuration file <path>:" and then echoes that file verbatim.
+          awk '
+            /^# configuration file .*:$/ {
+              path = $0
+              sub(/^# configuration file /, "", path)
+              sub(/:$/, "", path)
+              n = split(path, parts, "/")
+              out = dir "/live." parts[n]
+              # First occurrence wins; nginx prints a file once even if included twice.
+              if (seen[out]++) { out = "/dev/null" }
+              next
+            }
+            out { print > out }
+          ' dir="$work" "$NGINX_DUMP"
+
+          for conf in "${TRACKED[@]}"; do
+            repo_file="$REPO_NGINX/$conf"
+            live_file="$work/live.$conf"
+
+            say ""
+            say "=== $conf ==="
+
+            if [ ! -f "$repo_file" ]; then
+              say "  SKIP — no such repo file (tracked list is stale)"
+              drifted+=("$conf")
+              continue
+            fi
+
+            if [ ! -f "$live_file" ]; then
+              say "  DRIFT — nginx -T never read a file named '$conf'."
+              say "          The live edge is not serving this vhost from the repo copy."
+              drifted+=("$conf")
+              continue
+            fi
+
+            awk -f "$AWK_LIB" "$repo_file" > "$work/n.repo"
+            awk -f "$AWK_LIB" "$live_file" > "$work/n.live"
+
+            sort "$work/n.repo" > "$work/s.repo"
+            sort "$work/n.live" > "$work/s.live"
+            comm -23 "$work/s.repo" "$work/s.live" > "$work/only.repo"
+            comm -13 "$work/s.repo" "$work/s.live" > "$work/only.live"
+
+            n_repo=$(wc -l < "$work/n.repo")
+            n_live=$(wc -l < "$work/n.live")
+            n_missing=$(wc -l < "$work/only.repo")
+            n_extra=$(wc -l < "$work/only.live")
+
+            say "  statements: repo=$n_repo live=$n_live  missing=$n_missing extra=$n_extra"
+
+            if [ "$n_missing" -eq 0 ] && [ "$n_extra" -eq 0 ]; then
+              if cmp -s "$work/n.repo" "$work/n.live"; then
+                say "  OK — live matches the repo copy."
+                continue
+              fi
+              say "  DRIFT (ORDER) — same directives, different order. Order is"
+              say "                  load-bearing for return/rewrite inside a block."
+              drifted+=("$conf")
+              continue
+            fi
+
+            drifted+=("$conf")
+
+            # Everything in the repo file is already committed to this repository, so
+            # echoing a repo-side line back into the log discloses nothing that the repo
+            # does not. Live-only content is the edge configuration and is redacted.
+            if [ "$n_missing" -gt 0 ]; then
+              say "  in repo, MISSING from live (repo text, safe to print):"
+              head -n 40 "$work/only.repo" | while IFS=$'\t' read -r ctx name val; do
+                say "    - [$ctx] $name $val"
+              done
+              if [ "$n_missing" -gt 40 ]; then say "    … and $((n_missing - 40)) more"; fi
+            fi
+
+            if [ "$n_extra" -gt 0 ]; then
+              # A context component is printable only if the repo uses that exact
+              # component somewhere; otherwise the block header itself is live-only.
+              cut -f1 "$work/n.repo" | tr '>' '\n' | sed 's/^ *//; s/ *$//' | sort -u > "$work/ctx.repo"
+              cut -f2,3 "$work/n.repo" | sort -u > "$work/kv.repo"
+
+              say "  on live, NOT in repo (values redacted):"
+              head -n 40 "$work/only.live" | while IFS=$'\t' read -r ctx name val; do
+                safe_ctx=""
+                IFS='>' read -ra parts <<< "$ctx"
+                for part in "${parts[@]}"; do
+                  part="${part#"${part%%[![:space:]]*}"}"
+                  part="${part%"${part##*[![:space:]]}"}"
+                  if grep -Fxq -- "$part" "$work/ctx.repo"; then
+                    safe_ctx="${safe_ctx:+$safe_ctx > }$part"
+                  else
+                    # Hash the ARGUMENT, not the whole component, so the fingerprint of
+                    # a redacted block header matches the fingerprint of the same value
+                    # where it appears as a directive value — that is what lets a reader
+                    # tie a live-only block to the statements inside it.
+                    arg=""
+                    case "$part" in *' '*) arg="${part#* }" ;; esac
+                    safe_ctx="${safe_ctx:+$safe_ctx > }${part%% *} <redacted h=$(fp "$arg")>"
+                  fi
+                done
+                if printf '%s\t%s' "$name" "$val" | grep -Fxqf - "$work/kv.repo"; then
+                  say "    + [$safe_ctx] $name $val   (value already public in this repo)"
+                else
+                  say "    + [$safe_ctx] $name <redacted kind=$(kind "$val") len=${#val} h=$(fp "$val")>"
+                fi
+              done
+              if [ "$n_extra" -gt 40 ]; then say "    … and $((n_extra - 40)) more"; fi
+            fi
+          done
+
+          for f in "$REPO_NGINX"/*.conf; do
+            base="$(basename "$f")"
+            case "$base" in upstream-*.conf) continue ;; esac
+            found=0
+            for t in "${TRACKED[@]}"; do
+              if [ "$t" = "$base" ]; then found=1; fi
+            done
+            if [ "$found" -eq 0 ]; then
+              say ""
+              say "=== $base ==="
+              say "  UNTRACKED — present in $REPO_NGINX but absent from this job's TRACKED"
+              say "              list, so nothing compares it against the live edge. Add it."
+              drifted+=("$base(untracked)")
+            fi
+          done
+
+          {
+            echo "# nginx edge drift"
+            echo
+            if [ "${#drifted[@]}" -eq 0 ]; then
+              echo "All ${#TRACKED[@]} tracked vhosts match the repo copy."
+            else
+              echo "**Drifted: ${#drifted[@]} of ${#TRACKED[@]}** — ${drifted[*]}"
+            fi
+            echo '```'
+            cat "$report"
+            echo '```'
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          if [ "${#drifted[@]}" -gt 0 ]; then
+            echo "::error::nginx edge drifted from ops/nginx: ${drifted[*]}"
+            exit 1
+          fi
+
+      - name: Shred the captured config
+        if: always()
+        env:
+          DUMP: ${{ runner.temp }}/nginx-T.txt
+          ERRS: ${{ runner.temp }}/nginx-T.err
+        run: |
+          set -euo pipefail
+          # Runner temp is discarded with the VM, but a job that later gains an
+          # artifact-upload step should not find this lying there.
+          shred -u "$DUMP" "$ERRS" 2>/dev/null || true
+          rm -f "$DUMP" "$ERRS"
