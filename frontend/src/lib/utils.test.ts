@@ -45,7 +45,8 @@ describe('formatCurrency', () => {
   // No ICU locale can render a so'm symbol — neither Node nor Chromium has a
   // narrow symbol for UZS, so Intl's currency style prints the bare ISO code
   // ("UZS\u00a01.234.568") to an Uzbek guest. Measured in both engines. So the
-  // symbol is OURS, not ICU's, for the currencies in CURRENCY_SYMBOL_OVERRIDE.
+  // symbol is OURS, not ICU's, for the CURRENCY_DISPLAY entries marked
+  // `intl: 'own-symbol'`.
   it('prints the som word for UZS instead of the bare ISO code', () => {
     expect(formatCurrency(50000, 'UZS')).toBe("50.000 so'm");
     expect(formatCurrency(50000, 'UZS')).not.toContain('UZS');

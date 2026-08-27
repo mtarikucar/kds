@@ -122,6 +122,38 @@ describe('getApiErrorMessage', () => {
     }
   });
 
+  // "You are too far away" without a number is advice a guest cannot act on:
+  // 40m past the radius means walk to the door, 40km means they scanned a
+  // photo of someone else's QR. The old Turkish sentence spelled the numbers
+  // out, so localizing the refusal MUST NOT be what loses them — the backend
+  // ships them as `actionable.geofence` precisely so the localized sentence
+  // can quote them.
+  it('quotes the geofence distance and radius in the localized refusal', () => {
+    const err = axiosErrorWith({
+      errorCode: 'LOCATION_OUT_OF_RANGE',
+      message:
+        'Sipariş vermek için restoran konumunda olmanız gerekiyor. Mevcut mesafe: 320m (maksimum: 100m)',
+      actionable: { geofence: { distanceMeters: 320, radiusMeters: 100 } },
+    });
+    const shown = getApiErrorMessage(err, 'fallback');
+    expect(shown).toContain('320');
+    expect(shown).toContain('100');
+    // Still localized, not the Turkish passthrough.
+    expect(shown).not.toContain('Mevcut mesafe');
+  });
+
+  // An older backend (or any refusal that carries no numbers) must still get
+  // a clean sentence — never one with an unfilled {{distance}} in it.
+  it('falls back to the plain refusal when the body carries no geofence', () => {
+    const err = axiosErrorWith({
+      errorCode: 'LOCATION_OUT_OF_RANGE',
+      message: 'too far',
+    });
+    const shown = getApiErrorMessage(err, 'fallback');
+    expect(shown).toBe(i18n.t('errors:apiCodes.LOCATION_OUT_OF_RANGE'));
+    expect(shown).not.toContain('{{');
+  });
+
   it('never shows the raw 429 message to the user (ThrottlerException leak)', () => {
     // Nest's ThrottlerGuard answers with the literal body
     // { statusCode: 429, message: 'ThrottlerException: Too Many Requests' }
