@@ -120,11 +120,34 @@ describe("CustomerOrdersService.createOrder — guards", () => {
       });
     }
 
+    /** The thrown HttpException's structured body (what the filter reads). */
+    async function refusalBody(dto: any): Promise<any> {
+      try {
+        await svc.createOrder(dto);
+      } catch (err: any) {
+        return err.getResponse();
+      }
+      throw new Error("expected createOrder to reject");
+    }
+
     it("rejects when the customer sends no coordinates", async () => {
       tenantWithGeo();
       await expect(
         svc.createOrder({ ...baseDto, tableId: "tb-1" }),
       ).rejects.toThrow(/Konum bilgisi gerekli/);
+    });
+
+    // Both refusals land on a guest's own phone, in whatever language the QR
+    // menu is running in. getApiErrorMessage passes a 4xx `message` straight
+    // through, so WITHOUT a code the Turkish sentence is what an Uzbek diner
+    // reads. The code is the only thing the client can localize on.
+    it("tags the missing-location refusal with LOCATION_REQUIRED", async () => {
+      tenantWithGeo();
+      const body = await refusalBody({ ...baseDto, tableId: "tb-1" });
+      expect(body.errorCode).toBe("LOCATION_REQUIRED");
+      // The Turkish prose survives as the fallback for callers that don't
+      // know the code.
+      expect(body.message).toMatch(/Konum bilgisi gerekli/);
     });
 
     it("rejects when the customer is outside the allowed radius", async () => {
@@ -138,6 +161,98 @@ describe("CustomerOrdersService.createOrder — guards", () => {
           longitude: 0,
         }),
       ).rejects.toThrow(/restoran konumunda olmanız gerekiyor/);
+    });
+
+    it("tags the out-of-radius refusal with LOCATION_OUT_OF_RANGE + the distance and radius", async () => {
+      tenantWithGeo();
+      const body = await refusalBody({
+        ...baseDto,
+        tableId: "tb-1",
+        latitude: 0,
+        longitude: 0,
+      });
+      expect(body.errorCode).toBe("LOCATION_OUT_OF_RANGE");
+      // "How far off am I?" is the only actionable part of this refusal, and
+      // it must not live solely inside the Turkish sentence.
+      expect(body.geofence.radiusMeters).toBe(100);
+      expect(body.geofence.distanceMeters).toBeGreaterThan(100);
+      expect(body.message).toMatch(/restoran konumunda olmanız gerekiyor/);
+    });
+  });
+
+  // The combo refusals are guest-reachable through the same QR cart and were
+  // hardcoded Turkish for the same reason.
+  describe("combo refusals carry a code", () => {
+    function comboProduct(over: any = {}) {
+      (prisma.table.findFirst as any).mockResolvedValue({
+        id: "tb-1",
+        branchId: "b1",
+      });
+      (prisma.product.findMany as any).mockResolvedValue([
+        {
+          id: "p-combo",
+          name: "Menü",
+          price: 100,
+          productType: "COMBO",
+          comboGroups: [],
+          modifierGroups: [],
+          ...over,
+        },
+      ]);
+    }
+
+    const comboDto = {
+      ...baseDto,
+      tableId: "tb-1",
+      items: [{ productId: "p-combo", quantity: 1 }],
+    };
+
+    it("tags an empty combo with COMBO_NOT_CONFIGURED", async () => {
+      tenantNoGeo();
+      comboProduct();
+      try {
+        await svc.createOrder(comboDto as any);
+        throw new Error("expected createOrder to reject");
+      } catch (err: any) {
+        expect(err.getResponse().errorCode).toBe("COMBO_NOT_CONFIGURED");
+      }
+    });
+
+    it("tags a sold-out combo component with COMBO_ITEM_UNAVAILABLE", async () => {
+      tenantNoGeo();
+      comboProduct({
+        comboGroups: [
+          {
+            id: "g1",
+            name: "Ana yemek",
+            minSelect: 1,
+            maxSelect: 1,
+            items: [
+              {
+                componentProductId: "p-child",
+                quantity: 1,
+                priceDelta: 0,
+                isDefault: true,
+                componentProduct: {
+                  id: "p-child",
+                  price: 100,
+                  taxRate: 10,
+                  campaignPrice: null,
+                  campaignStartAt: null,
+                  campaignEndAt: null,
+                  isAvailable: false,
+                },
+              },
+            ],
+          },
+        ],
+      });
+      try {
+        await svc.createOrder(comboDto as any);
+        throw new Error("expected createOrder to reject");
+      } catch (err: any) {
+        expect(err.getResponse().errorCode).toBe("COMBO_ITEM_UNAVAILABLE");
+      }
     });
   });
 

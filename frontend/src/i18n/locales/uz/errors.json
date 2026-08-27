@@ -35,7 +35,11 @@
     "DEMO_PAYMENT_BLOCKED": "Demo rejimida toʻlov qabul qilinmaydi.",
     "ACCOUNT_PENDING_APPROVAL": "Hisobingiz hali tasdiqlanmagan. Iltimos, administrator tasdig'ini kuting.",
     "RESET_TOKEN_INVALID": "Parolni tiklash havolasi yaroqsiz yoki muddati o'tgan. Iltimos, yangisini so'rang.",
-    "VERIFICATION_CODE_INVALID": "Tasdiqlash kodi yaroqsiz yoki muddati o'tgan. Iltimos, yangi kod so'rang."
+    "VERIFICATION_CODE_INVALID": "Tasdiqlash kodi yaroqsiz yoki muddati o'tgan. Iltimos, yangi kod so'rang.",
+    "LOCATION_REQUIRED": "Buyurtma berish uchun joylashuv ma'lumoti kerak. Brauzerda joylashuvga ruxsat bering va qayta urinib ko'ring.",
+    "LOCATION_OUT_OF_RANGE": "Buyurtma berish uchun restoran hududida bo'lishingiz kerak.",
+    "COMBO_NOT_CONFIGURED": "Bu kombo menyu hali sozlanmagan. Iltimos, xodimlarga xabar bering.",
+    "COMBO_ITEM_UNAVAILABLE": "Ushbu kombo uchun tanlagan mahsulotlaringizdan biri hozir mavjud emas."
   },
   "errors": {
     "title": "Xatolik",

@@ -35,7 +35,11 @@
     "DEMO_PAYMENT_BLOCKED": "Demo modunda ödeme alınamaz.",
     "ACCOUNT_PENDING_APPROVAL": "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
     "RESET_TOKEN_INVALID": "Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş. Lütfen yeni bir bağlantı isteyin.",
-    "VERIFICATION_CODE_INVALID": "Doğrulama kodu geçersiz veya süresi dolmuş. Lütfen yeni bir kod isteyin."
+    "VERIFICATION_CODE_INVALID": "Doğrulama kodu geçersiz veya süresi dolmuş. Lütfen yeni bir kod isteyin.",
+    "LOCATION_REQUIRED": "Sipariş vermek için konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.",
+    "LOCATION_OUT_OF_RANGE": "Sipariş vermek için restoranın konumunda olmanız gerekiyor.",
+    "COMBO_NOT_CONFIGURED": "Bu kombo menü henüz tanımlanmamış. Lütfen personele bildirin.",
+    "COMBO_ITEM_UNAVAILABLE": "Bu kombo için seçtiğiniz ürünlerden biri şu an mevcut değil."
   },
   "errors": {
     "title": "Hata",

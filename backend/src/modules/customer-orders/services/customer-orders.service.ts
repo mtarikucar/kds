@@ -41,6 +41,7 @@ import {
   isValidCoordinates,
 } from "../../../common/utils/geolocation.util";
 import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+import { ErrorCode } from "../../../common/interfaces/error-response.interface";
 
 @Injectable()
 export class CustomerOrdersService {
@@ -134,9 +135,17 @@ export class CustomerOrdersService {
 
     if (isValidCoordinates(tenant.latitude, tenant.longitude)) {
       if (!isValidCoordinates(dto.latitude, dto.longitude)) {
-        throw new BadRequestException(
-          "Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.",
-        );
+        // A guest reads this on their own phone, in their own language. The
+        // object body carries the machine-readable code the SPA localizes
+        // (errors:apiCodes.*); the Turkish prose stays only as the fallback
+        // for clients that don't know the code yet.
+        throw new BadRequestException({
+          statusCode: 400,
+          error: "Location Required",
+          errorCode: ErrorCode.LOCATION_REQUIRED,
+          message:
+            "Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.",
+        });
       }
       const locationCheck = isLocationWithinRange(
         dto.latitude!,
@@ -146,9 +155,21 @@ export class CustomerOrdersService {
         tenant.locationRadius,
       );
       if (!locationCheck.isWithinRange) {
-        throw new BadRequestException(
-          `Sipariş vermek için restoran konumunda olmanız gerekiyor. Mevcut mesafe: ${locationCheck.distance}m (maksimum: ${tenant.locationRadius}m)`,
-        );
+        throw new BadRequestException({
+          statusCode: 400,
+          error: "Location Out Of Range",
+          errorCode: ErrorCode.LOCATION_OUT_OF_RANGE,
+          // The pre-code message spelled out the distance and the radius, and
+          // that is the only part of the refusal a guest can act on ("walk
+          // 40m" vs "you are in the wrong city"). Ship the numbers as data so
+          // a localized string can say it too, instead of losing them the
+          // moment the client stops rendering the Turkish sentence.
+          geofence: {
+            distanceMeters: locationCheck.distance,
+            radiusMeters: tenant.locationRadius,
+          },
+          message: `Sipariş vermek için restoran konumunda olmanız gerekiyor. Mevcut mesafe: ${locationCheck.distance}m (maksimum: ${tenant.locationRadius}m)`,
+        });
       }
     }
 
@@ -982,9 +1003,12 @@ export class CustomerOrdersService {
       if ((product as any).productType === "COMBO") {
         const groups = (product as any).comboGroups ?? [];
         if (groups.length === 0) {
-          throw new BadRequestException(
-            `"${product.name}" bir kombo ama içeriği tanımlı değil`,
-          );
+          throw new BadRequestException({
+            statusCode: 400,
+            error: "Combo Not Configured",
+            errorCode: ErrorCode.COMBO_NOT_CONFIGURED,
+            message: `"${product.name}" bir kombo ama içeriği tanımlı değil`,
+          });
         }
         const availabilityById = new Map<string, boolean>();
         const catalog: ComboCatalog = {
@@ -1046,9 +1070,12 @@ export class CustomerOrdersService {
           (c) => availabilityById.get(c.productId) === false,
         );
         if (unavailable) {
-          throw new BadRequestException(
-            "Seçilen kombo bileşenlerinden biri şu an mevcut değil",
-          );
+          throw new BadRequestException({
+            statusCode: 400,
+            error: "Combo Item Unavailable",
+            errorCode: ErrorCode.COMBO_ITEM_UNAVAILABLE,
+            message: "Seçilen kombo bileşenlerinden biri şu an mevcut değil",
+          });
         }
 
         const parentId = randomUUID();

@@ -95,6 +95,33 @@ describe('getApiErrorMessage', () => {
     expect(getApiErrorMessage(err, 'fallback')).toBe(expected);
   });
 
+  it('localizes the QR geofence refusals instead of leaking Turkish to a guest', () => {
+    // These two land on a diner's own phone, on a QR menu that may be running
+    // in en/ru/uz/ar. getApiErrorMessage passes a 4xx `message` through
+    // verbatim, so before the backend attached these codes the guest read the
+    // backend's Turkish sentence whatever language they had picked.
+    const cases: Array<[string, string]> = [
+      [
+        'LOCATION_REQUIRED',
+        'Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.',
+      ],
+      [
+        'LOCATION_OUT_OF_RANGE',
+        'Sipariş vermek için restoran konumunda olmanız gerekiyor. Mevcut mesafe: 320m (maksimum: 100m)',
+      ],
+    ];
+    for (const [errorCode, turkishPassthrough] of cases) {
+      const err = axiosErrorWith({ errorCode, message: turkishPassthrough });
+      const expected = i18n.t(`errors:apiCodes.${errorCode}`, {
+        defaultValue: '',
+      });
+      expect(expected).toBeTruthy();
+      const shown = getApiErrorMessage(err, 'fallback');
+      expect(shown).toBe(expected);
+      expect(shown).not.toBe(turkishPassthrough);
+    }
+  });
+
   it('never shows the raw 429 message to the user (ThrottlerException leak)', () => {
     // Nest's ThrottlerGuard answers with the literal body
     // { statusCode: 429, message: 'ThrottlerException: Too Many Requests' }

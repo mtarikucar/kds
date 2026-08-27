@@ -109,6 +109,22 @@ export enum ErrorCode {
   FEATURE_NOT_AVAILABLE = "FEATURE_NOT_AVAILABLE",
   QUOTA_EXCEEDED = "QUOTA_EXCEEDED",
 
+  // Guest (QR-menu) ordering refusals. These reach a diner's phone in
+  // whatever language they picked, so they MUST carry a code the SPA can
+  // localize — the raw messages are Turkish prose.
+  // Tenant has coordinates configured but the browser sent none
+  // (permission denied, no GPS fix, insecure origin).
+  LOCATION_REQUIRED = "LOCATION_REQUIRED",
+  // Guest is further from the restaurant than the tenant's configured
+  // locationRadius. The body carries `geofence` (distance + radius, metres)
+  // so the client can tell them how far off they are.
+  LOCATION_OUT_OF_RANGE = "LOCATION_OUT_OF_RANGE",
+  // A COMBO product with no groups defined — a menu-setup fault the diner
+  // can do nothing about except tell staff.
+  COMBO_NOT_CONFIGURED = "COMBO_NOT_CONFIGURED",
+  // One of the components resolved for the combo line is sold out.
+  COMBO_ITEM_UNAVAILABLE = "COMBO_ITEM_UNAVAILABLE",
+
   // Payment errors
   PAYMENT_FAILED = "PAYMENT_FAILED",
   PAYMENT_PROCESSING_ERROR = "PAYMENT_PROCESSING_ERROR",

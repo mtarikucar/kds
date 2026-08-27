@@ -24,6 +24,12 @@ const ACTIONABLE_KEYS = [
   "offer",
   "licenseRequired",
   "reason",
+  // QR geofence refusal: { distanceMeters, radiusMeters }. Without it here
+  // the numbers only survive as prose inside `message`, so a client that
+  // renders the localized errorCode string instead can no longer tell the
+  // guest how far away they are. `details` is not an option — it is
+  // development-only.
+  "geofence",
 ] as const;
 
 /**
