@@ -770,5 +770,9 @@
       "stir": "STIR (Uzbek Tax No.)",
       "pinfl": "PINFL (Uzbek ID No.)"
     }
+  },
+  "customerSelfPay": {
+    "title": "Customer self-pay (PayTR)",
+    "description": "Let guests pay from their own phone with PayTR straight from the QR menu. Turkey-region tenants only; a PayTR account is required."
   }
 }

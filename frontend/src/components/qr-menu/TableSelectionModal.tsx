@@ -50,7 +50,7 @@ export default function TableSelectionModal({
       setTables(response.data);
     } catch (err: any) {
       console.error('Failed to fetch tables:', err);
-      setError(err.response?.data?.message || t('errors.failedToLoadTables', 'Failed to load tables'));
+      setError(err.response?.data?.message || t('errors:errors.failedToLoadTables', 'Failed to load tables'));
     } finally {
       setLoading(false);
     }

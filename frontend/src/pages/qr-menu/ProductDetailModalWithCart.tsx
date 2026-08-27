@@ -401,7 +401,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {product.ingredients && (
           <div className="mb-5 rounded-lg bg-slate-50 p-3">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("menu.ingredients", "İçindekiler")}
+              {t("qrMenu.ingredients", "İçindekiler")}
             </div>
             <p className="text-sm leading-relaxed text-slate-700">
               {product.ingredients}

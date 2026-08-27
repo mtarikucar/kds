@@ -159,7 +159,10 @@
     "filterByDate": "تصفية حسب الفترة",
     "excellent": "ممتاز",
     "good": "جيد",
-    "needsImprovement": "يحتاج تحسين"
+    "needsImprovement": "يحتاج تحسين",
+    "avgScore": "متوسط النقاط",
+    "ratedStaff": "الموظفون المقيَّمون",
+    "viewDetail": "عرض التفاصيل"
   },
   "common": {
     "save": "حفظ",

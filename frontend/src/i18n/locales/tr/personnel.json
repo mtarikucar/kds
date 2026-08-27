@@ -159,7 +159,10 @@
     "filterByDate": "Tarih aralığına göre filtrele",
     "excellent": "Mükemmel",
     "good": "İyi",
-    "needsImprovement": "Geliştirilmeli"
+    "needsImprovement": "Geliştirilmeli",
+    "avgScore": "Ort. Skor",
+    "ratedStaff": "Değerlendirilen",
+    "viewDetail": "Detayı gör"
   },
   "common": {
     "save": "Kaydet",

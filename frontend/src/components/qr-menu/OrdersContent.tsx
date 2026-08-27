@@ -365,7 +365,7 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
                             className="w-full flex items-center justify-between text-left"
                           >
                             <span className="text-sm text-slate-600">
-                              {order.orderItems?.length || 0} {t('orders.items', 'items')}
+                              {t('cart.itemCount', { count: order.orderItems?.length || 0 })}
                             </span>
                             {isExpanded ? (
                               <ChevronUp className="h-4 w-4 text-slate-400" />
@@ -486,7 +486,7 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
                           className="w-full px-4 py-2 flex items-center justify-between bg-slate-50 text-sm text-slate-600 hover:bg-slate-100 transition-colors"
                         >
                           <span>
-                            {order.orderItems?.length || 0} {t('orders.items', 'items')} •{' '}
+                            {t('cart.itemCount', { count: order.orderItems?.length || 0 })} •{' '}
                             <span className="font-semibold" style={{ color: settings.primaryColor }}>
                               {formatCurrency(order.totalAmount, currency)}
                             </span>

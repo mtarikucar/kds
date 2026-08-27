@@ -43,7 +43,12 @@ export interface RunReceiptSideEffectsDeps {
   getPrinterId: () => string | null;
   hardware: ReceiptHardware;
   toast: ReceiptToast;
-  /** i18n translator (key, fallback) -> string. */
+  /**
+   * i18n translator (key, fallback) -> string. POSPage hands in a `t` bound
+   * to the 'pos' namespace; the keys below still spell `pos:` explicitly so
+   * this file — which has no useTranslation() of its own for a reader or the
+   * i18n parity guard to follow — resolves against that namespace on sight.
+   */
   t: (key: string, fallback: string) => string;
 }
 
@@ -67,15 +72,15 @@ export function runReceiptSideEffects(
     hardware.printReceipt(printerId, snapshot).catch((err) => {
       console.error('Receipt print failed:', err);
       toast.error(
-        t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
+        t('pos:payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
         {
           action: {
-            label: t('pos.reprint.label', 'Reprint Receipt'),
+            label: t('pos:reprint.label', 'Reprint Receipt'),
             onClick: () => {
               hardware.printReceipt(printerId, snapshot).catch((e) => {
                 console.error('Reprint failed:', e);
                 toast.error(
-                  t('pos.reprint.failed', 'Reprint failed — check printer connection'),
+                  t('pos:reprint.failed', 'Reprint failed — check printer connection'),
                 );
               });
             },

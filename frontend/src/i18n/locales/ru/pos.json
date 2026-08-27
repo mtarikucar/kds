@@ -102,7 +102,9 @@
     "noProductsFound": "По запросу ничего не найдено",
     "tryDifferentSearch": "Попробуйте другой поисковый запрос",
     "selectDifferentCategory": "Выберите другую категорию или добавьте продукты",
-    "clearSearch": "Очистить поиск"
+    "clearSearch": "Очистить поиск",
+    "decrease": "Уменьшить",
+    "increase": "Увеличить"
   },
   "payment": {
     "title": "Оплата",
@@ -117,7 +119,12 @@
     "transactionIdPlaceholder": "Введите ID транзакции",
     "confirmPayment": "Подтвердить оплату",
     "customerPhone": "Телефон клиента (необязательно)",
-    "customerPhonePlaceholder": "+7 555 123 4567"
+    "customerPhonePlaceholder": "+7 555 123 4567",
+    "amountTendered": "Полученная сумма",
+    "changeDue": "Сдача",
+    "exactAmount": "Точно",
+    "insufficientCash": "Сумма недостаточна",
+    "receiptPrintFailed": "Не удалось напечатать чек — платёж записан."
   },
   "notifications": {
     "pending": "Ожидает",
@@ -332,5 +339,19 @@
   },
   "campaign": "Акция",
   "startingFrom": "от",
-  "required": "Обязательно"
+  "required": "Обязательно",
+  "add": "Добавить",
+  "addDetails": "Добавить детали",
+  "updateOrderBeforePayment": "Сначала обновите заказ, затем принимайте оплату",
+  "orderPaymentFailed": "Оплата не прошла",
+  "reprint": {
+    "label": "Напечатать чек повторно",
+    "printing": "Печать...",
+    "success": "Чек отправлен на принтер",
+    "failed": "Повторная печать не удалась — проверьте подключение принтера",
+    "desktopOnly": "Повторная печать доступна только в настольном приложении POS",
+    "noPrinter": "Принтер чеков по умолчанию не настроен",
+    "noSnapshot": "Для этого платежа нет сохранённого снимка чека",
+    "notReprintable": "Возвращённые или неуспешные платежи нельзя напечатать повторно"
+  }
 }

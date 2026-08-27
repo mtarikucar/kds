@@ -73,7 +73,11 @@
     "backToMenu": "Back to Menu",
     "delete": "Delete",
     "language": "Language",
-    "copyFailed": "Failed to copy"
+    "copyFailed": "Failed to copy",
+    "loading": "Loading...",
+    "sending": "Sending...",
+    "verifying": "Verifying...",
+    "backHome": "Back home"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -908,7 +912,10 @@
     "noTablesDescription": "Add your first table to start managing your restaurant seating",
     "addFirstTable": "Add First Table",
     "gridView": "Grid View",
-    "floorPlan": "Floor Plan"
+    "floorPlan": "Floor Plan",
+    "reactivateUser": "Reactivate user",
+    "userReactivated": "User reactivated",
+    "userReactivateFailed": "Could not reactivate the user"
   },
   "pos": {
     "floorPlan": {
@@ -1033,7 +1040,13 @@
       "tiramisuDesc": "Classic Italian coffee-flavored dessert",
       "lavaCakeName": "Chocolate Lava Cake",
       "lavaCakeDesc": "Warm chocolate cake with molten center"
-    }
+    },
+    "invalidFileType": "Please upload an image file.",
+    "logoTooLarge": "Logo file is too large. Maximum size is 5MB.",
+    "logoUploaded": "Logo uploaded successfully",
+    "logoUploadFailed": "Failed to upload the logo",
+    "maxFileSize": "Max file size: 5MB",
+    "uploadingLogo": "Uploading..."
   },
   "pricing": {
     "title": "Pricing",
@@ -1246,7 +1259,9 @@
     "noProducts": "No products found",
     "noProductsDescription": "Try adjusting your search or browse all categories",
     "clearFilters": "Clear filters",
-    "notesPlaceholder": "E.g., No onions, extra sauce..."
+    "notesPlaceholder": "E.g., No onions, extra sauce...",
+    "arView": "View in 3D / AR",
+    "ingredients": "Ingredients"
   },
   "qr": {
     "shareText": "Check out our menu",
@@ -1362,7 +1377,9 @@
         "settlement_error": "Payment was taken but couldn't be recorded. Please notify the waiter — the restaurant will reconcile it manually.",
         "paytr_reported_failure": "Your bank declined the payment. Try a different card."
       }
-    }
+    },
+    "total": "Total",
+    "paid": "Paid"
   },
   "orderStatus": {
     "pendingApproval": "Awaiting Approval",
@@ -1417,5 +1434,32 @@
     "noReferralCode": "Contact support to get your referral code",
     "viewRewards": "View your rewards"
   },
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "from": "From",
+  "to": "To",
+  "showingPage": "Page {{page}} of {{total}}",
+  "phoneVerification": {
+    "title": "Verify your phone",
+    "subtitle": "Enter your phone number to receive a verification code",
+    "phoneLabel": "Phone number",
+    "phoneHint": "Include the country code (e.g. +90)",
+    "sendCode": "Send verification code",
+    "enterCode": "Enter the verification code",
+    "codeLabel": "6-digit code",
+    "verify": "Verify",
+    "changeNumber": "Change phone number",
+    "invalidPhone": "Please enter a valid phone number",
+    "invalidCode": "Please enter the 6-digit code",
+    "otpSent": "Verification code sent!",
+    "otpFailed": "Failed to send the verification code",
+    "verified": "Phone number verified!",
+    "verifyFailed": "Invalid verification code"
+  },
+  "legal": {
+    "backToHome": "Back to home",
+    "loading": "Loading...",
+    "fetchFailed": "The document could not be loaded. Please refresh the page or try again later.",
+    "versionLabel": "Version",
+    "effectiveFrom": "Effective from"
+  }
 }

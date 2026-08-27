@@ -51,18 +51,22 @@ describe('LegalDocumentPage', () => {
     expect(getDoc).toHaveBeenCalledWith('KVKK', 'en');
   });
 
+  // The chrome used to render its Turkish defaultValue in every language —
+  // the page asked for a `legal` namespace that i18n/config.ts never
+  // registered. The strings now live in common.json under `legal.*`, so an
+  // en-bootstrapped render must show English.
   it('renders the loading state and neither error nor body', () => {
     getDoc.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     renderPage();
-    expect(screen.getByText('Yükleniyor...')).toBeInTheDocument();
-    expect(screen.queryByText(/Belge yüklenemedi/)).not.toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText('KVKK Aydınlatma Metni')).not.toBeInTheDocument();
   });
 
   it('renders the error message branch, not the document', () => {
     getDoc.mockReturnValue({ data: undefined, isLoading: false, isError: true });
     renderPage();
-    expect(screen.getByText(/Belge yüklenemedi/)).toBeInTheDocument();
+    expect(screen.getByText(/could not be loaded/)).toBeInTheDocument();
     expect(screen.queryByText('KVKK Aydınlatma Metni')).not.toBeInTheDocument();
   });
 

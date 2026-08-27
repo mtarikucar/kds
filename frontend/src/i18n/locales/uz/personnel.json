@@ -159,7 +159,10 @@
     "filterByDate": "Davr bo'yicha filtrlash",
     "excellent": "A'lo",
     "good": "Yaxshi",
-    "needsImprovement": "Yaxshilash kerak"
+    "needsImprovement": "Yaxshilash kerak",
+    "avgScore": "O'rt. ball",
+    "ratedStaff": "Baholangan xodimlar",
+    "viewDetail": "Tafsilotni ko'rish"
   },
   "common": {
     "save": "Saqlash",

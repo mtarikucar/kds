@@ -102,7 +102,9 @@
     "noProductsFound": "No search results found",
     "tryDifferentSearch": "Try a different search term",
     "selectDifferentCategory": "Select a different category or add new products",
-    "clearSearch": "Clear Search"
+    "clearSearch": "Clear Search",
+    "decrease": "Decrease",
+    "increase": "Increase"
   },
   "payment": {
     "title": "Payment",
@@ -117,7 +119,12 @@
     "transactionIdPlaceholder": "Enter transaction ID",
     "confirmPayment": "Confirm Payment",
     "customerPhone": "Customer Phone (Optional)",
-    "customerPhonePlaceholder": "+90 555 123 4567"
+    "customerPhonePlaceholder": "+90 555 123 4567",
+    "amountTendered": "Amount tendered",
+    "changeDue": "Change due",
+    "exactAmount": "Exact",
+    "insufficientCash": "Amount is insufficient",
+    "receiptPrintFailed": "Receipt print failed — payment recorded."
   },
   "notifications": {
     "pending": "Pending",
@@ -332,5 +339,19 @@
   },
   "campaign": "Campaign",
   "startingFrom": "from",
-  "required": "Required"
+  "required": "Required",
+  "add": "Add",
+  "addDetails": "Add details",
+  "updateOrderBeforePayment": "Update the order before taking payment",
+  "orderPaymentFailed": "Payment failed",
+  "reprint": {
+    "label": "Reprint receipt",
+    "printing": "Printing...",
+    "success": "Receipt sent to the printer",
+    "failed": "Reprint failed — check the printer connection",
+    "desktopOnly": "Reprint is only available in the desktop POS app",
+    "noPrinter": "No default receipt printer configured",
+    "noSnapshot": "This payment has no stored receipt snapshot",
+    "notReprintable": "Refunded / failed payments cannot be reprinted"
+  }
 }

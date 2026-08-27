@@ -52,14 +52,14 @@ export function ReprintReceiptButton({
     inTauri && hasSnapshot && hasPrinter && isReprintable && !isPrinting;
 
   const tooltip = !inTauri
-    ? t('pos.reprint.desktopOnly', 'Reprint is only available on the desktop POS app')
+    ? t('reprint.desktopOnly', 'Reprint is only available on the desktop POS app')
     : !hasPrinter
-      ? t('pos.reprint.noPrinter', 'No default receipt printer configured')
+      ? t('reprint.noPrinter', 'No default receipt printer configured')
       : !hasSnapshot
-        ? t('pos.reprint.noSnapshot', 'This payment has no stored receipt snapshot')
+        ? t('reprint.noSnapshot', 'This payment has no stored receipt snapshot')
         : !isReprintable
           ? t(
-              'pos.reprint.notReprintable',
+              'reprint.notReprintable',
               'Refunded / failed payments cannot be reprinted',
             )
           : undefined;
@@ -69,10 +69,10 @@ export function ReprintReceiptButton({
     setIsPrinting(true);
     try {
       await HardwareService.printReceipt(defaultPrinterId, payment.receiptSnapshot);
-      toast.success(t('pos.reprint.success', 'Receipt sent to printer'));
+      toast.success(t('reprint.success', 'Receipt sent to printer'));
     } catch (err) {
       console.error('Reprint failed:', err);
-      toast.error(t('pos.reprint.failed', 'Reprint failed — check printer connection'));
+      toast.error(t('reprint.failed', 'Reprint failed — check printer connection'));
     } finally {
       setIsPrinting(false);
     }
@@ -89,8 +89,8 @@ export function ReprintReceiptButton({
     >
       <Printer className="h-4 w-4 mr-1.5" />
       {isPrinting
-        ? t('pos.reprint.printing', 'Printing...')
-        : t('pos.reprint.label', 'Reprint Receipt')}
+        ? t('reprint.printing', 'Printing...')
+        : t('reprint.label', 'Reprint Receipt')}
     </Button>
   );
 }

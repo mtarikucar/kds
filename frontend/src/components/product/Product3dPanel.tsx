@@ -146,7 +146,7 @@ function Product3dPanelInner({ productId, hasImage, ensureProductId }: Props) {
             {generate.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t("common:loading", "Yükleniyor…")}
+                {t("common:common.loading", "Yükleniyor…")}
               </>
             ) : (
               <>

@@ -73,7 +73,11 @@
     "backToMenu": "العودة للقائمة",
     "delete": "حذف",
     "language": "اللغة",
-    "copyFailed": "تعذّر النسخ"
+    "copyFailed": "تعذّر النسخ",
+    "loading": "جارٍ التحميل...",
+    "sending": "جارٍ الإرسال...",
+    "verifying": "جارٍ التحقق...",
+    "backHome": "العودة إلى الرئيسية"
   },
   "navigation": {
     "dashboard": "لوحة التحكم",
@@ -928,7 +932,10 @@
     "noTablesDescription": "أضف أول طاولة لبدء إدارة جلوس عملاء مطعمك",
     "addFirstTable": "إضافة أول طاولة",
     "gridView": "عرض الشبكة",
-    "floorPlan": "مخطط القاعة"
+    "floorPlan": "مخطط القاعة",
+    "reactivateUser": "إعادة تفعيل المستخدم",
+    "userReactivated": "تمت إعادة تفعيل المستخدم",
+    "userReactivateFailed": "تعذّرت إعادة تفعيل المستخدم"
   },
   "qrDesigner": {
     "quickColorThemes": "سمات الألوان السريعة",
@@ -1033,7 +1040,13 @@
       "tiramisuDesc": "حلوى إيطالية كلاسيكية بنكهة القهوة",
       "lavaCakeName": "كيكة الشوكولاتة الذائبة",
       "lavaCakeDesc": "كيكة شوكولاتة دافئة بمركز سائل"
-    }
+    },
+    "invalidFileType": "يرجى رفع ملف صورة.",
+    "logoTooLarge": "ملف الشعار كبير جدًا. الحد الأقصى 5 ميغابايت.",
+    "logoUploaded": "تم رفع الشعار بنجاح",
+    "logoUploadFailed": "تعذّر رفع الشعار",
+    "maxFileSize": "أقصى حجم للملف: 5 ميغابايت",
+    "uploadingLogo": "جارٍ الرفع..."
   },
   "pricing": {
     "title": "الأسعار",
@@ -1246,7 +1259,9 @@
     "noProducts": "لم يتم العثور على منتجات",
     "noProductsDescription": "جرّب تعديل بحثك أو تصفّح كل الفئات",
     "clearFilters": "مسح عوامل التصفية",
-    "notesPlaceholder": "مثال: بدون بصل، صلصة إضافية..."
+    "notesPlaceholder": "مثال: بدون بصل، صلصة إضافية...",
+    "arView": "عرض بالأبعاد الثلاثية / الواقع المعزّز",
+    "ingredients": "المكوّنات"
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",
@@ -1366,7 +1381,9 @@
         "settlement_error": "تم استلام الدفع لكن تعذّر تسجيله. الرجاء إبلاغ النادل — سيقوم المطعم بالتسوية يدويًا.",
         "paytr_reported_failure": "رفض البنك الدفع. جرّب بطاقة أخرى."
       }
-    }
+    },
+    "total": "الإجمالي",
+    "paid": "المدفوع"
   },
   "orderStatus": {
     "pendingApproval": "في انتظار الموافقة",
@@ -1441,5 +1458,32 @@
       "printFailed": "فشلت طباعة تذكرة المطبخ — أعد الطباعة من الطلب."
     }
   },
-  "cancel": "إلغاء"
+  "cancel": "إلغاء",
+  "from": "من",
+  "to": "إلى",
+  "showingPage": "الصفحة {{page}} من {{total}}",
+  "phoneVerification": {
+    "title": "تحقّق من رقم هاتفك",
+    "subtitle": "أدخل رقم هاتفك لتصلك رسالة برمز التحقق",
+    "phoneLabel": "رقم الهاتف",
+    "phoneHint": "أضف رمز الدولة (مثال: +90)",
+    "sendCode": "إرسال رمز التحقق",
+    "enterCode": "أدخل رمز التحقق",
+    "codeLabel": "رمز من 6 أرقام",
+    "verify": "تحقّق",
+    "changeNumber": "تغيير رقم الهاتف",
+    "invalidPhone": "يرجى إدخال رقم هاتف صالح",
+    "invalidCode": "يرجى إدخال الرمز المكوّن من 6 أرقام",
+    "otpSent": "تم إرسال رمز التحقق!",
+    "otpFailed": "تعذّر إرسال رمز التحقق",
+    "verified": "تم التحقق من رقم الهاتف!",
+    "verifyFailed": "رمز التحقق غير صحيح"
+  },
+  "legal": {
+    "backToHome": "العودة إلى الصفحة الرئيسية",
+    "loading": "جارٍ التحميل...",
+    "fetchFailed": "تعذّر تحميل المستند. يرجى تحديث الصفحة أو المحاولة لاحقًا.",
+    "versionLabel": "الإصدار",
+    "effectiveFrom": "سارٍ اعتبارًا من"
+  }
 }

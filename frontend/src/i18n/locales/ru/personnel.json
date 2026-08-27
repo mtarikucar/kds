@@ -159,7 +159,10 @@
     "filterByDate": "Фильтр по периоду",
     "excellent": "Отлично",
     "good": "Хорошо",
-    "needsImprovement": "Требует улучшения"
+    "needsImprovement": "Требует улучшения",
+    "avgScore": "Ср. балл",
+    "ratedStaff": "Оценено сотрудников",
+    "viewDetail": "Подробнее"
   },
   "common": {
     "save": "Сохранить",
