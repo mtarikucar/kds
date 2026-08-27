@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CURRENCY_DISPLAY,
+  resetCurrencyFormatterCache,
   calculateAverageWaitTime,
   calculateOrderTotal,
   countUrgentOrders,
@@ -66,6 +68,21 @@ describe('formatCurrency', () => {
     expect(formatCurrency(-19.5, 'TRY')).toBe('-₺19,50');
   });
 
+  // KGS is pinned to the ISO code ON PURPOSE. 'narrowSymbol' resolves KGS to
+  // U+20C0 ⃀, a glyph most fonts on our POS/tablet targets do not carry, so it
+  // lands next to the number as a box or a bare combining mark — measured in
+  // Chromium: "⃀50.000,00". Nothing reaches KGS today (only the TR and UZ
+  // country profiles exist), which is exactly why the wrong glyph could be
+  // adopted silently the day Kyrgyzstan launches. The real local convention
+  // still has to be confirmed with a Kyrgyz source before then.
+  it('renders KGS as its ISO code, never the U+20C0 som sign', () => {
+    const out = formatCurrency(50000, 'KGS');
+    expect(out).not.toContain('\u20C0');
+    expect(out).toContain('KGS');
+    // Only the symbol is pinned — grouping is still ours (tr-TR).
+    expect(out).toContain('50.000');
+  });
+
   // `currencyDisplay: 'narrowSymbol'` landed in Safari 14.1 / WebKitGTK 2.32,
   // and an engine older than that does not ignore the option — it throws
   // RangeError from the CONSTRUCTOR. Our web build targets es2020 (Safari
@@ -73,6 +90,9 @@ describe('formatCurrency', () => {
   // supported set, and an uncaught throw here takes down every price on the
   // page — a white screen at the table. Fall back to ICU's default display.
   it('still renders money on an engine that rejects narrowSymbol', () => {
+    // Formatters are cached, and a cached one never touches Intl again — the
+    // stub below would go unreached and the test would pass for nothing.
+    resetCurrencyFormatterCache();
     const real = Intl.NumberFormat;
     const spy = vi
       .spyOn(Intl, 'NumberFormat')
@@ -92,6 +112,39 @@ describe('formatCurrency', () => {
       expect(formatCurrency(50000, 'UZS')).toBe("50.000 so'm");
     } finally {
       spy.mockRestore();
+      // The stub built real formatters through the fallback path; drop them so
+      // no later test inherits a formatter created under a mocked Intl.
+      resetCurrencyFormatterCache();
+    }
+  });
+});
+
+// CURRENCY_DISPLAY is the ONE place a currency's symbol and precision are
+// decided; all three money rails read it (this file, lib/currency.ts and
+// hooks/useFormatCurrency.ts). These pin that it stays a table of decisions
+// and not a table of guesses.
+describe('CURRENCY_DISPLAY', () => {
+  it('never places a bare ISO code where a real symbol exists, and vice versa', () => {
+    // A currency we format ourselves must carry a symbol that is NOT just its
+    // code (otherwise we are hand-rolling what ICU already does), and a
+    // currency pinned to 'code' must carry exactly its code.
+    for (const [code, rule] of Object.entries(CURRENCY_DISPLAY)) {
+      if (rule.intl === 'own-symbol') expect(rule.symbol).not.toBe(code);
+      if (rule.intl === 'code') expect(rule.symbol).toBe(code);
+    }
+  });
+
+  it('drives this rail for every currency it takes the symbol away from ICU for', () => {
+    // The table is not decoration: where it overrides ICU, the rendered
+    // string has to show it — symbol and decimal count alike. (Entries with
+    // no `intl` key deliberately leave the symbol to ICU on this rail; their
+    // `symbol` serves the rail that places symbols itself, lib/currency.ts,
+    // and is asserted there.)
+    for (const [code, rule] of Object.entries(CURRENCY_DISPLAY)) {
+      if (!rule.intl) continue;
+      const out = formatCurrency(1234.5, code);
+      expect(out).toContain(rule.symbol);
+      if (rule.decimals === 0) expect(out).not.toMatch(/[.,]\d\d$/);
     }
   });
 });
