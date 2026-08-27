@@ -161,7 +161,7 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
   Bu ayar bir commit olmadan geri gelebilir; o tarihten sonra tekrar kontrol
   edin:
 
-      curl -A "Mozilla/5.0 (compatible; OAI-SearchBot/1.0)" -o /dev/null \
+      curl -s -A "Mozilla/5.0 (compatible; OAI-SearchBot/1.0)" -o /dev/null \
         -w "%{http_code}\n" https://landing.hummytummy.com/tr
 
   200 beklenir. 403 görürseniz blok geri gelmiştir.
@@ -175,6 +175,15 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
   Sitemap'teki her URL'in kendisini gösterdiğini doğrular. `--expect-origin`
   host'u da kontrol eder: yaşanan gerçek olay yanlış host'tu (canonical'lar
   apex'i gösteriyordu, orada her URL'e SPA kabuğu dönüyor) ve yalnızca yol
-  karşılaştıran bir kontrol bunu "temiz" diye raporlar. Bu hata bir kez
+  karşılaştıran bir kontrol bunu "temiz" diye raporlar.
+
+  Çıkış kodları: `0` hepsi doğrulandı, `1` gerçek bir canonical hatası var,
+  `2` bazı URL'ler **kontrol edilemedi**. Sonuncusu genelde ağ kaynaklıdır —
+  27 Ağustos'ta bu komutu çalıştırdığımda 139 URL'in 137'si doğrulandı, 2'si
+  kurumsal bir içerik filtresinin "Access Denied" sayfasını döndürdüğü için
+  kontrol edilemedi (site sağlamdı, o iki sayfayı "Shopping" diye
+  sınıflandırıp engelleyen ağdı). Kod bunu ayrı raporlar ve `2` ile çıkar;
+  "doğrulanmadı" ile "hatalı" aynı şey değildir. Kurum ağından çalıştırıyorsanız
+  ve `2` alıyorsanız önce hangi URL'lerin engellendiğine bakın. Bu hata bir kez
   sessizce yaşandı: sayfalar doğru render oluyordu ve yalnızca indekslenmemeyi
   istiyorlardı.
