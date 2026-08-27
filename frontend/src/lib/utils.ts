@@ -9,86 +9,195 @@ export function cn(...inputs: ClassValue[]) {
 // The platform collects in Turkish Lira only (PayTR is TRY-only), so money
 // defaults to TRY and renders with Turkish grouping/decimals (₺2.999,00). A
 // non-TRY `currency` is still honoured for the multi-currency code paths that
-// remain (e.g. the bank-transfer/havale plan rendering).
+// remain (e.g. the bank-transfer/havale plan rendering) and for the tenants
+// whose country profile is not TR.
 //
-// DISPLAY-DECIMALS OVERRIDE (Task 7, multi-country): most of the app renders
-// money through useFormatCurrency()/useFormatCurrencyExtended(), which read
-// `displayDecimals` off the tenant's country profile (COUNTRY_PROFILES —
-// see backend/src/common/country/country-profile.const.ts). This helper is
-// a plain (non-hook) function called from many places that don't have
-// access to that profile, so it can't ask for it — but it must not silently
-// mis-render UZS with Intl's ISO-4217 default of two decimals when the
-// country profile says so'm is quoted WHOLE. Mirrors ONLY the one currency
-// that actually diverges; every other currency (including TRY) keeps
-// Intl's own default, unchanged.
+// ─────────────────────────────────────────────────────────────────────────
+// ONE SOURCE OF TRUTH FOR SYMBOL + PRECISION
 //
-// Exported so useFormatCurrency.ts's formatWithCurrency() (the explicit
-// currency-override path, e.g. rendering an invoice's own frozen `currency`
-// field) can apply the SAME override — "so'm has no decimals" is a fact
-// about the currency, not something that only holds when it happens to be
-// the live tenant currency.
-export const CURRENCY_DECIMALS_OVERRIDE: Record<string, number> = { UZS: 0 };
+// There are three money rails in this app and they used to disagree, so a
+// currency was only ever right on whichever rail someone remembered to fix:
+//   1. formatCurrency() below — the non-hook rail (QR menu, printing, ~15
+//      other call sites), locale PINNED to tr-TR;
+//   2. useFormatCurrency()/useFormatCurrencyExtended() — the admin/desktop
+//      rail, which deliberately follows the VIEWER's locale for grouping;
+//   3. lib/currency.ts — the billing/subscription rail, which deliberately
+//      always places our own symbol in front of a tr-TR number because the
+//      screens there pair the amount with an explicit ISO code.
+// The LOCALE policy of each rail is deliberate and stays where it is. The
+// SYMBOL and the DECIMAL COUNT are facts about the currency, not about the
+// rail, so all three now read them from CURRENCY_DISPLAY: add a currency
+// once and it is right on every screen.
+// ─────────────────────────────────────────────────────────────────────────
 
-// The number locale is pinned for EVERY currency, and it has to be a locale
-// whose data is complete in every engine we render in. tr-TR is: it groups
-// 50000 as "50.000" in Node and in Chromium alike. uz-UZ is NOT — measured off
-// the same locale tag, Node gives "50 000" and Chromium gives "50,000". So the
-// guest's own locale never picks the grouping; if it did, a jsdom-green test
-// would still ship a wrong number to a phone.
-const MONEY_LOCALE = 'tr-TR';
+/** How ONE currency is displayed, on every rail. */
+export interface CurrencyDisplayRule {
+  /** The symbol/word WE print whenever our code places the symbol itself. */
+  symbol: string;
+  /** Where that symbol sits when we place it: `₺1.234,00` vs `1.234 so'm`. */
+  position: 'prefix' | 'suffix';
+  /**
+   * Display fraction digits, when the currency is quoted differently from
+   * ISO-4217's default. `undefined` keeps ICU's own default, which is right
+   * for TRY (2) and for the zero-decimal currencies (JPY, KRW) alike.
+   * Storage/wire stays x100 for EVERY currency, always — this is display.
+   */
+  decimals?: number;
+  /**
+   * What the two Intl-currency-style rails (1 and 2) should do:
+   *  - omitted    → ICU's narrow symbol is correct; use it.
+   *  - 'code'     → force the ISO code because the "symbol" ICU would print
+   *                 is not one a local reader recognises.
+   *  - 'own-symbol' → ICU has nothing usable at all: format a plain number
+   *                 and place `symbol` ourselves.
+   */
+  intl?: 'code' | 'own-symbol';
+}
 
-// SYMBOL OVERRIDE: currencies whose symbol ICU simply does not carry, so Intl's
-// currency style falls back to printing the bare ISO code at the guest. UZS is
-// the live case — neither Node's nor Chromium's ICU has a narrow symbol for
-// so'm, so an Uzbek guest reading the QR menu was shown "UZS 50.000" instead of
-// money. Listed currencies are formatted as a plain number and get OUR symbol
-// and OUR placement; everything else stays on Intl's currency style, which
-// renders ₺/$/€ correctly and stays the single source of truth for them.
-const CURRENCY_SYMBOL_OVERRIDE: Record<
-  string,
-  { symbol: string; position: 'prefix' | 'suffix' }
-> = {
-  // Uzbek quotes the som by word, after the amount ("50.000 so'm"); there is
-  // no som sign in Unicode for UZS (U+20C0 is the Kyrgyz som).
-  UZS: { symbol: "so'm", position: 'suffix' },
+export const CURRENCY_DISPLAY: Record<string, CurrencyDisplayRule> = {
+  TRY: { symbol: '₺', position: 'prefix' },
+  USD: { symbol: '$', position: 'prefix' },
+  EUR: { symbol: '€', position: 'prefix' },
+  GBP: { symbol: '£', position: 'prefix' },
+  // The disambiguated dollar signs are for the rail that places symbols
+  // itself (lib/currency.ts). The two Intl rails print ICU's own narrow
+  // symbol for these, which in most locales is a plain "$" — unchanged from
+  // before this table existed, and not worth moving for a currency nothing
+  // sells in.
+  CAD: { symbol: 'C$', position: 'prefix' },
+  AUD: { symbol: 'A$', position: 'prefix' },
+
+  // Uzbek quotes the som by word, AFTER the amount ("50.000 so'm"), and
+  // quotes it WHOLE — tiyin are not shown, even though ISO-4217 gives UZS
+  // two decimals (matches the UZ country profile's displayDecimals: 0, see
+  // backend/src/common/country/country-profile.const.ts). Neither Node's nor
+  // Chromium's ICU carries a narrow symbol for UZS, so Intl's currency style
+  // showed an Uzbek guest the bare ISO code, "UZS 50.000", instead of money.
+  // There is no som sign in Unicode for UZS: U+20C0 is the KYRGYZ som.
+  UZS: { symbol: "so'm", position: 'suffix', decimals: 0, intl: 'own-symbol' },
+
+  // KGS is pinned to its ISO code ON PURPOSE. `currencyDisplay:'narrowSymbol'`
+  // resolves KGS to U+20C0 ⃀, which is a combining-looking glyph most fonts
+  // on our POS/tablet targets do not carry, so it renders as a box or as a
+  // bare mark next to the number. No country profile defines KGS today (only
+  // TR and UZ exist), so nothing reaches this entry — it is here so the
+  // narrow symbol cannot arrive by accident the day one does.
+  // BEFORE KYRGYZSTAN LAUNCHES: confirm the local convention (spelling,
+  // placement, decimal count) with a Kyrgyz source and replace this entry.
+  // Deliberately NOT guessing a Cyrillic spelling here.
+  KGS: { symbol: 'KGS', position: 'prefix', intl: 'code' },
 };
 
-export function formatCurrency(amount: number, currency: string = 'TRY'): string {
-  const decimals = CURRENCY_DECIMALS_OVERRIDE[currency];
-  const override = CURRENCY_SYMBOL_OVERRIDE[currency];
+// The number locale is pinned for EVERY currency on rails 1 and 3, and it has
+// to be a locale whose data is complete in every engine we render in. tr-TR
+// is: it groups 50000 as "50.000" in Node and in Chromium alike. uz-UZ is NOT
+// — measured off the same locale tag, Node gives "50 000" and Chromium gives
+// "50,000". So the guest's own locale never picks the grouping; if it did, a
+// jsdom-green test would still ship a wrong number to a phone.
+export const MONEY_LOCALE = 'tr-TR';
 
-  if (override) {
-    // style:'decimal' has no currency-aware default precision of its own, so
-    // spell it out — two, unless the currency is quoted otherwise above.
-    const number = new Intl.NumberFormat(MONEY_LOCALE, {
-      style: 'decimal',
-      minimumFractionDigits: decimals ?? 2,
-      maximumFractionDigits: decimals ?? 2,
-    }).format(amount);
-    return override.position === 'suffix'
-      ? `${number} ${override.symbol}`
-      : `${override.symbol}${number}`;
+// Building an Intl.NumberFormat is the expensive part (ICU data lookup), and a
+// POS grid renders hundreds of prices per frame. The hook rail used to keep its
+// own useMemo'd formatter; now that all three rails go through the two
+// functions below, they share ONE cache instead. The key set is bounded by the
+// (locale, currency, precision) triples we actually render.
+const formatterCache = new Map<string, Intl.NumberFormat>();
+
+function cachedFormatter(key: string, build: () => Intl.NumberFormat): Intl.NumberFormat {
+  const hit = formatterCache.get(key);
+  if (hit) return hit;
+  // A throwing `build` (see the narrowSymbol fallback below) caches nothing,
+  // so the fallback path gets its own key and its own entry.
+  const built = build();
+  formatterCache.set(key, built);
+  return built;
+}
+
+/**
+ * TEST ONLY. A cached formatter is built once and then never asks Intl
+ * anything again, which would make a test that stubs Intl.NumberFormat (the
+ * narrowSymbol/RangeError fallback) pass without ever reaching the stub. Tests
+ * that care about construction call this first.
+ */
+export function resetCurrencyFormatterCache(): void {
+  formatterCache.clear();
+}
+
+/**
+ * Format a plain number in `locale` and place OUR symbol on it.
+ *
+ * This is rail 3's whole policy (lib/currency.ts), and rail 1/2's fallback
+ * for a currency ICU cannot render (`intl: 'own-symbol'`). A currency with no
+ * entry in CURRENCY_DISPLAY prints its ISO code as the symbol, which is the
+ * honest fallback: better a readable code than a wrong glyph.
+ */
+export function formatCurrencyWithOwnSymbol(
+  locale: string,
+  amount: number,
+  currency: string,
+  fallbackDecimals = 2
+): string {
+  const rule = CURRENCY_DISPLAY[currency];
+  // style:'decimal' has no currency-aware default precision of its own, so
+  // spell it out — the caller's fallback, unless the currency is quoted
+  // otherwise in the table above.
+  const decimals = rule?.decimals ?? fallbackDecimals;
+  const number = cachedFormatter(
+    `d|${locale}|${decimals}`,
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: 'decimal',
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })
+  ).format(amount);
+  const symbol = rule?.symbol ?? currency;
+  // A word or a code needs the separating space a glyph does not: "₺1.234,00"
+  // but "1.234 so'm".
+  return rule?.position === 'suffix' ? `${number} ${symbol}` : `${symbol}${number}`;
+}
+
+/**
+ * Format money for an explicit locale, letting ICU own the symbol unless
+ * CURRENCY_DISPLAY says it cannot be trusted for this currency.
+ *
+ * `fallbackDecimals` is the caller's own precision (rail 2 passes the tenant
+ * country profile's displayDecimals); the table wins when it has an opinion,
+ * because "so'm is quoted whole" is a fact about UZS and not about who is
+ * looking at it. `undefined` leaves precision to ICU, which already gets the
+ * zero-decimal currencies (JPY, KRW) right.
+ */
+export function formatCurrencyForLocale(
+  locale: string,
+  amount: number,
+  currency: string,
+  fallbackDecimals?: number
+): string {
+  const rule = CURRENCY_DISPLAY[currency];
+  const decimals = rule?.decimals ?? fallbackDecimals;
+
+  if (rule?.intl === 'own-symbol') {
+    return formatCurrencyWithOwnSymbol(locale, amount, currency, decimals ?? 2);
   }
 
   const currencyOptions: Intl.NumberFormatOptions = {
     style: 'currency',
     currency,
-    // Precision is deliberately left to ICU when we have no override — passing
-    // an explicit 2 would break the zero-decimal currencies (JPY, KRW) that
-    // ICU already gets right.
     ...(decimals !== undefined
       ? { minimumFractionDigits: decimals, maximumFractionDigits: decimals }
       : {}),
   };
 
+  // Without this, a currency whose full symbol ICU spells as its ISO code in
+  // some locales (RUB -> "RUB", not "₽") renders as letters. 'code' is for the
+  // currencies whose narrow symbol we refuse (see KGS above).
+  const currencyDisplay = rule?.intl === 'code' ? 'code' : 'narrowSymbol';
+
   try {
-    return new Intl.NumberFormat(MONEY_LOCALE, {
-      ...currencyOptions,
-      // Without this, a currency whose full symbol ICU spells as its ISO code in
-      // some locales (RUB -> "RUB", not "₽") renders as letters. TRY/USD/EUR are
-      // byte-identical either way under tr-TR, so no existing call site moves.
-      currencyDisplay: 'narrowSymbol',
-    }).format(amount);
+    return cachedFormatter(
+      `c|${locale}|${currency}|${decimals}|${currencyDisplay}`,
+      () => new Intl.NumberFormat(locale, { ...currencyOptions, currencyDisplay })
+    ).format(amount);
   } catch {
     // 'narrowSymbol' arrived in Safari 14.1 / WebKitGTK 2.32, and an older
     // engine does not ignore the option — the CONSTRUCTOR throws RangeError.
@@ -96,8 +205,23 @@ export function formatCurrency(amount: number, currency: string = 'TRY'): string
     // such an engine is inside the supported set and an uncaught throw would
     // take down every price on the page. Take ICU's default display instead:
     // one currency loses its symbol, nobody loses the screen.
-    return new Intl.NumberFormat(MONEY_LOCALE, currencyOptions).format(amount);
+    return cachedFormatter(
+      `c|${locale}|${currency}|${decimals}|default`,
+      () => new Intl.NumberFormat(locale, currencyOptions)
+    ).format(amount);
   }
+}
+
+/**
+ * The non-hook money rail: locale pinned to tr-TR (see MONEY_LOCALE).
+ *
+ * Most of the app renders money through useFormatCurrency(), which reads
+ * `displayDecimals` off the tenant's country profile; this plain function is
+ * called from the many places that have no hook access, so precision comes
+ * from CURRENCY_DISPLAY instead — the same table the hook consults first.
+ */
+export function formatCurrency(amount: number, currency: string = 'TRY'): string {
+  return formatCurrencyForLocale(MONEY_LOCALE, amount, currency);
 }
 
 export function formatDate(date: string | Date, formatStr: string = 'PPP'): string {

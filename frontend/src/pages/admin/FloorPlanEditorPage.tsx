@@ -428,7 +428,7 @@ export default function FloorPlanEditorPage({
             />
           ) : (
             <div className="flex items-center justify-center h-full text-slate-400 text-sm px-6 text-center">
-              {zones.length === 0 ? t('floorPlan:noZones') : t('common:loading', 'Loading…')}
+              {zones.length === 0 ? t('floorPlan:noZones') : t('common:common.loading', 'Loading…')}
             </div>
           )}
           {armed && !placeHintDismissed && (

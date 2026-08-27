@@ -35,7 +35,12 @@
     "DEMO_PAYMENT_BLOCKED": "Payments can't be made in demo mode.",
     "ACCOUNT_PENDING_APPROVAL": "Your account has not been approved yet. Please wait for administrator approval.",
     "RESET_TOKEN_INVALID": "The password reset link is invalid or has expired. Please request a new one.",
-    "VERIFICATION_CODE_INVALID": "The verification code is invalid or has expired. Please request a new one."
+    "VERIFICATION_CODE_INVALID": "The verification code is invalid or has expired. Please request a new one.",
+    "LOCATION_REQUIRED": "Location access is needed to place an order. Please allow location in your browser and try again.",
+    "LOCATION_OUT_OF_RANGE": "You need to be at the restaurant to place an order.",
+    "LOCATION_OUT_OF_RANGE_withDistance": "You need to be at the restaurant to place an order. You are about {{distance}}m away; the limit is {{radius}}m.",
+    "COMBO_NOT_CONFIGURED": "This combo hasn't been set up yet. Please let the staff know.",
+    "COMBO_ITEM_UNAVAILABLE": "One of the items you chose for this combo is currently unavailable."
   },
   "errors": {
     "title": "Error",

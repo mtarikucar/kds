@@ -21,7 +21,7 @@ interface LegalDocumentPageProps {
  * TermsOfServicePage / PrivacyPolicyPage chrome.
  */
 const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ kind }) => {
-  const { t, i18n } = useTranslation('legal');
+  const { t, i18n } = useTranslation('common');
   const { data: doc, isLoading, isError } = useGetCurrentLegalDocument(
     kind,
     i18n.language || 'tr',
@@ -36,7 +36,7 @@ const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ kind }) => {
             className="flex items-center gap-2 text-primary-600 hover:text-primary-700"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">{t('backToHome', 'Ana sayfaya dön')}</span>
+            <span className="font-medium">{t('legal.backToHome', 'Ana sayfaya dön')}</span>
           </Link>
           <div className="flex items-center gap-2">
             <ChefHat className="w-6 h-6 text-primary-600" />
@@ -47,12 +47,12 @@ const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ kind }) => {
 
       <main className="max-w-4xl mx-auto px-4 py-10">
         {isLoading && (
-          <div className="text-slate-500">{t('loading', 'Yükleniyor...')}</div>
+          <div className="text-slate-500">{t('legal.loading', 'Yükleniyor...')}</div>
         )}
         {isError && (
           <div className="text-red-600">
             {t(
-              'fetchFailed',
+              'legal.fetchFailed',
               'Belge yüklenemedi. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.',
             )}
           </div>
@@ -61,8 +61,8 @@ const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ kind }) => {
           <article>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">{doc.title}</h1>
             <p className="text-sm text-slate-500 mb-8">
-              {t('versionLabel', 'Versiyon')} {doc.version} ·{' '}
-              {t('effectiveFrom', 'Yürürlük')}:{' '}
+              {t('legal.versionLabel', 'Versiyon')} {doc.version} ·{' '}
+              {t('legal.effectiveFrom', 'Yürürlük')}:{' '}
               {new Date(doc.effectiveAt).toLocaleDateString(i18n.language || 'tr', {
                 year: 'numeric',
                 month: 'long',

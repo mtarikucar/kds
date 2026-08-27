@@ -24,7 +24,8 @@
     "legal": "Юридические документы",
     "print3d": "3D-производство",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "openMenu": "Открыть меню"
   },
   "login": {
     "welcomeBack": "Welcome back",
@@ -34,7 +35,8 @@
     "emailPlaceholder": "admin@example.com",
     "password": "Password",
     "signingIn": "Signing in...",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "sessionExpired": "Срок действия сессии истёк. Войдите снова."
   },
   "twoFactor": {
     "setupTitle": "Setup 2FA",

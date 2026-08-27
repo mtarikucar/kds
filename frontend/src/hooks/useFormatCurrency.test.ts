@@ -22,6 +22,7 @@ import {
   useFormatCurrency,
   useFormatCurrencyExtended,
 } from './useFormatCurrency';
+import { resetCurrencyFormatterCache } from '../lib/utils';
 
 /**
  * useFormatCurrency binds the tenant's configured currency to the active
@@ -79,6 +80,78 @@ describe('useFormatCurrency', () => {
     expect(out.replace(/[^\d]/g, '')).toBe('1234568');
   });
 
+  // The admin/desktop rail used to run its own Intl.NumberFormat with
+  // style:'currency' and nothing else, so an Uzbek tenant's dashboard showed
+  // "UZS 50,000" — ICU has no som symbol — while the QR menu, fixed earlier,
+  // showed "50.000 so'm". Same money, two answers. Both now read the symbol
+  // off CURRENCY_DISPLAY.
+  it("prints the som word for a UZS tenant, never the bare ISO code", () => {
+    intlLocaleRef.value = 'uz-UZ';
+    currencyRef.value = 'UZS';
+    displayDecimalsRef.value = 0;
+    const { result } = renderHook(() => useFormatCurrency());
+    const out = result.current(50000);
+    expect(out).toContain("so'm");
+    expect(out).not.toContain('UZS');
+    // Grouping is still the viewer locale's, and uz-UZ grouping is NOT
+    // portable between engines (Node "50 000" vs Chromium "50,000"), so only
+    // the digits are asserted.
+    expect(out.replace(/[^\d]/g, '')).toBe('50000');
+  });
+
+  // "so'm is quoted whole" is a fact about UZS, so the shared table outranks a
+  // profile that says otherwise — a stale/misconfigured displayDecimals must
+  // not put tiyin back on an Uzbek screen.
+  it('takes UZS precision from the shared table even when the profile disagrees', () => {
+    intlLocaleRef.value = 'uz-UZ';
+    currencyRef.value = 'UZS';
+    displayDecimalsRef.value = 2;
+    const { result } = renderHook(() => useFormatCurrency());
+    expect(result.current(1234567.89).replace(/[^\d]/g, '')).toBe('1234568');
+  });
+
+  // The narrow symbol has to be carried on THIS rail too: without it, an admin
+  // reading the dashboard in English saw "TRY 50,000.00" for the same lira the
+  // rest of the app renders as "₺". ₺ is what both engines resolve
+  // narrowSymbol to under en-US (measured in Node and Chromium).
+  it('shows the narrow symbol, not the ISO code, for a TRY tenant on an en-US screen', () => {
+    intlLocaleRef.value = 'en-US';
+    currencyRef.value = 'TRY';
+    const { result } = renderHook(() => useFormatCurrency());
+    const out = result.current(50000);
+    expect(out).toContain('₺');
+    expect(out).not.toContain('TRY');
+  });
+
+  // narrowSymbol arrived in Safari 14.1 / WebKitGTK 2.32 and an older engine
+  // throws RangeError from the CONSTRUCTOR — the Tauri shell targets safari13,
+  // so that engine is inside the supported set and an uncaught throw would
+  // blank every price on the dashboard.
+  it('still renders money on an engine that rejects narrowSymbol', () => {
+    // Formatters are cached, and a cached one never touches Intl again — the
+    // stub below would go unreached and the test would pass for nothing.
+    resetCurrencyFormatterCache();
+    const real = Intl.NumberFormat;
+    const spy = vi
+      .spyOn(Intl, 'NumberFormat')
+      .mockImplementation(((locale?: string, options?: Intl.NumberFormatOptions) => {
+        if (options?.currencyDisplay === 'narrowSymbol') {
+          throw new RangeError('invalid value narrowSymbol for option currencyDisplay');
+        }
+        return new real(locale, options);
+      }) as unknown as typeof Intl.NumberFormat);
+
+    try {
+      intlLocaleRef.value = 'tr-TR';
+      currencyRef.value = 'TRY';
+      const { result } = renderHook(() => useFormatCurrency());
+      expect(result.current(2999).replace(/[^\d]/g, '')).toBe('299900');
+    } finally {
+      spy.mockRestore();
+      resetCurrencyFormatterCache();
+    }
+  });
+
   it('round-trips: a UZS amount stored x100 displays whole and re-parses to the same integer', () => {
     intlLocaleRef.value = 'uz-UZ';
     currencyRef.value = 'UZS';
@@ -125,6 +198,16 @@ describe('useFormatCurrencyExtended', () => {
     expect(out.replace(/[^\d]/g, '')).toBe('1234568');
   });
 
+  // KGS resolves to U+20C0 ⃀ under narrowSymbol — a mark most POS/tablet fonts
+  // do not carry. It is pinned to the ISO code on every rail until a Kyrgyz
+  // source confirms the local convention.
+  it('renders KGS as its ISO code on the override path, never U+20C0', () => {
+    const { result } = renderHook(() => useFormatCurrencyExtended());
+    const out = result.current.formatWithCurrency(50000, 'KGS');
+    expect(out).not.toContain('\u20C0');
+    expect(out).toContain('KGS');
+  });
+
   // A UZS amount rendered via the explicit-override path (invoices/
   // InvoiceDetailDrawer render a record's OWN `currency` field through
   // formatWithCurrency, not the live tenant currency) must STILL show zero
@@ -134,5 +217,9 @@ describe('useFormatCurrencyExtended', () => {
     const { result } = renderHook(() => useFormatCurrencyExtended());
     const out = result.current.formatWithCurrency(1234567.89, 'UZS');
     expect(out.replace(/[^\d]/g, '')).toBe('1234568');
+    // ...and with the som word, for the same reason the tenant-currency path
+    // has it: ICU would print the bare code.
+    expect(out).toContain("so'm");
+    expect(out).not.toContain('UZS');
   });
 });

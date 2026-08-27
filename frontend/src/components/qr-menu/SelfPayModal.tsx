@@ -209,13 +209,13 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
                 {/* Summary strip */}
                 <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1">
                   <span className="text-slate-500">
-                    {t('billSplit.total', 'Total')}:{' '}
+                    {t('payment.total', 'Total')}:{' '}
                     <span className="font-bold text-slate-900">
                       {formatCurrency(parseFloat(payable!.summary.totalAmount), currency)}
                     </span>
                   </span>
                   <span className="text-slate-500">
-                    {t('billSplit.paid', 'Paid')}:{' '}
+                    {t('payment.paid', 'Paid')}:{' '}
                     <span className="font-bold text-emerald-600">
                       {formatCurrency(parseFloat(payable!.summary.paidAmount), currency)}
                     </span>

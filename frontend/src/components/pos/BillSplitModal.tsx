@@ -439,7 +439,7 @@ const BillSplitModal = ({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2 border-t">
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            {t('common:common.cancel', 'Cancel')}
+            {t('common:cancel', 'Cancel')}
           </Button>
           <Button
             variant="primary"

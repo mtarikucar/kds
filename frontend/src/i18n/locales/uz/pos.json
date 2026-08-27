@@ -102,7 +102,9 @@
     "noProductsFound": "Qidiruv natijalari topilmadi",
     "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring",
     "selectDifferentCategory": "Boshqa kategoriyani tanlang yoki yangi mahsulotlar qo'shing",
-    "clearSearch": "Qidiruvni tozalash"
+    "clearSearch": "Qidiruvni tozalash",
+    "decrease": "Kamaytirish",
+    "increase": "Ko'paytirish"
   },
   "payment": {
     "title": "To'lov",
@@ -117,7 +119,12 @@
     "transactionIdPlaceholder": "Tranzaksiya ID kiriting",
     "confirmPayment": "To'lovni tasdiqlash",
     "customerPhone": "Mijoz telefoni (Ixtiyoriy)",
-    "customerPhonePlaceholder": "+998 90 123 4567"
+    "customerPhonePlaceholder": "+998 90 123 4567",
+    "amountTendered": "Olingan summa",
+    "changeDue": "Qaytim",
+    "exactAmount": "Aniq",
+    "insufficientCash": "Summa yetarli emas",
+    "receiptPrintFailed": "Chek chop etilmadi — to'lov qayd etildi."
   },
   "notifications": {
     "pending": "Kutilmoqda",
@@ -332,5 +339,19 @@
   },
   "campaign": "Aksiya",
   "startingFrom": "dan",
-  "required": "Majburiy"
+  "required": "Majburiy",
+  "add": "Qo'shish",
+  "addDetails": "Tafsilot qo'shish",
+  "updateOrderBeforePayment": "Avval buyurtmani yangilang, keyin to'lovni qabul qiling",
+  "orderPaymentFailed": "To'lov amalga oshmadi",
+  "reprint": {
+    "label": "Chekni qayta chop etish",
+    "printing": "Chop etilmoqda...",
+    "success": "Chek printerga yuborildi",
+    "failed": "Qayta chop etish amalga oshmadi — printer ulanishini tekshiring",
+    "desktopOnly": "Qayta chop etish faqat ish stoli POS ilovasida mavjud",
+    "noPrinter": "Standart chek printeri sozlanmagan",
+    "noSnapshot": "Bu to'lov uchun saqlangan chek nusxasi yo'q",
+    "notReprintable": "Qaytarilgan yoki muvaffaqiyatsiz to'lovlarni qayta chop etib bo'lmaydi"
+  }
 }

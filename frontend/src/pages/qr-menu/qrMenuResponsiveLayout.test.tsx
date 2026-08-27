@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 /**
@@ -32,20 +32,31 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: stableI18n }),
 }));
 
-vi.mock('framer-motion', () => {
+vi.mock('framer-motion', async () => {
+  const { forwardRef } = await vi.importActual<typeof import('react')>('react');
   const MOTION_ONLY_PROPS = new Set([
     'initial', 'animate', 'exit', 'transition', 'variants', 'whileHover',
     'whileTap', 'whileFocus', 'layout', 'layoutId', 'drag', 'dragConstraints',
     'dragElastic', 'onDragEnd', 'mode',
   ]);
+  // Real motion.* components forward their ref to the DOM node and are cached
+  // per tag. Both matter: a plain function component swallows the ref (so a
+  // component that measures itself sees nothing), and a fresh component type
+  // on every property read remounts the subtree on every render.
+  const cache = new Map<string, unknown>();
   return {
     motion: new Proxy({}, {
-      get: (_t, tag: string) => ({ children, ...p }: any) => {
-        const Tag = tag as any;
-        const rest = Object.fromEntries(
-          Object.entries(p).filter(([k]) => !MOTION_ONLY_PROPS.has(k)),
-        );
-        return <Tag {...rest}>{children}</Tag>;
+      get: (_t, tag: string) => {
+        if (!cache.has(tag)) {
+          cache.set(tag, forwardRef(({ children, ...p }: any, ref: any) => {
+            const Tag = tag as any;
+            const rest = Object.fromEntries(
+              Object.entries(p).filter(([k]) => !MOTION_ONLY_PROPS.has(k)),
+            );
+            return <Tag ref={ref} {...rest}>{children}</Tag>;
+          }));
+        }
+        return cache.get(tag);
       },
     }),
     AnimatePresence: ({ children }: any) => <>{children}</>,
@@ -194,9 +205,26 @@ function sizeClasses(el: Element): string {
   return el.className.toString();
 }
 
+/** jsdom lays nothing out, so offsetHeight is always 0. Feed the component a
+ *  panel height the way a browser would, to test what OUR code does with it. */
+function stubOffsetHeight(get: () => number): () => void {
+  const proto = window.HTMLElement.prototype;
+  const original = Object.getOwnPropertyDescriptor(proto, 'offsetHeight');
+  Object.defineProperty(proto, 'offsetHeight', { configurable: true, get });
+  return () => {
+    if (original) Object.defineProperty(proto, 'offsetHeight', original);
+    else delete (proto as unknown as Record<string, unknown>).offsetHeight;
+  };
+}
+
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   cartItems = [];
+  setViewportWidth(1024);
 });
 
 describe('ProductCard — the quick-add button must not sit on the copy', () => {
@@ -257,10 +285,59 @@ describe('CartContent — the summary panel sits on the bottom edge', () => {
     expect(cls).toContain('bottom-0');
   });
 
-  it('pads the scrolling column by the panel height plus the safe area', () => {
-    const { container } = renderCart();
-    const scroller = container.firstElementChild as HTMLElement;
-    expect(sizeClasses(scroller)).toContain('env(safe-area-inset-bottom');
+  it('reserves the MEASURED panel height, not a hardcoded 13rem', () => {
+    // 13rem (208px) was a snapshot of one panel in one locale. The panel grows
+    // with a wrapped button label, the approval note, or a device safe area,
+    // and the guess does not follow it, so the reservation drifts out of true.
+    const restore = stubOffsetHeight(() => 240);
+    setViewportWidth(320);
+    try {
+      const { container } = renderCart();
+      const scroller = container.firstElementChild as HTMLElement;
+      expect(sizeClasses(scroller)).not.toMatch(/pb-\[/);
+      // The panel already carries the safe-area inset in its own padding, so
+      // the measurement contains it; adding env() here would double-count.
+      expect(scroller.style.paddingBottom).toBe('264px'); // 240 + 24px gap
+    } finally {
+      restore();
+    }
+  });
+
+  it('re-reserves when the panel changes height', () => {
+    const observers: ResizeObserverCallback[] = [];
+    const realRO = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(cb: ResizeObserverCallback) { observers.push(cb); }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    let panelHeight = 200;
+    const restore = stubOffsetHeight(() => panelHeight);
+    setViewportWidth(320);
+    try {
+      const { container } = renderCart();
+      const scroller = container.firstElementChild as HTMLElement;
+      expect(scroller.style.paddingBottom).toBe('224px');
+      panelHeight = 260;
+      act(() => { observers.forEach((cb) => cb([], {} as ResizeObserver)); });
+      expect(scroller.style.paddingBottom).toBe('284px');
+    } finally {
+      restore();
+      globalThis.ResizeObserver = realRO;
+    }
+  });
+
+  it('reserves nothing at >=768, where the panel is back in flow', () => {
+    const restore = stubOffsetHeight(() => 240);
+    setViewportWidth(1024);
+    try {
+      const { container } = renderCart();
+      const scroller = container.firstElementChild as HTMLElement;
+      expect(scroller.style.paddingBottom).toBe('');
+    } finally {
+      restore();
+    }
   });
 
   it('grows the Continue Shopping hit box without moving the text', () => {

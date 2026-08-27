@@ -358,7 +358,7 @@ export default function LocationSettings({ compact = false }: LocationSettingsPr
           ) : (
             <Save className="w-3.5 h-3.5" />
           )}
-          {t('common.save', 'Kaydet')}
+          {t('save', 'Kaydet')}
         </button>
       </div>
     </>

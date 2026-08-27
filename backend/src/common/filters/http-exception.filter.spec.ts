@@ -99,6 +99,32 @@ describe('HttpExceptionFilter', () => {
       expect(mockResponse.json.mock.calls[0][0].actionable).toBeUndefined();
     });
 
+    // The QR geofence refusal is the second producer of an actionable
+    // payload: a diner turned away by the radius check needs the numbers
+    // ("you are 320m away, the limit is 100m"). Before this they lived only
+    // inside the Turkish `message`, so a client rendering the localized
+    // LOCATION_OUT_OF_RANGE string had nothing to put them in — and `details`
+    // is stripped outside development.
+    it('carries the geofence distance and radius onto the response', () => {
+      filter.catch(
+        new HttpException(
+          {
+            statusCode: 400,
+            message: 'too far',
+            errorCode: 'LOCATION_OUT_OF_RANGE',
+            geofence: { distanceMeters: 320, radiusMeters: 100 },
+          },
+          HttpStatus.BAD_REQUEST,
+        ),
+        mockArgumentsHost,
+      );
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body.errorCode).toBe('LOCATION_OUT_OF_RANGE');
+      expect(body.actionable).toEqual({
+        geofence: { distanceMeters: 320, radiusMeters: 100 },
+      });
+    });
+
     it('carries only the allowlisted keys, never the whole exception body', () => {
       // The body is a public contract; a spread would publish whatever a
       // future thrower happens to attach.

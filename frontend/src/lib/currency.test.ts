@@ -4,6 +4,7 @@ import {
   formatCurrencyWithPeriod,
   getCurrencySymbol,
 } from './currency';
+import { CURRENCY_DISPLAY, formatCurrency as formatCurrencyPinnedRail } from './utils';
 
 describe('getCurrencySymbol', () => {
   it('maps known currency codes to their symbols', () => {
@@ -19,6 +20,17 @@ describe('getCurrencySymbol', () => {
 
   it('falls back to the raw code for unknown currencies', () => {
     expect(getCurrencySymbol('JPY')).toBe('JPY');
+  });
+
+  // The billing screens used to keep their OWN symbol table, which had no UZS
+  // row — so an Uzbek tenant's invoice said "UZS1.234.567,89" while the same
+  // money on the QR menu said "1.234.568 so'm". Symbol and precision are facts
+  // about the currency, so there is now one table (lib/utils CURRENCY_DISPLAY)
+  // and this rail reads it.
+  it('takes its symbols from the shared table, for every currency in it', () => {
+    for (const [code, rule] of Object.entries(CURRENCY_DISPLAY)) {
+      expect(getCurrencySymbol(code)).toBe(rule.symbol);
+    }
   });
 });
 
@@ -38,6 +50,34 @@ describe('formatCurrency', () => {
 
   it('keeps the sign for negative amounts (refunds, write-offs)', () => {
     expect(formatCurrency(-42.1, 'TRY')).toBe('₺-42,10');
+  });
+});
+
+describe('formatCurrency across rails', () => {
+  // The defect this closes: a currency whose symbol/precision was fixed on one
+  // rail stayed wrong on the others. Any currency the shared table formats
+  // with OUR symbol must come out identically here and on the pinned
+  // (non-hook) rail — same symbol, same side, same decimals.
+  it('agrees with the pinned rail wherever the table owns the symbol', () => {
+    for (const [code, rule] of Object.entries(CURRENCY_DISPLAY)) {
+      if (rule.intl !== 'own-symbol') continue;
+      expect(formatCurrency(1234567.89, code)).toBe(
+        formatCurrencyPinnedRail(1234567.89, code)
+      );
+    }
+  });
+
+  it("renders UZS whole and som-suffixed, not as a two-decimal ISO code", () => {
+    expect(formatCurrency(1234567.89, 'UZS')).toBe("1.234.568 so'm");
+    expect(formatCurrency(50000, 'UZS')).not.toContain('UZS');
+  });
+
+  // KGS is deliberately still the ISO code here (this rail always prefixes its
+  // own symbol, and we refuse to guess a Kyrgyz spelling), so its rendering is
+  // unchanged — the pin exists to keep U+20C0 from arriving by accident.
+  it('leaves KGS on its ISO code', () => {
+    expect(formatCurrency(50000, 'KGS')).toBe('KGS50.000,00');
+    expect(formatCurrency(50000, 'KGS')).not.toContain('\u20C0');
   });
 });
 

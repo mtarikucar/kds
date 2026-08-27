@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListHardwareOrders, type HardwareOrderSummary } from './storeApi';
+import { formatCurrency } from '../../lib/utils';
 
 /**
  * v2.8.84 — tenant-facing hardware order history.
@@ -146,10 +147,7 @@ function OrderRow({ order }: { order: HardwareOrderSummary }) {
         {order.print3dJob?.itemCount ?? order.itemCount}
       </td>
       <td className="px-4 py-2 font-medium">
-        {(order.totalCents / 100).toLocaleString('tr-TR', {
-          style: 'currency',
-          currency: order.currency,
-        })}
+        {formatCurrency(order.totalCents / 100, order.currency)}
       </td>
       <td className="px-4 py-2">
         <span

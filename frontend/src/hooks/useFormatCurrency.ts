@@ -3,10 +3,10 @@
  * Formats currency with proper locale separators and symbols
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useLocale } from './useLocale';
 import { useCountryProfile } from './useCountryProfile';
-import { CURRENCY_DECIMALS_OVERRIDE } from '../lib/utils';
+import { formatCurrencyForLocale } from '../lib/utils';
 
 /**
  * Hook providing locale-aware currency formatting
@@ -18,8 +18,8 @@ import { CURRENCY_DECIMALS_OVERRIDE } from '../lib/utils';
  *
  * // Uses restaurant's configured currency with current locale formatting
  * // In English (USD): "$99.99"
- * // In Turkish (TRY): "99,99 ₺"
- * // In Arabic (SAR): "٩٩٫٩٩ ر.س."
+ * // In Turkish (TRY): "₺99,99"
+ * // In Uzbek (UZS): "1 234 568 so'm" — whole, and the som by word
  * formatCurrency(99.99)
  * ```
  */
@@ -32,26 +32,20 @@ export const useFormatCurrency = (): ((amount: number) => string) => {
   // always — this only ever touches the Intl.NumberFormat presentation.
   const { currency, displayDecimals } = useCountryProfile();
 
-  // Cached formatter for the restaurant's currency
-  const currencyFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat(intlLocale, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: displayDecimals,
-        maximumFractionDigits: displayDecimals,
-      }),
-    [intlLocale, currency, displayDecimals]
-  );
-
   /**
-   * Format amount with restaurant's configured currency
+   * Format amount with restaurant's configured currency.
+   *
+   * The LOCALE is the viewer's, on purpose — an admin reading the dashboard
+   * gets the grouping of the language they picked. The SYMBOL and the decimal
+   * count are not the viewer's business: they come from CURRENCY_DISPLAY (see
+   * lib/utils.ts), the one table every money rail reads, with the country
+   * profile's displayDecimals as the fallback for currencies the table has no
+   * opinion about.
    */
   const formatCurrency = useCallback(
-    (amount: number): string => {
-      return currencyFormatter.format(amount);
-    },
-    [currencyFormatter]
+    (amount: number): string =>
+      formatCurrencyForLocale(intlLocale, amount, currency, displayDecimals),
+    [intlLocale, currency, displayDecimals]
   );
 
   return formatCurrency;
@@ -84,26 +78,15 @@ export const useFormatCurrencyExtended = (): UseFormatCurrencyExtendedReturn => 
   const { intlLocale } = useLocale();
   const { currency, displayDecimals } = useCountryProfile();
 
-  // Cached formatter for the restaurant's currency
-  const currencyFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat(intlLocale, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: displayDecimals,
-        maximumFractionDigits: displayDecimals,
-      }),
-    [intlLocale, currency, displayDecimals]
-  );
-
   /**
-   * Format amount with restaurant's configured currency
+   * Format amount with restaurant's configured currency — same rail as
+   * useFormatCurrency(): viewer's locale, CURRENCY_DISPLAY's symbol and
+   * precision.
    */
   const formatCurrency = useCallback(
-    (amount: number): string => {
-      return currencyFormatter.format(amount);
-    },
-    [currencyFormatter]
+    (amount: number): string =>
+      formatCurrencyForLocale(intlLocale, amount, currency, displayDecimals),
+    [intlLocale, currency, displayDecimals]
   );
 
   /**
@@ -111,23 +94,15 @@ export const useFormatCurrencyExtended = (): UseFormatCurrencyExtendedReturn => 
    *
    * This is an explicit OVERRIDE — a caller passing a currency other than
    * the live tenant currency (e.g. an invoice rendering its OWN frozen
-   * `currency` field: InvoicesPage/InvoiceDetailDrawer). It uses Intl's own
-   * default precision for whatever currency is passed, EXCEPT the same
-   * small override useFormatCurrency() applies for the tenant's own
-   * currency: "so'm is quoted whole" is a fact about UZS itself, not
-   * something that only holds on the live-tenant-currency path.
+   * `currency` field: InvoicesPage/InvoiceDetailDrawer). There is no country
+   * profile to ask for such a record, so precision falls through to ICU
+   * except where CURRENCY_DISPLAY has an opinion: "so'm is quoted whole" is a
+   * fact about UZS itself, not something that only holds on the
+   * live-tenant-currency path.
    */
   const formatWithCurrency = useCallback(
-    (amount: number, currencyCode: string): string => {
-      const decimalsOverride = CURRENCY_DECIMALS_OVERRIDE[currencyCode];
-      return new Intl.NumberFormat(intlLocale, {
-        style: 'currency',
-        currency: currencyCode,
-        ...(decimalsOverride !== undefined
-          ? { minimumFractionDigits: decimalsOverride, maximumFractionDigits: decimalsOverride }
-          : {}),
-      }).format(amount);
-    },
+    (amount: number, currencyCode: string): string =>
+      formatCurrencyForLocale(intlLocale, amount, currencyCode),
     [intlLocale]
   );
 

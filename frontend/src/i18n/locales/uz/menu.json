@@ -172,7 +172,30 @@
     "noPhoto": "Rasm yo‘q",
     "closed": "yopiq",
     "importFromSource": "Manba bering (havola / PDF / Excel)",
-    "bulkAddManual": "Qo‘lda ommaviy qo‘shish"
+    "bulkAddManual": "Qo‘lda ommaviy qo‘shish",
+    "aiStudio": "AI studiya",
+    "aiStudioHint": "Foto, tarkib videosi va 3D/AR modelini avtomatik yarating — avval saqlash shart emas.",
+    "assetPhoto": "Foto",
+    "asset3d": "3D",
+    "assetVideo": "Video",
+    "basicInfo": "Asosiy ma'lumotlar",
+    "customerContent": "Mijozga ko'rinadigan kontent",
+    "editorNeedsBasics": "Avval mahsulot nomi, narxi va kategoriyasini kiriting.",
+    "ingredientsPlaceholder": "Masalan: mol go'shti qiymasi, piyoz, pomidor, qalampir, ziravorlar",
+    "itemSaved": "Mahsulot saqlandi",
+    "operations": "Operatsiya / POS",
+    "bulk": {
+      "subtitle": "Bir vaqtning o'zida bir nechta mahsulot qo'shing. Har bir qatorga nom, narx va kategoriya kiriting.",
+      "addRow": "Qator qo'shish",
+      "submit": "Hammasini qo'shish",
+      "needRows": "Kamida bitta mahsulot uchun nom, narx va kategoriya kiriting.",
+      "incompleteRows": "Ba'zi qatorlarda nom, narx yoki kategoriya yo'q. To'ldiring yoki o'chiring.",
+      "noValidCategory": "Tanlangan kategoriyalar endi yaroqli emas — sahifani yangilang.",
+      "done": "{{ok}} ta mahsulot qo'shildi.",
+      "partial": "{{ok}} ta mahsulot qo'shildi, {{fail}} tasi qo'shilmadi.",
+      "noneCreated": "Hech qanday mahsulot qo'shilmadi.",
+      "failedTitle": "Qo'shib bo'lmagan mahsulotlar"
+    }
   },
   "media": {
     "title": "AI-studiya",
@@ -214,7 +237,16 @@
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "AI 3D model krediti tugadi. Do'kondan 10 ta modellik kredit paketini sotib olishingiz mumkin (790 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi."
+    "quotaExhausted": "AI 3D model krediti tugadi. Do'kondan 10 ta modellik kredit paketini sotib olishingiz mumkin (790 ₺, bir martalik, QQS ichida) — kreditlar muddatsiz, tugaguncha amal qiladi.",
+    "chip": "3D / AR",
+    "title": "3D / AR modeli",
+    "subtitle": "Taom fotosidan 3D model yarating — mehmonlar QR menyu orqali stolda AR'da ko'radi.",
+    "ready": "3D model tayyor — QR menyuda AR faol",
+    "regenerate": "Qayta yaratish",
+    "pending": "3D model yaratilmoqda… (bir necha daqiqa olishi mumkin)",
+    "failed": "Oxirgi urinish muvaffaqiyatsiz tugadi",
+    "generate": "3D model yaratish",
+    "needsImage": "Avval taom fotosini qo'shing."
   },
   "import": {
     "invalidRows": "{{n}} ta qator to‘liq emas yoki xato (bo‘sh nom yoki manfiy narx) — to‘g‘rilang yoki o‘chiring",
@@ -257,5 +289,14 @@
     "reading": "O‘qilmoqda…",
     "summary": "{{p}} ta mahsulot · {{u}} ta yangilandi · {{cc}} ta yangi + {{cm}} ta mavjud kategoriya",
     "fileTooLarge": "Fayl juda katta — {{mb}} MB dan oshmasligi kerak."
+  },
+  "ai": {
+    "lockedTitle": "Sun'iy intellekt vositalari",
+    "lockedNew": "Mahsulotni saqlaganingizda avtomatik foto, tarkib videosi va 3D/AR modeli shu yerda ochiladi."
+  },
+  "ar": {
+    "loadFailed": "3D ko'rgich yuklanmadi.",
+    "loading": "3D yuklanmoqda…",
+    "viewOnTable": "📱 Stolingizda AR'da ko'ring"
   }
 }

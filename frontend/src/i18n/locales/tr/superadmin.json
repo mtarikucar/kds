@@ -24,7 +24,8 @@
     "legal": "Yasal Belgeler",
     "print3d": "3D Üretim",
     "settings": "Ayarlar",
-    "signOut": "Çıkış yap"
+    "signOut": "Çıkış yap",
+    "openMenu": "Menüyü aç"
   },
   "login": {
     "welcomeBack": "Tekrar hoş geldiniz",
@@ -34,7 +35,8 @@
     "emailPlaceholder": "admin@example.com",
     "password": "Parola",
     "signingIn": "Oturum açılıyor...",
-    "signIn": "Oturum aç"
+    "signIn": "Oturum aç",
+    "sessionExpired": "Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın."
   },
   "twoFactor": {
     "setupTitle": "2FA Kurulumu",

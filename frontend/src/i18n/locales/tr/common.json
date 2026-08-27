@@ -73,7 +73,11 @@
     "backToMenu": "Menüye Dön",
     "delete": "Sil",
     "language": "Dil",
-    "copyFailed": "Kopyalanamadı"
+    "copyFailed": "Kopyalanamadı",
+    "loading": "Yükleniyor...",
+    "sending": "Gönderiliyor...",
+    "verifying": "Doğrulanıyor...",
+    "backHome": "Ana sayfaya dön"
   },
   "navigation": {
     "dashboard": "Kontrol Paneli",
@@ -908,7 +912,10 @@
     "noTablesDescription": "Restoran oturma düzeninizi yönetmeye başlamak için ilk masanızı ekleyin",
     "addFirstTable": "İlk Masayı Ekle",
     "gridView": "Liste Görünümü",
-    "floorPlan": "Kat Planı"
+    "floorPlan": "Kat Planı",
+    "reactivateUser": "Kullanıcıyı aktif et",
+    "userReactivated": "Kullanıcı aktif edildi",
+    "userReactivateFailed": "Kullanıcı aktif edilemedi"
   },
   "pos": {
     "floorPlan": {
@@ -1033,7 +1040,13 @@
       "tiramisuDesc": "Klasik İtalyan kahveli tatlı",
       "lavaCakeName": "Çikolatalı Sufle",
       "lavaCakeDesc": "Sıcak, akışkan merkezli çikolatalı kek"
-    }
+    },
+    "invalidFileType": "Lütfen bir görsel dosyası yükleyin.",
+    "logoTooLarge": "Logo dosyası çok büyük. En fazla 5 MB olabilir.",
+    "logoUploaded": "Logo başarıyla yüklendi",
+    "logoUploadFailed": "Logo yüklenemedi",
+    "maxFileSize": "En büyük dosya boyutu: 5 MB",
+    "uploadingLogo": "Yükleniyor..."
   },
   "pricing": {
     "title": "Fiyatlandırma",
@@ -1246,7 +1259,9 @@
     "noProducts": "Ürün bulunamadı",
     "noProductsDescription": "Aramanızı değiştirin veya tüm kategorilere göz atın",
     "clearFilters": "Filtreleri temizle",
-    "notesPlaceholder": "Örn. soğansız, ekstra sos..."
+    "notesPlaceholder": "Örn. soğansız, ekstra sos...",
+    "arView": "3D / AR ile gör",
+    "ingredients": "İçindekiler"
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -1362,7 +1377,9 @@
         "settlement_error": "Ödeme alındı ama kayıt sırasında bir sorun oluştu. Garsona haber verin — restoran ödemenizi manuel olarak işleyecek.",
         "paytr_reported_failure": "Bankanız ödemeyi onaylamadı. Farklı bir kart ile tekrar deneyin."
       }
-    }
+    },
+    "total": "Toplam",
+    "paid": "Ödenen"
   },
   "orderStatus": {
     "pendingApproval": "Onay Bekleniyor",
@@ -1417,5 +1434,32 @@
     "noReferralCode": "Referans kodunuz için destek ekibiyle iletişime geçin",
     "viewRewards": "Ödüllerinizi görüntüleyin"
   },
-  "cancel": "İptal"
+  "cancel": "İptal",
+  "from": "Başlangıç",
+  "to": "Bitiş",
+  "showingPage": "Sayfa {{page}} / {{total}}",
+  "phoneVerification": {
+    "title": "Telefonunuzu doğrulayın",
+    "subtitle": "Doğrulama kodu almak için telefon numaranızı girin",
+    "phoneLabel": "Telefon numarası",
+    "phoneHint": "Ülke kodunu ekleyin (örn. +90)",
+    "sendCode": "Doğrulama kodu gönder",
+    "enterCode": "Doğrulama kodunu girin",
+    "codeLabel": "6 haneli kod",
+    "verify": "Doğrula",
+    "changeNumber": "Telefon numarasını değiştir",
+    "invalidPhone": "Lütfen geçerli bir telefon numarası girin",
+    "invalidCode": "Lütfen 6 haneli kodu girin",
+    "otpSent": "Doğrulama kodu gönderildi!",
+    "otpFailed": "Doğrulama kodu gönderilemedi",
+    "verified": "Telefon numarası doğrulandı!",
+    "verifyFailed": "Geçersiz doğrulama kodu"
+  },
+  "legal": {
+    "backToHome": "Ana sayfaya dön",
+    "loading": "Yükleniyor...",
+    "fetchFailed": "Belge yüklenemedi. Lütfen sayfayı yenileyin veya daha sonra tekrar deneyin.",
+    "versionLabel": "Versiyon",
+    "effectiveFrom": "Yürürlük"
+  }
 }

@@ -102,7 +102,9 @@
     "noProductsFound": "لم يتم العثور على نتائج بحث",
     "tryDifferentSearch": "جرب مصطلح بحث مختلف",
     "selectDifferentCategory": "اختر فئة مختلفة أو أضف منتجات جديدة",
-    "clearSearch": "مسح البحث"
+    "clearSearch": "مسح البحث",
+    "decrease": "إنقاص",
+    "increase": "زيادة"
   },
   "payment": {
     "title": "الدفع",
@@ -117,7 +119,12 @@
     "transactionIdPlaceholder": "أدخل رقم المعاملة",
     "confirmPayment": "تأكيد الدفع",
     "customerPhone": "هاتف العميل (اختياري)",
-    "customerPhonePlaceholder": "+966 55 123 4567"
+    "customerPhonePlaceholder": "+966 55 123 4567",
+    "amountTendered": "المبلغ المستلم",
+    "changeDue": "الباقي",
+    "exactAmount": "بالضبط",
+    "insufficientCash": "المبلغ غير كافٍ",
+    "receiptPrintFailed": "تعذّرت طباعة الإيصال — تم تسجيل الدفعة."
   },
   "notifications": {
     "pending": "قيد الانتظار",
@@ -332,5 +339,19 @@
   },
   "campaign": "عرض",
   "startingFrom": "من",
-  "required": "مطلوب"
+  "required": "مطلوب",
+  "add": "إضافة",
+  "addDetails": "إضافة تفاصيل",
+  "updateOrderBeforePayment": "حدّث الطلب قبل استلام الدفعة",
+  "orderPaymentFailed": "فشل الدفع",
+  "reprint": {
+    "label": "إعادة طباعة الإيصال",
+    "printing": "جارٍ الطباعة...",
+    "success": "تم إرسال الإيصال إلى الطابعة",
+    "failed": "فشلت إعادة الطباعة — تحقّق من اتصال الطابعة",
+    "desktopOnly": "إعادة الطباعة متاحة فقط في تطبيق نقاط البيع لسطح المكتب",
+    "noPrinter": "لم يتم تعيين طابعة إيصالات افتراضية",
+    "noSnapshot": "لا توجد نسخة إيصال محفوظة لهذه الدفعة",
+    "notReprintable": "لا يمكن إعادة طباعة المدفوعات المستردّة أو الفاشلة"
+  }
 }

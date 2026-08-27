@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { getApiErrorMessage } from '../../lib/api-error';
 import i18n from '../../i18n/config';
+import { formatCurrency } from '../../lib/utils';
 
 export interface HardwareProduct {
   id: string;
@@ -56,8 +57,8 @@ export type SaleMode = NonNullable<HardwareProduct['saleMode']>;
  * how the same SKU's price renders. currency is non-optional in the product
  * contract, so no 'TRY' fallback is needed.
  */
-export function formatMoney(cents: number, currency: string, opts?: Intl.NumberFormatOptions): string {
-  return (cents / 100).toLocaleString('tr-TR', { style: 'currency', currency, ...opts });
+export function formatMoney(cents: number, currency: string): string {
+  return formatCurrency(cents / 100, currency);
 }
 
 /**

@@ -180,7 +180,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   setArOpen(true);
                 }}
                 className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm"
-                aria-label={t("ar.view", "3D / AR") as string}
+                aria-label={t("qrMenu.arView", "3D / AR") as string}
               >
                 <Box className="h-3.5 w-3.5" />
                 3D
@@ -364,7 +364,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <button
               type="button"
               onClick={() => setArOpen(false)}
-              aria-label={t("common.close", "Kapat") as string}
+              aria-label={t("qrMenu.close", "Kapat") as string}
             >
               <X className="h-6 w-6" />
             </button>

@@ -159,7 +159,10 @@
     "filterByDate": "Filter by date range",
     "excellent": "Excellent",
     "good": "Good",
-    "needsImprovement": "Needs Improvement"
+    "needsImprovement": "Needs Improvement",
+    "avgScore": "Avg. score",
+    "ratedStaff": "Rated staff",
+    "viewDetail": "View detail"
   },
   "common": {
     "save": "Save",

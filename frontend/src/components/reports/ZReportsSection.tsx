@@ -161,7 +161,7 @@ const ZReportsSection = () => {
               variant="outline"
               onClick={() => setDateFilter({ startDate: '', endDate: '' })}
             >
-              {t('common:clear', 'Clear')}
+              {t('common:buttons.clear', 'Clear')}
             </Button>
           </div>
         </CardContent>
@@ -195,7 +195,7 @@ const ZReportsSection = () => {
                       {t('zReports.status', 'Status')}
                     </th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                      {t('common:actions', 'Actions')}
+                      {t('common:admin.actions', 'Actions')}
                     </th>
                   </tr>
                 </thead>
@@ -289,7 +289,7 @@ const ZReportsSection = () => {
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                   >
-                    {t('common:previous', 'Previous')}
+                    {t('common:buttons.previous', 'Previous')}
                   </Button>
                   <Button
                     size="sm"
@@ -297,7 +297,7 @@ const ZReportsSection = () => {
                     onClick={() => setPage((p) => Math.min(reportsData.meta.totalPages, p + 1))}
                     disabled={page === reportsData.meta.totalPages}
                   >
-                    {t('common:next', 'Next')}
+                    {t('common:buttons.next', 'Next')}
                   </Button>
                 </div>
               </div>

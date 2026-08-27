@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useGetHardwareOrder, type ShippingAddress } from './storeApi';
 import { formatAddress } from './formatAddress';
 import PartnerBadge from '../print3d/PartnerBadge';
+import { formatCurrency } from '../../lib/utils';
 
 /**
  * v2.8.84 — single hardware order view.
@@ -39,7 +40,7 @@ export default function HardwareOrderDetailPage() {
   }
 
   const fmt = (cents: number) =>
-    (cents / 100).toLocaleString('tr-TR', { style: 'currency', currency: order.currency });
+    formatCurrency(cents / 100, order.currency);
   const date = new Date(order.createdAt).toLocaleString('tr-TR');
 
   return (

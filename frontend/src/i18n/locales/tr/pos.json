@@ -101,7 +101,9 @@
     "noProductsFound": "Arama sonucu bulunamadı",
     "tryDifferentSearch": "Farklı bir arama terimi deneyin",
     "selectDifferentCategory": "Farklı bir kategori seçin veya yeni ürün ekleyin",
-    "clearSearch": "Aramayı Temizle"
+    "clearSearch": "Aramayı Temizle",
+    "decrease": "Azalt",
+    "increase": "Artır"
   },
   "payment": {
     "title": "Ödeme",
@@ -116,7 +118,12 @@
     "transactionIdPlaceholder": "İşlem numarası girin",
     "confirmPayment": "Ödemeyi Onayla",
     "customerPhone": "Müşteri Telefonu (İsteğe Bağlı)",
-    "customerPhonePlaceholder": "+90 555 123 4567"
+    "customerPhonePlaceholder": "+90 555 123 4567",
+    "amountTendered": "Alınan Tutar",
+    "changeDue": "Para üstü",
+    "exactAmount": "Tam",
+    "insufficientCash": "Tutar yetersiz",
+    "receiptPrintFailed": "Fiş yazdırılamadı — ödeme kaydedildi."
   },
   "checkout": "Ödeme",
   "notifications": {
@@ -332,5 +339,19 @@
   },
   "campaign": "Kampanya",
   "startingFrom": "başlangıç",
-  "required": "Zorunlu"
+  "required": "Zorunlu",
+  "add": "Ekle",
+  "addDetails": "Detay ekle",
+  "updateOrderBeforePayment": "Önce siparişi güncelleyin",
+  "orderPaymentFailed": "Ödeme başarısız",
+  "reprint": {
+    "label": "Fişi yeniden yazdır",
+    "printing": "Yazdırılıyor...",
+    "success": "Fiş yazıcıya gönderildi",
+    "failed": "Yeniden yazdırma başarısız — yazıcı bağlantısını kontrol edin",
+    "desktopOnly": "Yeniden yazdırma yalnızca masaüstü POS uygulamasında kullanılabilir",
+    "noPrinter": "Varsayılan fiş yazıcısı tanımlı değil",
+    "noSnapshot": "Bu ödeme için kayıtlı fiş görüntüsü yok",
+    "notReprintable": "İade edilen / başarısız ödemeler yeniden yazdırılamaz"
+  }
 }

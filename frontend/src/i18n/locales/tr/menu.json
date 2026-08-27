@@ -172,7 +172,30 @@
     "noPhoto": "Fotoğraf yok",
     "closed": "kapalı",
     "importFromSource": "Kaynak ver (link / PDF / Excel)",
-    "bulkAddManual": "Manuel toplu ekle"
+    "bulkAddManual": "Manuel toplu ekle",
+    "aiStudio": "AI Stüdyo",
+    "aiStudioHint": "Fotoğraf, içindekiler videosu ve 3D/AR modelini otomatik üretin — kaydetmeniz gerekmez.",
+    "assetPhoto": "Foto",
+    "asset3d": "3D",
+    "assetVideo": "Video",
+    "basicInfo": "Temel bilgiler",
+    "customerContent": "Müşteriye görünen içerik",
+    "editorNeedsBasics": "Önce ürün adı, fiyat ve kategori girin.",
+    "ingredientsPlaceholder": "Örn: Dana kıyma, soğan, domates, biber, baharatlar",
+    "itemSaved": "Ürün kaydedildi",
+    "operations": "Operasyon / POS",
+    "bulk": {
+      "subtitle": "Birden çok ürünü tek seferde ekleyin. Her satır için ad, fiyat ve kategori girin.",
+      "addRow": "Satır ekle",
+      "submit": "Tümünü ekle",
+      "needRows": "En az bir ürün için ad, fiyat ve kategori girin.",
+      "incompleteRows": "Bazı satırlarda ad, fiyat veya kategori eksik. Tamamlayın veya silin.",
+      "noValidCategory": "Seçili kategoriler artık geçerli değil — sayfayı yenileyin.",
+      "done": "{{ok}} ürün eklendi.",
+      "partial": "{{ok}} ürün eklendi, {{fail}} başarısız.",
+      "noneCreated": "Hiç ürün eklenemedi.",
+      "failedTitle": "Eklenemeyen ürünler"
+    }
   },
   "media": {
     "title": "Yapay zeka stüdyo",
@@ -214,7 +237,16 @@
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "AI 3D model kontörünüz kalmadı. Mağaza'dan 10 modellik kontör paketi alabilirsiniz (790 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir."
+    "quotaExhausted": "AI 3D model kontörünüz kalmadı. Mağaza'dan 10 modellik kontör paketi alabilirsiniz (790 ₺, tek seferlik, KDV dahil) — kontörlerin süresi yoktur, tükenene kadar geçerlidir.",
+    "chip": "3D / AR",
+    "title": "3D / AR modeli",
+    "subtitle": "Tabak fotoğrafından 3D model oluştur — müşteriler QR menüde masalarında AR ile görebilir.",
+    "ready": "3D model hazır — QR menüde AR aktif",
+    "regenerate": "Yeniden oluştur",
+    "pending": "3D model oluşturuluyor… (birkaç dakika sürebilir)",
+    "failed": "Son deneme başarısız oldu",
+    "generate": "3D model oluştur",
+    "needsImage": "Önce bir tabak fotoğrafı ekleyin."
   },
   "import": {
     "invalidRows": "{{n}} satır eksik veya hatalı (boş ad ya da negatif fiyat) — düzeltin veya silin",
@@ -257,5 +289,14 @@
     "reading": "Okunuyor…",
     "summary": "{{p}} ürün · {{u}} güncellendi · {{cc}} yeni + {{cm}} mevcut kategori",
     "fileTooLarge": "Dosya çok büyük — en fazla {{mb}} MB olmalı."
+  },
+  "ai": {
+    "lockedTitle": "Yapay zeka araçları",
+    "lockedNew": "Ürünü kaydedince otomatik fotoğraf, içindekiler videosu ve 3D/AR modeli burada açılır."
+  },
+  "ar": {
+    "loadFailed": "3D görüntüleyici yüklenemedi.",
+    "loading": "3D yükleniyor…",
+    "viewOnTable": "📱 Masanda AR ile gör"
   }
 }

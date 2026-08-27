@@ -172,7 +172,30 @@
     "noPhoto": "No photo",
     "closed": "off",
     "importFromSource": "Give a source (link / PDF / Excel)",
-    "bulkAddManual": "Manual bulk add"
+    "bulkAddManual": "Manual bulk add",
+    "aiStudio": "AI Studio",
+    "aiStudioHint": "Generate the photo, the ingredients video and the 3D/AR model automatically — no need to save first.",
+    "assetPhoto": "Photo",
+    "asset3d": "3D",
+    "assetVideo": "Video",
+    "basicInfo": "Basic information",
+    "customerContent": "Customer-facing content",
+    "editorNeedsBasics": "Enter the product name, price and category first.",
+    "ingredientsPlaceholder": "e.g. Ground beef, onion, tomato, pepper, spices",
+    "itemSaved": "Product saved",
+    "operations": "Operations / POS",
+    "bulk": {
+      "subtitle": "Add several products at once. Enter a name, price and category on every row.",
+      "addRow": "Add row",
+      "submit": "Add all",
+      "needRows": "Enter a name, price and category for at least one product.",
+      "incompleteRows": "Some rows are missing a name, price or category. Complete them or delete them.",
+      "noValidCategory": "The selected categories are no longer valid — refresh the page.",
+      "done": "{{ok}} product(s) added.",
+      "partial": "{{ok}} product(s) added, {{fail}} failed.",
+      "noneCreated": "No products could be added.",
+      "failedTitle": "Products that could not be added"
+    }
   },
   "media": {
     "title": "AI Studio",
@@ -214,7 +237,16 @@
   },
   "threeD": {
     "quotaLabel": "3D",
-    "quotaExhausted": "You are out of AI 3D-model credits. Buy a 10-model credit pack in the Store (790 TRY, one-time, VAT included) — credits never expire and stay valid until consumed."
+    "quotaExhausted": "You are out of AI 3D-model credits. Buy a 10-model credit pack in the Store (790 TRY, one-time, VAT included) — credits never expire and stay valid until consumed.",
+    "chip": "3D / AR",
+    "title": "3D / AR model",
+    "subtitle": "Build a 3D model from the dish photo — guests can view it in AR at their table from the QR menu.",
+    "ready": "3D model ready — AR is live on the QR menu",
+    "regenerate": "Regenerate",
+    "pending": "Building the 3D model… (this can take a few minutes)",
+    "failed": "The last attempt failed",
+    "generate": "Generate 3D model",
+    "needsImage": "Add a dish photo first."
   },
   "import": {
     "invalidRows": "{{n}} rows are incomplete or invalid (empty name or negative price) — fix or remove them",
@@ -257,5 +289,14 @@
     "reading": "Reading…",
     "summary": "{{p}} products · {{u}} updated · {{cc}} new + {{cm}} existing categories",
     "fileTooLarge": "File is too large — must be at most {{mb}} MB."
+  },
+  "ai": {
+    "lockedTitle": "AI tools",
+    "lockedNew": "Save the product and the automatic photo, ingredients video and 3D/AR model unlock here."
+  },
+  "ar": {
+    "loadFailed": "The 3D viewer could not be loaded.",
+    "loading": "Loading 3D…",
+    "viewOnTable": "📱 View it in AR on your table"
   }
 }

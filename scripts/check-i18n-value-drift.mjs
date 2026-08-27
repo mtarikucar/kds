@@ -96,6 +96,7 @@ const ALLOW = new Set(
     "WhatsApp Business",
     "Aa Bb Cc",
     "John Doe",
+    "3D / AR",
   ].map((s) => s.toLowerCase()),
 );
 

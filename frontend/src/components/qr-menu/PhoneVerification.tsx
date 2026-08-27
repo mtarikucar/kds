@@ -47,12 +47,7 @@ const PhoneVerification = ({
 
       setVerificationId(response.data.verificationId);
       setStep('code');
-      toast.success(
-        t(
-          'phoneVerification.otpSent',
-          'Verification code sent! (Check console in development)'
-        )
-      );
+      toast.success(t('phoneVerification.otpSent', 'Verification code sent!'));
     } catch (error: any) {
       console.error('Failed to send OTP:', error);
       toast.error(

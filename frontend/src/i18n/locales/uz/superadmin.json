@@ -24,7 +24,8 @@
     "legal": "Huquqiy hujjatlar",
     "print3d": "3D ishlab chiqarish",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "openMenu": "Menyuni ochish"
   },
   "login": {
     "welcomeBack": "Welcome back",
@@ -34,7 +35,8 @@
     "emailPlaceholder": "admin@example.com",
     "password": "Password",
     "signingIn": "Signing in...",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "sessionExpired": "Sessiya muddati tugadi. Iltimos, qaytadan kiring."
   },
   "twoFactor": {
     "setupTitle": "Setup 2FA",

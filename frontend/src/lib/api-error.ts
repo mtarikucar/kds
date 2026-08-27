@@ -37,6 +37,17 @@ export interface ApiErrorBody {
   message?: string | string[];
   errorCode?: string;
   error?: string;
+  /**
+   * The allowlisted remediation payload the backend filter carries through
+   * (ACTIONABLE_KEYS in http-exception.filter.ts). Only the members this
+   * module renders are typed; the rest stay unknown so a reader is not misled
+   * into thinking this is the whole contract.
+   */
+  actionable?: {
+    /** QR geofence refusal — metres, already rounded by the backend. */
+    geofence?: { distanceMeters?: number; radiusMeters?: number };
+    [key: string]: unknown;
+  };
 }
 
 export type ApiError = AxiosError<ApiErrorBody>;
@@ -93,6 +104,26 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
     // "apiCodes.SOME_CODE" into the toast. exists() only passes for codes we
     // actually translated.
     const key = `errors:apiCodes.${code}`;
+    // Some refusals carry numbers the sentence has to quote. The geofence one
+    // is the live case: "you are too far away" with no distance is advice a
+    // guest cannot act on — 40m past the radius means walk to the door, 40km
+    // means they scanned a photo of someone else's QR code. The backend's own
+    // Turkish prose spelled both out, so localizing the refusal must not be
+    // what loses them; it ships them as `actionable.geofence` instead.
+    //
+    // A SEPARATE key rather than placeholders on the base one: an older
+    // backend, or any deployment that stops sending the payload, must still
+    // get a clean sentence instead of a literal "{{distance}}".
+    const geofence = api?.response?.data?.actionable?.geofence;
+    if (typeof geofence?.distanceMeters === 'number') {
+      const withDistance = `${key}_withDistance`;
+      if (i18n.exists(withDistance)) {
+        return i18n.t(withDistance, {
+          distance: geofence.distanceMeters,
+          radius: geofence.radiusMeters,
+        });
+      }
+    }
     if (i18n.exists(key)) return i18n.t(key);
   }
   // The backend's raw `message` is only written FOR A USER on the 4xx

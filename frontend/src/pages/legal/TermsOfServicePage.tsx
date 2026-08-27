@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ChefHat } from 'lucide-react';
 
 const TermsOfServicePage: React.FC = () => {
-  const { t, i18n } = useTranslation('legal');
+  const { t, i18n } = useTranslation('common');
   const isEnglish = i18n.language === 'en';
 
   return (
@@ -14,7 +14,7 @@ const TermsOfServicePage: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-primary-600 hover:text-primary-700">
             <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">{t('backToHome', 'Back to Home')}</span>
+            <span className="font-medium">{t('legal.backToHome', 'Back to Home')}</span>
           </Link>
           <div className="flex items-center gap-2">
             <ChefHat className="w-6 h-6 text-primary-600" />

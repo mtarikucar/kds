@@ -770,5 +770,9 @@
       "stir": "STIR (Özbekistan Vergi No)",
       "pinfl": "PINFL (Özbekistan Kimlik No)"
     }
+  },
+  "customerSelfPay": {
+    "title": "Müşteri Self-Pay (PayTR)",
+    "description": "QR menüden müşterilerin kendi telefonlarından PayTR ile ödeme yapmasına izin ver. Yalnızca Türkiye bölgesindeki tenantlar için ve PayTR hesabı gerektirir."
   }
 }

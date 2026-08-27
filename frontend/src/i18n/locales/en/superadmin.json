@@ -24,7 +24,8 @@
     "legal": "Legal Documents",
     "print3d": "3D Production",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "openMenu": "Open menu"
   },
   "login": {
     "welcomeBack": "Welcome back",
@@ -34,7 +35,8 @@
     "emailPlaceholder": "admin@example.com",
     "password": "Password",
     "signingIn": "Signing in...",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "sessionExpired": "Your session has expired. Please sign in again."
   },
   "twoFactor": {
     "setupTitle": "Setup 2FA",

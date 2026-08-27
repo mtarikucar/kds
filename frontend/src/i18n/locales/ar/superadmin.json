@@ -24,7 +24,8 @@
     "legal": "المستندات القانونية",
     "print3d": "إنتاج ثلاثي الأبعاد",
     "settings": "Settings",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "openMenu": "فتح القائمة"
   },
   "login": {
     "welcomeBack": "Welcome back",
@@ -34,7 +35,8 @@
     "emailPlaceholder": "admin@example.com",
     "password": "Password",
     "signingIn": "Signing in...",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "sessionExpired": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى."
   },
   "twoFactor": {
     "setupTitle": "Setup 2FA",

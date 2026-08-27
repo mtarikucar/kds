@@ -73,7 +73,11 @@
     "backToMenu": "Menyuga qaytish",
     "delete": "O'chirish",
     "language": "Til",
-    "copyFailed": "Nusxalab bo'lmadi"
+    "copyFailed": "Nusxalab bo'lmadi",
+    "loading": "Yuklanmoqda...",
+    "sending": "Yuborilmoqda...",
+    "verifying": "Tekshirilmoqda...",
+    "backHome": "Bosh sahifaga"
   },
   "navigation": {
     "dashboard": "Boshqaruv paneli",
@@ -908,7 +912,10 @@
     "noTablesDescription": "Restoran o'rindiqlarini boshqarishni boshlash uchun birinchi stolingizni qo'shing",
     "addFirstTable": "Birinchi stolni qo'shish",
     "gridView": "Katakli ko'rinish",
-    "floorPlan": "Zal rejasi"
+    "floorPlan": "Zal rejasi",
+    "reactivateUser": "Foydalanuvchini qayta faollashtirish",
+    "userReactivated": "Foydalanuvchi qayta faollashtirildi",
+    "userReactivateFailed": "Foydalanuvchini qayta faollashtirib bo'lmadi"
   },
   "qrDesigner": {
     "quickColorThemes": "Tez rang temalari",
@@ -1013,7 +1020,13 @@
       "tiramisuDesc": "Klassik italyan qahva ta'mli desert",
       "lavaCakeName": "Shokolad lava torti",
       "lavaCakeDesc": "Eritilgan markazli iliq shokolad tort"
-    }
+    },
+    "invalidFileType": "Iltimos, rasm faylini yuklang.",
+    "logoTooLarge": "Logo fayli juda katta. Eng ko'pi 5 MB.",
+    "logoUploaded": "Logo muvaffaqiyatli yuklandi",
+    "logoUploadFailed": "Logoni yuklab bo'lmadi",
+    "maxFileSize": "Maks. fayl hajmi: 5 MB",
+    "uploadingLogo": "Yuklanmoqda..."
   },
   "pricing": {
     "title": "Narxlar",
@@ -1226,7 +1239,9 @@
     "noProducts": "Mahsulot topilmadi",
     "noProductsDescription": "Qidiruvni o'zgartiring yoki barcha turkumlarni ko'rib chiqing",
     "clearFilters": "Filtrlarni tozalash",
-    "notesPlaceholder": "Masalan: piyozsiz, ko'proq sous..."
+    "notesPlaceholder": "Masalan: piyozsiz, ko'proq sous...",
+    "arView": "3D / AR'da ko'rish",
+    "ingredients": "Tarkibi"
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",
@@ -1342,7 +1357,9 @@
         "settlement_error": "To'lov qabul qilindi, ammo yozib olinmadi. Ofitsiantga xabar bering — restoran qo'lda solishtiradi.",
         "paytr_reported_failure": "Bank to'lovni rad etdi. Boshqa karta bilan urinib ko'ring."
       }
-    }
+    },
+    "total": "Jami",
+    "paid": "To'langan"
   },
   "orderStatus": {
     "pendingApproval": "Tasdiqlash kutilmoqda",
@@ -1417,5 +1434,32 @@
       "printFailed": "Oshxona chekini chop etib bo‘lmadi — buyurtmadan qayta chop eting."
     }
   },
-  "cancel": "Bekor qilish"
+  "cancel": "Bekor qilish",
+  "from": "Dan",
+  "to": "Gacha",
+  "showingPage": "{{total}} sahifadan {{page}}-si",
+  "phoneVerification": {
+    "title": "Telefoningizni tasdiqlang",
+    "subtitle": "Tasdiqlash kodini olish uchun telefon raqamingizni kiriting",
+    "phoneLabel": "Telefon raqami",
+    "phoneHint": "Mamlakat kodini kiriting (masalan, +90)",
+    "sendCode": "Tasdiqlash kodini yuborish",
+    "enterCode": "Tasdiqlash kodini kiriting",
+    "codeLabel": "6 xonali kod",
+    "verify": "Tasdiqlash",
+    "changeNumber": "Telefon raqamini o'zgartirish",
+    "invalidPhone": "Iltimos, to'g'ri telefon raqamini kiriting",
+    "invalidCode": "Iltimos, 6 xonali kodni kiriting",
+    "otpSent": "Tasdiqlash kodi yuborildi!",
+    "otpFailed": "Tasdiqlash kodini yuborib bo'lmadi",
+    "verified": "Telefon raqami tasdiqlandi!",
+    "verifyFailed": "Tasdiqlash kodi noto'g'ri"
+  },
+  "legal": {
+    "backToHome": "Bosh sahifaga qaytish",
+    "loading": "Yuklanmoqda...",
+    "fetchFailed": "Hujjat yuklanmadi. Sahifani yangilang yoki keyinroq urinib ko'ring.",
+    "versionLabel": "Versiya",
+    "effectiveFrom": "Kuchga kirish sanasi"
+  }
 }

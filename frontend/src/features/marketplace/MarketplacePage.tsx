@@ -25,6 +25,7 @@ import Card from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import CheckoutConsent, { useConsentComplete } from '../legal/CheckoutConsent';
+import { formatCurrency } from '../../lib/utils';
 
 const KIND_CODES = [undefined, 'software', 'integration', 'capacity', 'support'] as const;
 
@@ -130,10 +131,7 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
     // hidden/disabled button and prevents a double-charge in that window.
     if (addon?.includedInPlan || ownedCodes.has(code)) return;
     const price = addon
-      ? (addon.priceCents / 100).toLocaleString('tr-TR', {
-          style: 'currency',
-          currency: addon.currency || 'TRY',
-        })
+      ? formatCurrency(addon.priceCents / 100, addon.currency || 'TRY')
       : '';
     // Annual products are quoted per licensing year; `oneTime` rows (credit
     // packs, on-site setup) are a flat charge and carry no period suffix.
@@ -300,10 +298,7 @@ export default function MarketplacePage({ embedded = false }: { embedded?: boole
 
                 <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
                   <span className="text-lg font-semibold text-slate-900">
-                    {(a.priceCents / 100).toLocaleString('tr-TR', {
-                      style: 'currency',
-                      currency: a.currency,
-                    })}
+                    {formatCurrency(a.priceCents / 100, a.currency)}
                     {a.billing === 'annual' && (
                       <span className="text-xs font-normal text-slate-500">
                         {t('hummytummy.marketplace.perYear', { defaultValue: '/yıl' })}

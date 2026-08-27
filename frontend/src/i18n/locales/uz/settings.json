@@ -770,5 +770,9 @@
       "stir": "STIR (soliq raqami)",
       "pinfl": "PINFL (shaxsiy ID raqami)"
     }
+  },
+  "customerSelfPay": {
+    "title": "Mijozning o'zi to'lashi (PayTR)",
+    "description": "Mehmonlar QR menyudan o'z telefoni orqali PayTR bilan to'lay olsin. Faqat Turkiya hududidagi ijarachilar uchun; PayTR hisobi talab qilinadi."
   }
 }
