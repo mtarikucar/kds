@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
@@ -43,6 +43,10 @@ interface CartContentProps {
   specialNotes: string;
   onSpecialNotesChange: (notes: string) => void;
 }
+
+// A visible gap between the last cart row and the summary panel, matching the
+// scrolling column's own py-6 rhythm.
+const SUMMARY_GAP_PX = 24;
 
 // Animated number component
 const AnimatedNumber: React.FC<{ value: number; currency: string; className?: string; style?: React.CSSProperties }> = ({
@@ -91,7 +95,11 @@ const CartContent: React.FC<CartContentProps> = ({
   const isRTL = useIsRTL();
   const { items, updateItemQuantity, removeItem, reorderItems, getSubtotal, getTotal, sessionId } = useCartStore();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  // Read the width on the FIRST render, not in an effect after it: starting at
+  // `false` painted the desktop row on a phone and swapped it a frame later.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768,
+  );
 
   // Check if on mobile
   useEffect(() => {
@@ -102,6 +110,30 @@ const CartContent: React.FC<CartContentProps> = ({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Below md the summary panel is `fixed`, so it is out of flow and the
+  // scrolling column has to reserve its height by hand. That reservation used
+  // to be a hardcoded 13rem — a snapshot of one panel, in one locale, on one
+  // device. The panel is taller whenever the Place Order label wraps, the
+  // approval note shows, or the device has a safe-area inset, and the guess
+  // did not follow it. Measure the panel instead and reserve what it takes.
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const [summaryHeight, setSummaryHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const panel = summaryRef.current;
+    if (!panel) return;
+    // offsetHeight, not getBoundingClientRect: the panel slides in under a
+    // transform and we want its laid-out height, not the animated one.
+    const measure = () => setSummaryHeight(panel.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(panel);
+    return () => observer.disconnect();
+    // items.length re-runs it when the panel first mounts (the empty cart
+    // returns early and never renders one).
+  }, [isMobile, items.length]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -161,7 +193,14 @@ const CartContent: React.FC<CartContentProps> = ({
   }
 
   return (
-    <div className="px-4 sm:px-6 py-6 pb-[calc(13rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+    <div
+      className="px-4 sm:px-6 py-6"
+      // Only while the panel is out of flow. At md it is `relative` and takes
+      // its own space, so py-6 is already the right bottom padding. The safe
+      // area is NOT added here: the panel's inner padding carries it, so the
+      // measured height already includes it.
+      style={isMobile ? { paddingBottom: `${summaryHeight + SUMMARY_GAP_PX}px` } : undefined}
+    >
       <div className="max-w-lg mx-auto">
         {/* Back to Menu Button */}
         <motion.button
@@ -286,6 +325,7 @@ const CartContent: React.FC<CartContentProps> = ({
 
       {/* Sticky Order Summary */}
       <motion.div
+        ref={summaryRef}
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
