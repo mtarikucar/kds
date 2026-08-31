@@ -12,7 +12,7 @@
  * No hard-coded production host: a staging or preview build with nothing set
  * would otherwise silently read production data. In dev, localhost.
  */
-const API_BASES: string[] = [
+export const API_BASES: string[] = [
   process.env.INTERNAL_API_URL,
   process.env.NEXT_PUBLIC_API_URL,
   process.env.API_URL,
@@ -29,7 +29,7 @@ const API_BASES: string[] = [
  * and the pricing section fell back to hardcoded tier prices. The page looked
  * right while showing numbers no API had confirmed in months.
  */
-function apiUrl(base: string, path: string): string {
+export function apiUrl(base: string, path: string): string {
   const root = base.replace(/\/+$/, '');
   return `${root}${root.endsWith('/api') ? '' : '/api'}${path}`;
 }

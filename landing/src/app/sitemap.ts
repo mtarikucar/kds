@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { locales, defaultLocale } from '@/i18n/config';
+import { API_BASES, apiUrl } from '@/lib/api';
 import { MODULES, SECTORS } from '@/content/catalog';
 import { MODULE_CONTENT } from '@/content/modules';
 import { SECTOR_CONTENT } from '@/content/sectors';
@@ -10,17 +11,35 @@ import { SECTOR_CONTENT } from '@/content/sectors';
 // freshly-published SKU appears in search-engine crawls within
 // minutes rather than only after the next full deploy.
 async function fetchStoreSkus(): Promise<string[]> {
+  // Walk the same base list the rest of the app uses, INTERNAL_API_URL first.
+  //
+  // This function used to reach for NEXT_PUBLIC_API_URL on its own — the public
+  // host — which from inside the container means leaving the box, crossing
+  // Cloudflare and hairpinning back. lib/api.ts documents that path as one that
+  // "can quietly fail while the very same URL works from a browser", and it
+  // did: on 2026-08-27 production's sitemap carried 139 URLs, and after the
+  // v3.16.1 deploy it carried 64 across three consecutive fetches, while
+  // /api/v1/catalog/products answered 200 publicly and /tr/store/HW-TAB-001
+  // rendered fine. 75 store URLs had silently dropped out, and the catch below
+  // is what made it silent.
+  //
+  // Sharing the list rather than restating it is the point: the divergence
+  // existed because there were two copies of "where is the API".
   try {
-    const base =
-      process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') ??
-      process.env.BACKEND_URL?.replace(/\/+$/, '') ??
-      '';
-    if (!base) return [];
-    const res = await fetch(`${base}/v1/catalog/products`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return [];
-    const products = (await res.json()) as Array<{ sku?: string }>;
+    let products: Array<{ sku?: string }> | null = null;
+    for (const base of API_BASES) {
+      try {
+        const res = await fetch(apiUrl(base, '/v1/catalog/products'), {
+          next: { revalidate: 300 },
+        });
+        if (!res.ok) continue;
+        products = (await res.json()) as Array<{ sku?: string }>;
+        break;
+      } catch {
+        // Try the next base — an unreachable one is not a reason to give up.
+      }
+    }
+    if (!products) return [];
     return products
       .map((p) => p.sku)
       .filter((s): s is string => typeof s === 'string' && s.length > 0);
