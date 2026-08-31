@@ -98,3 +98,24 @@ frontend/.env.local
 # Generated at build time by scripts/gen-sitemap-routes.mjs (help/ and developer/)
 help/sitemap-routes.generated.json
 developer/sitemap-routes.generated.json
+
+# Playwright MCP session artifacts.
+#
+# The browser tool writes a page snapshot per navigation here. 397 of the 429
+# untracked entries in this repo are these files, which buries anything real in
+# `git status` and has already made two sessions warn each other not to run
+# `git add -A` — the kind of footgun that eventually commits something nobody
+# meant to. Two of them were in fact committed by accident in #341 and are
+# untracked in the same change (left on disk, not deleted).
+.playwright-mcp/
+
+# One-off verification screenshots at the repo root.
+#
+# Sessions drop these while checking a change in a browser; none has ever been
+# meant to ship. Real image assets live under */public/ or */assets/ and are
+# unaffected — the leading slash confines this to the top level. Nothing here is
+# deleted, only hidden from `git status` so `git add -A` cannot sweep it in.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
