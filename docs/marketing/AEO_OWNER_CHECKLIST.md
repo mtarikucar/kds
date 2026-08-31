@@ -78,6 +78,17 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
       başka kurallar da olabilir) körlemesine çalıştırmak canlıda çalışan
       kuralları düşürebilir. Doğru sıra:
 
+          # 0. ÖNCE DOSYA ADINI DOĞRULA — apply.sh'ı körlemesine çalıştırma.
+          #    30 Ağustos'taki ilk `nginx Edge Drift` koşusu beş vhost için de
+          #    şunu raporladı: "nginx -T never read a file named
+          #    'help.hummytummy.com.conf'". Yani canlı edge bu adları hiç
+          #    yüklemiyor. apply.sh /etc/nginx/sites-available/<ad>.conf yazıp
+          #    sites-enabled'a bağladığı için, o hâliyle çalıştırmak aynı host'a
+          #    İKİNCİ bir server bloğu ekler; nginx ilk eşleşeni kullanır ve
+          #    düzeltme sessizce etkisiz kalır. Aşağıdaki komut, nginx'in
+          #    gerçekten okuduğu dosyaları listeler:
+          ssh root@38.242.233.166 'nginx -T' | grep '^# configuration file'
+
           # 1. canlı hâli al ve repodakiyle karşılaştır
           ssh root@38.242.233.166 'nginx -T' > /tmp/live-nginx.txt
           # Tam yolu eşleştirin: ".*hummytummy.com.conf" gibi gevşek bir kalıp
@@ -88,10 +99,11 @@ canlıda çalışıyor; aşağıdaki ikisi ayrı.
           #    repoda olmayan diğer kuralları taşı, robots kuralını çıkar
           # 3. ancak ondan sonra uygula (yedekler, nginx -t koşar,
           #    test geçmezse geri alır)
-          sudo ops/nginx/apply.sh hummytummy.com.conf
+          #    (apex bu adımı 27 Ağustos'ta geçti: robots.txt orada artık 200
+          #     dönüyor ve dört sitemap'i duyuruyor. Kalan yalnız help.)
           sudo ops/nginx/apply.sh help.hummytummy.com.conf
           # 4. doğrula
-          curl -s -o /dev/null -w "%{http_code}\n" https://hummytummy.com/robots.txt
+          curl -s -o /dev/null -w "%{http_code}\n" https://help.hummytummy.com/robots.txt
 
       Repodaki iki vhost'a niyeti sabitleyen açık bir
       `location = /robots.txt { proxy_pass … }` kuralı eklendi; yukarıdaki
