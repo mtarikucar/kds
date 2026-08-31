@@ -58,7 +58,17 @@ Two positions taken deliberately:
 
 ## Verified starting state
 
-All of the following were confirmed live or in-source on 2026-08-25, not taken from a report.
+All of the following were confirmed live or in-source on 2026-08-25, not taken
+from a report.
+
+Several of the files cited below no longer exist: this change deleted them.
+`landing/src/data/stats.json`, `landing/src/data/features.ts` and
+`landing/scripts/fetch-stats.js` were removed in the truth-remediation commit,
+and `help/public/robots.txt` and `developer/public/robots.txt` in the
+discoverability one. Their contents are quoted inline here so the evidence
+survives without them, and `git show 4d077abd:<path>` still opens the originals.
+Saying so matters: a record that names evidence a reader cannot open reads as
+verifiable while being nothing of the kind.
 
 | # | Finding | Evidence |
 |---|---|---|
