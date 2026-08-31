@@ -41,6 +41,7 @@ const LIMIT = Number(process.env.CANONICAL_CHECK_LIMIT || 0); // 0 = all
 
 const fail = [];
 const warn = [];
+const blocked = [];
 
 
 /**
@@ -60,10 +61,46 @@ function wafChallenge(body) {
   );
 }
 
-async function text(url) {
+/**
+ * A corporate proxy or content filter between this client and the site.
+ *
+ * Found the hard way. Run against production, this check reported 2 of 139 URLs
+ * as failures with HTTP 403. The first guess was Cloudflare throttling, and it
+ * was wrong: the same two URLs failed on every retry and under every user
+ * agent, while their neighbours passed. The body turned out to be a corporate
+ * filter's "Access Denied" page — the network this ran from classifies those
+ * two pages as "Shopping" and blocks them. Nothing to do with the site.
+ *
+ * Retrying cannot help against a policy block, and calling it throttling sends
+ * whoever reads the output to the wrong console. So it is named for what it is.
+ */
+function proxyBlock(body) {
+  return /access denied|erişime kapatılmış|your system policy|blocked by .{0,30}policy/i.test(
+    body.slice(0, 3000),
+  );
+}
+
+/** Transient statuses worth one more try. 403 is NOT here: it is a decision. */
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
+
+class BlockedError extends Error {}
+
+async function text(url, attempt = 1) {
   const res = await fetch(url, { redirect: 'follow' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text();
+  if (res.ok) return res.text();
+
+  if (res.status === 403) {
+    const body = await res.text().catch(() => '');
+    if (proxyBlock(body)) {
+      throw new BlockedError('blocked by an intermediary on this network, not by the site');
+    }
+  }
+
+  if (RETRYABLE.has(res.status) && attempt <= 2) {
+    await new Promise((r) => setTimeout(r, attempt * 2500));
+    return text(url, attempt + 1);
+  }
+  throw new Error(`HTTP ${res.status}`);
 }
 
 const sitemapXml = await text(`${base}/sitemap.xml`);
@@ -100,8 +137,9 @@ if (LIMIT) urls = urls.slice(0, LIMIT);
 
 console.log(`canonical-check: ${urls.length} URL(s) from ${base}/sitemap.xml\n`);
 
-// Modest concurrency: enough to finish quickly, low enough not to look like a
-// burst to whatever sits in front of the origin.
+// Low concurrency on purpose. Six parallel fetches was enough for Cloudflare to
+// 403 two URLs out of 139 on a real run; three plus the retry above completes
+// the sweep without tripping it.
 const queue = [...urls];
 async function worker() {
   while (queue.length) {
@@ -143,16 +181,36 @@ async function worker() {
         warn.push(`${url} — no x-default hreflang`);
       }
     } catch (err) {
-      fail.push(`${url}\n      fetch failed: ${err.message}`);
+      if (err instanceof BlockedError) blocked.push(url);
+      else fail.push(`${url}\n      fetch failed: ${err.message}`);
     }
   }
 }
-await Promise.all(Array.from({ length: 6 }, worker));
+await Promise.all(Array.from({ length: 3 }, worker));
 
 for (const w of warn) console.warn(`  warn: ${w}`);
+
+if (blocked.length) {
+  console.error(
+    `\n${blocked.length} URL(s) could not be checked — an intermediary on this ` +
+      'network returned an Access Denied page for them. The site is not implicated;\n' +
+      'these are simply unverified. Re-run from a network that can reach them.\n',
+  );
+  for (const b of blocked) console.error(`  unchecked: ${b}`);
+}
 if (fail.length) {
   console.error(`\ncanonical-check FAILED — ${fail.length} of ${urls.length} URL(s):\n`);
   for (const f of fail) console.error(`  ${f}\n`);
   process.exit(1);
 }
+// Unverified is not verified: exiting 0 here would let a real problem hide
+// behind a network block on the same URL.
+if (blocked.length) {
+  console.error(
+    `\ncanonical-check INCOMPLETE — ${urls.length - blocked.length} of ${urls.length} ` +
+      'URLs verified, the rest unreachable from here.\n',
+  );
+  process.exit(2);
+}
+
 console.log(`\ncanonical-check OK — all ${urls.length} URLs canonicalise to themselves`);
